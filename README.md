@@ -12,4 +12,6 @@ There's a lot of good features, but I'm kinda tired and I'll write a lot more la
 
 You're going to need to need to use an SBARDEF compliant sourceport like the dev builds of [Helion](https://github.com/Helion-Engine/Helion) or [Woof](https://github.com/fabiangreffrath/woof).
 
-Build it in the same way you build a rust application, or I have a Windows precompiled release available.
+Build it in the same way you build a rust application in your environment of choice, or [I have a Windows precompiled release available](https://github.com/lizzieshinkicker/cacoco/releases).
+
+...Yeah, I'll write a better landing page soon, I promise! ^^;;
