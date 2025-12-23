@@ -64,6 +64,8 @@ impl Default for CacocoApp {
 
 impl CacocoApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        cc.egui_ctx.set_visuals(egui::Visuals::dark());
+
         let mut app = Self::default();
         app.load_system_assets(&cc.egui_ctx);
 
@@ -198,6 +200,8 @@ impl CacocoApp {
 
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_visuals(egui::Visuals::dark());
+
         if self.selection != self.last_selection {
             self.preview_state.strobe_timer = 0.5;
             self.last_selection = self.selection.clone();
