@@ -143,7 +143,7 @@ pub fn draw_menu_bar(
 
                         if draw_menu_card(
                             ui,
-                            "Empty Project",
+                            "Empty",
                             "Start from scratch.",
                         ) {
                             action = MenuAction::NewEmpty;

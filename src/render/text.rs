@@ -82,12 +82,12 @@ pub fn draw_text_line(
 
             let s_pos = ctx.to_screen(char_pos);
             let s_size = egui::vec2(
-                glyph.w * ctx.proj.final_scale_x,
+                glyph.tex_w * ctx.proj.final_scale_x,
                 glyph.h * ctx.proj.final_scale_y,
             );
             ctx.painter.image(tex.id(), egui::Rect::from_min_size(s_pos, s_size), uv, tint);
         }
-        cur_x += glyph.w;
+        cur_x += glyph.advance;
     }
 }
 
@@ -121,7 +121,8 @@ fn layout_text_line<'a>(
         if c == ' ' {
             glyphs.push(Glyph {
                 texture: None,
-                w: 4.0,
+                tex_w: 0.0,
+                advance: 4.0,
                 h: 0.0,
                 y_offset: 0.0,
             });
@@ -132,9 +133,16 @@ fn layout_text_line<'a>(
         let name = ctx.assets.resolve_patch_name(&stem, c, is_num);
         if let Some(tex) = ctx.assets.textures.get(&name) {
             let sz = tex.size_vec2();
-            
-            // Hardcode vertical offsets specifically for the IWAD HUD font characters.
+
             let mut y_offset = 0.0;
+            let mut advance = sz.x;
+
+            // Hardcode spacing offset for STT from the IWAD.
+            if stem_upper == "STT" && c == '1' {
+                advance += 2.0;
+            }
+
+            // Hardcode vertical offsets specifically for the IWAD HUD font characters.
             if stem_upper == "STCFN" {
                 match c {
                     '.' | ','  => y_offset = 4.0,
@@ -145,17 +153,19 @@ fn layout_text_line<'a>(
 
             glyphs.push(Glyph {
                 texture: Some(tex),
-                w: sz.x,
+                tex_w: sz.x,
+                advance,
                 h: sz.y,
                 y_offset,
             });
 
-            total_w += sz.x;
+            total_w += advance;
             if (sz.y + y_offset) > max_h { max_h = sz.y + y_offset; }
         } else {
             glyphs.push(Glyph {
                 texture: None,
-                w: DEFAULT_GLYPH_W,
+                tex_w: 0.0,
+                advance: DEFAULT_GLYPH_W,
                 h: 0.0,
                 y_offset: 0.0,
             });
@@ -172,7 +182,8 @@ fn layout_text_line<'a>(
 
 struct Glyph<'a> {
     texture: Option<&'a egui::TextureHandle>,
-    w: f32,
+    tex_w: f32,
+    advance: f32,
     h: f32,
     y_offset: f32,
 }

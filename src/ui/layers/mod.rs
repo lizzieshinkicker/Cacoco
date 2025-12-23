@@ -1,4 +1,3 @@
-// src/ui/layers/mod.rs
 use crate::assets::AssetStore;
 use crate::document::{self, LayerAction};
 use crate::model::{
@@ -131,7 +130,7 @@ pub fn draw_layers_panel(
                             false,
                             wizard_state,
                             confirmation_modal,
-                            true,
+                            show_fonts,
                         );
                     }
                     BrowserTab::Library => {
@@ -162,31 +161,34 @@ pub fn draw_layers_panel(
                     egui::Slider::new(&mut zoom, 0.5..=3.0).show_value(false),
                 );
 
-                if current_tab == BrowserTab::Graphics {
+                if current_tab == BrowserTab::Graphics || current_tab == BrowserTab::IWAD {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(4.0);
 
-                        ui.menu_button("Import...", |ui| {
-                            if ui.button("Files").clicked() {
-                                let count = crate::io::import_images_dialog(ui.ctx(), assets);
-                                if count > 0 {
-                                    state.push_message(format!("Imported {} images.", count));
+                        if current_tab == BrowserTab::Graphics {
+                            ui.menu_button("Import...", |ui| {
+                                if ui.button("Files").clicked() {
+                                    let count = crate::io::import_images_dialog(ui.ctx(), assets);
+                                    if count > 0 {
+                                        state.push_message(format!("Imported {} images.", count));
+                                    }
+                                    ui.close();
                                 }
-                                ui.close();
-                            }
-                            if ui.button("Folder").clicked() {
-                                let count = crate::io::import_folder_dialog(ui.ctx(), assets);
-                                if count > 0 {
-                                    state
-                                        .push_message(format!("Imported {} images from folder.", count));
+                                if ui.button("Folder").clicked() {
+                                    let count = crate::io::import_folder_dialog(ui.ctx(), assets);
+                                    if count > 0 {
+                                        state
+                                            .push_message(format!("Imported {} images from folder.", count));
+                                    }
+                                    ui.close();
                                 }
-                                ui.close();
-                            }
-                        });
-
-                        ui.add_space(4.0);
-                        ui.separator();
-                        ui.add_space(4.0);
+                            });
+                            ui.add_space(4.0);
+                            ui.separator();
+                            ui.add_space(4.0);
+                        } else if current_tab == BrowserTab::IWAD {
+                            ui.add_space(87.0);
+                        }
 
                         ui.checkbox(&mut show_fonts, "Fonts");
                     });

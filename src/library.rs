@@ -65,6 +65,9 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("progbar5.png", AssetCategory::Icon),
     a!("progbar6.png", AssetCategory::Icon),
     a!("progbar7.png", AssetCategory::Icon),
+    a!("stkeys6.png", AssetCategory::Icon),
+    a!("stkeys7.png", AssetCategory::Icon),
+    a!("stkeys8.png", AssetCategory::Icon),
     a!("tag_amm.png", AssetCategory::Icon),
     a!("tag_ammo.png", AssetCategory::Icon),
     a!("tag_arm.png", AssetCategory::Icon),
@@ -345,17 +348,26 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("prbm093.png", AssetCategory::Font),
 ];
 
+pub const CLASSIC_PREFIXES: &[&str] = &[];
 pub const NIGHTKICKER_PREFIXES: &[&str] = &[
     "ammo_ov", "arm_", "bmty", "boom", "dsda", "progbar", "tag_", "prbm",
     "dgt", "dig", "etl", "etm", "etr", "ets", "frag",
 ];
 
-pub const TEMPLATES: &[Template] = &[Template {
-    name: "Nightkicker",
-    description: "A compact, modern Statusbar showcasing the power of SBARDEF with dynamic elements.",
-    json_content: include_str!("../assets/templates/nightkicker.json"),
-    required_prefixes: NIGHTKICKER_PREFIXES,
-}];
+pub const TEMPLATES: &[Template] = &[
+    Template {
+        name: "Classic Vanilla",
+        description: "The original STARMS and STBAR, a great starting point for any new HUD.",
+        json_content: include_str!("../assets/templates/classicSTBAR.json"),
+        required_prefixes: CLASSIC_PREFIXES,
+    },
+    Template {
+        name: "Nightkicker",
+        description: "A compact, modern Statusbar showcasing the power of SBARDEF with dynamic elements.",
+        json_content: include_str!("../assets/templates/nightkicker.json"),
+        required_prefixes: NIGHTKICKER_PREFIXES,
+    },
+];
 
 pub const FONTS: &[FontDefinition] = &[
     FontDefinition {

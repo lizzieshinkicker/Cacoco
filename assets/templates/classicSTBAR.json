@@ -1,0 +1,794 @@
+{
+  "type": "sbardef",
+  "version": "1.0",
+  "data": {
+    "numberfonts": [
+      {
+        "name": "Classic Status Bar",
+        "type": 0,
+        "stem": "STT"
+      },
+      {
+        "name": "Classic Gray",
+        "type": 0,
+        "stem": "STG"
+      },
+      {
+        "name": "Classic Yellow",
+        "type": 0,
+        "stem": "STYS"
+      }
+    ],
+    "hudfonts": [
+      {
+        "name": "Classic HUD",
+        "type": 0,
+        "stem": "STCFN"
+      }
+    ],
+    "statusbars": [
+      {
+        "height": 32,
+        "fullscreenrender": false,
+        "fillflat": null,
+        "children": [
+          {
+            "graphic": {
+              "x": 0,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "patch": "STBAR",
+              "width": 0,
+              "height": 0,
+              "topoffset": 0,
+              "leftoffset": 0,
+              "midoffset": 0
+            }
+          },
+          {
+            "number": {
+              "x": 44,
+              "y": 3,
+              "alignment": 2,
+              "translucency": false,
+              "font": "Classic Status Bar",
+              "type": 4,
+              "param": 0,
+              "maxlength": 0
+            }
+          },
+          {
+            "percent": {
+              "x": 104,
+              "y": 3,
+              "alignment": 2,
+              "translucency": false,
+              "font": "Classic Status Bar",
+              "type": 0,
+              "param": 0,
+              "maxlength": 0
+            }
+          },
+          {
+            "canvas": {
+              "x": 104,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "conditions": [
+                {
+                  "condition": 14,
+                  "param": 0,
+                  "param2": 0
+                }
+              ],
+              "children": [
+                {
+                  "graphic": {
+                    "x": 0,
+                    "y": 0,
+                    "alignment": 0,
+                    "translucency": false,
+                    "patch": "STARMS",
+                    "width": 0,
+                    "height": 0,
+                    "topoffset": 0,
+                    "leftoffset": 0,
+                    "midoffset": 0
+                  }
+                },
+                {
+                  "canvas": {
+                    "x": 0,
+                    "y": 0,
+                    "alignment": 0,
+                    "translucency": false,
+                    "children": [
+                      {
+                        "graphic": {
+                          "x": 7,
+                          "y": 4,
+                          "alignment": 0,
+                          "translucency": false,
+                          "patch": "STGNUM2",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 19,
+                          "y": 4,
+                          "alignment": 0,
+                          "translucency": false,
+                          "patch": "STGNUM3",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 31,
+                          "y": 4,
+                          "alignment": 0,
+                          "translucency": false,
+                          "patch": "STGNUM4",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 7,
+                          "y": 14,
+                          "alignment": 0,
+                          "translucency": false,
+                          "patch": "STGNUM5",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 19,
+                          "y": 14,
+                          "alignment": 0,
+                          "translucency": false,
+                          "patch": "STGNUM6",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 31,
+                          "y": 14,
+                          "alignment": 0,
+                          "translucency": false,
+                          "patch": "STGNUM7",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 7,
+                          "y": 4,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 6,
+                              "param": 2,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STYSNUM2",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 19,
+                          "y": 4,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 6,
+                              "param": 3,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STYSNUM3",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 31,
+                          "y": 4,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 6,
+                              "param": 4,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STYSNUM4",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 7,
+                          "y": 14,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 6,
+                              "param": 5,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STYSNUM5",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 19,
+                          "y": 14,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 6,
+                              "param": 6,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STYSNUM6",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 31,
+                          "y": 14,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 6,
+                              "param": 7,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STYSNUM7",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      }
+                    ]
+                  },
+                  "_cacoco_name": "Weapon Slot Group"
+                }
+              ]
+            },
+            "_cacoco_name": "STARMS Cluster"
+          },
+          {
+            "canvas": {
+              "x": 0,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "conditions": [
+                {
+                  "condition": 14,
+                  "param": 2,
+                  "param2": 0
+                }
+              ],
+              "children": [
+                {
+                  "number": {
+                    "x": 138,
+                    "y": 3,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Status Bar",
+                    "type": 2,
+                    "param": 0,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "facebackground": {
+                    "x": 143,
+                    "y": 1,
+                    "alignment": 0,
+                    "translucency": false,
+                    "width": 0,
+                    "height": 0,
+                    "topoffset": 0,
+                    "leftoffset": 0,
+                    "midoffset": 0
+                  }
+                }
+              ]
+            },
+            "_cacoco_name": "Deathmatch Group"
+          },
+          {
+            "face": {
+              "x": 143,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "width": 0,
+              "height": 0,
+              "topoffset": 0,
+              "leftoffset": 0,
+              "midoffset": 0
+            }
+          },
+          {
+            "canvas": {
+              "x": 239,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "children": [
+                {
+                  "canvas": {
+                    "x": 0,
+                    "y": 3,
+                    "alignment": 0,
+                    "translucency": false,
+                    "children": [
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 10,
+                              "param": 1,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 11,
+                              "param": 4,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS0",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 11,
+                              "param": 1,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 10,
+                              "param": 4,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS3",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 10,
+                              "param": 1,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 10,
+                              "param": 4,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS6",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      }
+                    ]
+                  },
+                  "_cacoco_name": "Blue Keys"
+                },
+                {
+                  "canvas": {
+                    "x": 0,
+                    "y": 13,
+                    "alignment": 0,
+                    "translucency": false,
+                    "children": [
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 10,
+                              "param": 2,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 11,
+                              "param": 5,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS1",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 11,
+                              "param": 2,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 10,
+                              "param": 5,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS4",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 10,
+                              "param": 2,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 10,
+                              "param": 5,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS7",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      }
+                    ]
+                  },
+                  "_cacoco_name": "Yellow Keys"
+                },
+                {
+                  "canvas": {
+                    "x": 0,
+                    "y": 23,
+                    "alignment": 0,
+                    "translucency": false,
+                    "children": [
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 10,
+                              "param": 3,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 11,
+                              "param": 6,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS2",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 11,
+                              "param": 3,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 10,
+                              "param": 6,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS5",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      },
+                      {
+                        "graphic": {
+                          "x": 0,
+                          "y": 0,
+                          "alignment": 0,
+                          "translucency": false,
+                          "conditions": [
+                            {
+                              "condition": 10,
+                              "param": 3,
+                              "param2": 0
+                            },
+                            {
+                              "condition": 10,
+                              "param": 6,
+                              "param2": 0
+                            }
+                          ],
+                          "patch": "STKEYS8",
+                          "width": 0,
+                          "height": 0,
+                          "topoffset": 0,
+                          "leftoffset": 0,
+                          "midoffset": 0
+                        }
+                      }
+                    ]
+                  },
+                  "_cacoco_name": "Red Keys"
+                }
+              ]
+            },
+            "_cacoco_name": "Keys Cluster"
+          },
+          {
+            "percent": {
+              "x": 235,
+              "y": 3,
+              "alignment": 2,
+              "translucency": false,
+              "font": "Classic Status Bar",
+              "type": 1,
+              "param": 0,
+              "maxlength": 0
+            }
+          },
+          {
+            "canvas": {
+              "x": 288,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "children": [
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 5,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 3,
+                    "param": 0,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 11,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 3,
+                    "param": 1,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 17,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 3,
+                    "param": 3,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 23,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 3,
+                    "param": 2,
+                    "maxlength": 0
+                  }
+                }
+              ]
+            },
+            "_cacoco_name": "Current Ammo Group"
+          },
+          {
+            "canvas": {
+              "x": 314,
+              "y": 0,
+              "alignment": 0,
+              "translucency": false,
+              "children": [
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 5,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 5,
+                    "param": 0,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 11,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 5,
+                    "param": 1,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 17,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 5,
+                    "param": 3,
+                    "maxlength": 0
+                  }
+                },
+                {
+                  "number": {
+                    "x": 0,
+                    "y": 23,
+                    "alignment": 2,
+                    "translucency": false,
+                    "font": "Classic Yellow",
+                    "type": 5,
+                    "param": 2,
+                    "maxlength": 0
+                  }
+                }
+              ]
+            },
+            "_cacoco_name": "Max Ammo Group"
+          }
+        ]
+      }
+    ]
+  }
+}

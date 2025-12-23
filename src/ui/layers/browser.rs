@@ -1,4 +1,3 @@
-// src/ui/layers/browser.rs
 use crate::app::ConfirmationRequest;
 use crate::assets::AssetStore;
 use crate::library::{self, FontDefinition, FontSource};
@@ -111,7 +110,7 @@ pub fn draw_filtered_browser(
     show_project_assets: bool,
     wizard_state: &mut Option<FontWizardState>,
     confirmation_modal: &mut Option<ConfirmationRequest>,
-    show_registered_fonts: bool,
+    show_fonts_toggle: bool,
 ) {
     if !show_project_assets {
         ui.heading("Base IWAD Browser");
@@ -169,20 +168,17 @@ pub fn draw_filtered_browser(
         .keys()
         .filter(|k| !k.starts_with('_'))
         .filter(|key| {
-            if !show_project_assets {
-                if library::FONTS.iter().any(|f| key.starts_with(&f.stem.to_uppercase())) {
+            if !show_fonts_toggle {
+                if registered_font_stems.iter().any(|stem| key.starts_with(stem)) {
                     return false;
                 }
-                if library_stems.contains(*key) {
+                if library::FONTS.iter().any(|f| key.starts_with(&f.stem.to_uppercase())) {
                     return false;
                 }
             }
 
-            if show_project_assets && !show_registered_fonts {
-                if registered_font_stems
-                    .iter()
-                    .any(|stem| key.starts_with(stem))
-                {
+            if !show_project_assets {
+                if library_stems.contains(*key) {
                     return false;
                 }
             }
