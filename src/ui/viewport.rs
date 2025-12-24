@@ -41,7 +41,7 @@ pub fn draw_viewport(
 
     let background_rect = ui.available_rect_before_wrap();
     ui.painter()
-        .rect_filled(background_rect, 0.0, egui::Color32::from_rgb(20, 20, 20));
+        .rect_filled(background_rect, 0.0, egui::Color32::from_rgb(15, 15, 15));
 
     ui.data_mut(|d| d.insert_temp(egui::Id::new(VIEWPORT_RECT_ID), background_rect));
 
@@ -99,24 +99,7 @@ pub fn draw_viewport(
         ui.data_mut(|d| d.remove::<egui::Vec2>(accum_id));
     }
 
-    ui.painter()
-        .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
-
-    if let Some(tex) = assets.textures.get("_BG_MASTER") {
-        let uv_rect = if preview_state.engine.widescreen_mode {
-            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0))
-        } else {
-            let margin = (1.0 - 0.75) / 2.0;
-            egui::Rect::from_min_max(egui::pos2(margin, 0.0), egui::pos2(1.0 - margin, 1.0))
-        };
-        ui.painter()
-            .image(tex.id(), proj.screen_rect, uv_rect, egui::Color32::WHITE);
-    }
-
-    let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(proj.screen_rect));
-    screen_ui.set_clip_rect(proj.screen_rect.intersect(ui.clip_rect()));
-
-    render_player_weapon(&screen_ui, preview_state, assets, &proj);
+    ui.painter().rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
 
     let bar_idx = if current_bar_idx < file_ref.data.status_bars.len() {
         current_bar_idx
@@ -124,12 +107,83 @@ pub fn draw_viewport(
         0
     };
 
+    let mut bar_height = 0.0;
+    let mut is_fullscreen = true;
+    let mut fill_flat_name = None;
     if let Some(bar) = file_ref.data.status_bars.get(bar_idx) {
-        let root_y = if bar.fullscreen_render {
-            0.0
+        bar_height = bar.height as f32;
+        is_fullscreen = bar.fullscreen_render;
+        fill_flat_name = bar.fill_flat.clone();
+    }
+
+    let h_view = if is_fullscreen { 200.0 } else { 200.0 - bar_height };
+    let y_center = h_view / 2.0;
+    let y_offset_from_top = y_center - 100.0;
+
+    let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(proj.screen_rect));
+    screen_ui.set_clip_rect(proj.screen_rect);
+
+    if let Some(tex) = assets.textures.get("_BG_MASTER") {
+        let mut uv_rect = if preview_state.engine.widescreen_mode {
+            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0))
         } else {
-            200.0 - bar.height as f32
+            let margin = (1.0 - 0.75) / 2.0;
+            egui::Rect::from_min_max(egui::pos2(margin, 0.0), egui::pos2(1.0 - margin, 1.0))
         };
+
+        let uv_top_crop = (-y_offset_from_top) / 200.0;
+        let uv_bottom_crop = (y_center + 100.0 - h_view) / 200.0;
+        uv_rect.min.y += uv_top_crop;
+        uv_rect.max.y -= uv_bottom_crop;
+
+        let mut draw_rect = proj.screen_rect;
+        draw_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
+
+        screen_ui.painter().image(tex.id(), draw_rect, uv_rect, egui::Color32::WHITE);
+    }
+
+    if !is_fullscreen && bar_height > 0.0 {
+        let flat_key = fill_flat_name.unwrap_or_else(|| "GRNROCK".to_string());
+        if let Some(tex) = assets.textures.get(&flat_key.to_uppercase()) {
+            let tile_size_px = 64.0 * proj.final_scale_x;
+            let bar_area_rect = egui::Rect::from_min_max(
+                egui::pos2(proj.screen_rect.left(), proj.screen_rect.bottom() - (bar_height * proj.final_scale_y)),
+                egui::pos2(proj.screen_rect.right(), proj.screen_rect.bottom())
+            );
+
+            let mut y = bar_area_rect.min.y;
+            while y < bar_area_rect.max.y {
+                let mut x = bar_area_rect.min.x;
+                while x < bar_area_rect.max.x {
+                    let draw_w = (bar_area_rect.max.x - x).min(tile_size_px);
+                    let draw_h = (bar_area_rect.max.y - y).min(tile_size_px);
+                    let uv_w = draw_w / tile_size_px;
+                    let uv_h = draw_h / tile_size_px;
+
+                    screen_ui.painter().image(
+                        tex.id(),
+                        egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(draw_w, draw_h)),
+                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(uv_w, uv_h)),
+                        egui::Color32::WHITE
+                    );
+                    x += tile_size_px;
+                }
+                y += tile_size_px;
+            }
+        }
+    }
+
+    let mut world_clip_rect = proj.screen_rect;
+    world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
+
+    {
+        let mut weapon_ui = screen_ui.new_child(egui::UiBuilder::new());
+        weapon_ui.set_clip_rect(world_clip_rect.intersect(proj.screen_rect));
+        render_player_weapon(&weapon_ui, preview_state, assets, &proj, y_offset_from_top);
+    }
+
+    if let Some(bar) = file_ref.data.status_bars.get(bar_idx) {
+        let root_y = if is_fullscreen { 0.0 } else { 200.0 - bar_height };
         ui.ctx().request_repaint();
 
         let mouse_pos = ui
@@ -180,7 +234,7 @@ pub fn draw_viewport(
 
             if is_over_viewport {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-                ui.painter().rect_stroke(
+                screen_ui.painter().rect_stroke(
                     proj.screen_rect,
                     0.0,
                     egui::Stroke::new(2.0, egui::Color32::YELLOW),
@@ -251,6 +305,7 @@ fn render_player_weapon(
     state: &PreviewState,
     assets: &AssetStore,
     proj: &ViewportProjection,
+    v_shift: f32,
 ) {
     let (weapon_lump_name, constant_offset) = match state.display_weapon_slot {
         1 => {
@@ -281,7 +336,8 @@ fn render_player_weapon(
             let scaled_size =
                 egui::vec2(tex_size.x * proj.final_scale_x, tex_size.y * proj.final_scale_y);
             let draw_x = proj.screen_rect.center().x - (scaled_size.x / 2.0);
-            let total_offset_y = (state.weapon_offset_y + constant_offset) * proj.final_scale_y;
+
+            let total_offset_y = (state.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
             let draw_y = (proj.screen_rect.max.y - scaled_size.y) + total_offset_y;
 
             ui.painter().image(

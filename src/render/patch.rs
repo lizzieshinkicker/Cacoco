@@ -50,3 +50,22 @@ pub fn decode_doom_patch(data: &[u8], palette: &DoomPalette) -> Option<(u32, u32
     }
     Some((width, height, left_offset, top_offset, pixels))
 }
+
+pub fn decode_doom_flat(data: &[u8], palette: &DoomPalette) -> Option<(u32, u32, Vec<u8>)> {
+    if data.len() != 4096 { return None; }
+
+    let width = 64;
+    let height = 64;
+    let mut pixels = vec![0u8; width * height * 4];
+
+    for i in 0..4096 {
+        let color = palette.get(data[i]);
+        let pix_idx = i * 4;
+        pixels[pix_idx] = color.r();
+        pixels[pix_idx + 1] = color.g();
+        pixels[pix_idx + 2] = color.b();
+        pixels[pix_idx + 3] = 255;
+    }
+
+    Some((width as u32, height as u32, pixels))
+}

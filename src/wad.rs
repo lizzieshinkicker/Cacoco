@@ -14,11 +14,10 @@ static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
         "BKEY", "YKEY", "RKEY", "BSKU", "YSKU", "RSKU",
         "PINV", "PSTR", "PINS", "SUIT", "PMAP", "PVIS",
         "ARM", "MEDI", "BPAK", "AMMO", "SHEL", "CELL", "ROCK",
-        "INTER", "FINALE", "TITLE", "PAT",
+        "INTER", "FINALE", "TITLE", "PAT", "GRN",
     ];
     prefixes.into_iter().collect()
 });
-
 pub fn load_wad_into_store(ctx: &egui::Context, file: &mut fs::File, assets: &mut AssetStore) -> anyhow::Result<()> {
     let mut header = [0u8; 12];
     file.read_exact(&mut header).ok();
@@ -69,6 +68,10 @@ pub fn load_wad_into_store(ctx: &egui::Context, file: &mut fs::File, assets: &mu
 
             if let Some((width, height, left, top, pixels)) = patch::decode_doom_patch(&lump_data, &palette) {
                 assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
+            } else if size == 4096 {
+                if let Some((w, h, pixels)) = patch::decode_doom_flat(&lump_data, &palette) {
+                    assets.load_rgba(ctx, &name, w, h, &pixels);
+                }
             } else {
                 assets.load_reference_image(ctx, &name, &lump_data);
             }
