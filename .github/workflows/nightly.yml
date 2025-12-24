@@ -1,0 +1,112 @@
+name: Nightly
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+  
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            appname: cacoco
+            extension: ""
+            platform: linux
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            appname: cacoco
+            extension: .exe
+            platform: windows
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            target2: x86_64-apple-darwin
+            appname: cacoco
+            extension: ""
+            platform: macos
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+      with:
+        target: ${{ matrix.target }}
+    - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+      if: ${{ matrix.os == 'macos-latest' }}
+      with:
+        target: ${{ matrix.target2 }}
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Build release binary
+      run: cargo build --release --target ${{ matrix.target }}
+    - name: Build release binary
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: cargo build --release --target ${{ matrix.target2 }}
+    - name: Create macOS universal binary
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        mkdir -p dist
+        lipo -create \
+          target/aarch64-apple-darwin/release/${{ matrix.appname }} \
+          target/x86_64-apple-darwin/release/${{ matrix.appname }} \
+          -output dist/${{ matrix.appname }}-${{ matrix.platform }}
+    - name: Package (Linux / Windows)
+      if: ${{ matrix.os != 'macos-latest' }}
+      run: |
+        mkdir -p dist
+        cp target/${{ matrix.target }}/release/${{ matrix.appname }}${{ matrix.extension }} dist/${{ matrix.appname }}-${{ matrix.platform }}${{ matrix.extension }}
+    - name: Upload artifact
+      uses: actions/upload-artifact@v6
+      with:
+        name: cacoco-${{ matrix.platform }}
+        path: dist/*
+
+  release-nightly:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check existing nightly release commit
+      id: check
+      run: |
+        existing_sha=$(gh release view nightly --json targetCommitish --jq .targetCommitish 2>/dev/null || echo "")
+        echo "existing_sha=$existing_sha"
+        if [ "$existing_sha" = "${{ github.sha }}" ]; then
+          echo "release-exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "release-exists=false" >> $GITHUB_OUTPUT
+        fi
+    - uses: actions/download-artifact@v7
+      if: steps.check.outputs.release-exists == 'false'
+      with:
+        path: artifacts
+    - name: Delete old nightly release
+      if: steps.check.outputs.release-exists == 'false'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release delete nightly --yes || true
+        git push origin :nightly || true
+    - name: Create nightly release
+      if: steps.check.outputs.release-exists == 'false'
+      uses: softprops/action-gh-release@v2.5.0
+      with:
+        tag_name: nightly
+        target_commitish: ${{ github.sha }}
+        name: "Cacoco nightly ${{ github.ref_name }}"
+        prerelease: true
+        make_latest: false
+        draft: false
+        overwrite_files: true
+        generate_release_notes: false
+        body: ""
+        files: |
+          artifacts/**/*
