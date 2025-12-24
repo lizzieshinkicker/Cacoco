@@ -4,6 +4,7 @@ use crate::io::{self, LoadedProject};
 use crate::library;
 use crate::model::SBarDefFile;
 use eframe::egui;
+use std::path::Path;
 
 pub enum MenuAction {
     None,
@@ -95,30 +96,40 @@ pub fn draw_menu_bar(
 
         ui.menu_button("Run", |ui| {
             let has_file = current_file.is_some();
-            let has_port = config.source_port_path.is_some();
 
-            if ui
-                .add_enabled(has_file, egui::Button::new("Launch in Source Port"))
-                .clicked()
-            {
-                if !has_port {
+            if config.source_ports.is_empty() {
+                if ui
+                    .add_enabled(has_file, egui::Button::new("Launch (No port set...)"))
+                    .clicked()
+                {
                     action = MenuAction::PickPortAndRun;
-                } else if let (Some(f), Some(port), Some(iwad)) = (
-                    current_file.as_ref(),
-                    &config.source_port_path,
-                    config.base_wad_path.as_ref(),
-                ) {
-                    io::launch_game(f, assets, port, iwad);
+                    ui.close();
                 }
-                ui.close();
+            } else {
+                for path_str in &config.source_ports {
+                    let name = get_port_name(path_str);
+                    if ui
+                        .add_enabled(has_file, egui::Button::new(format!("Launch in {}", name)))
+                        .clicked()
+                    {
+                        if let (Some(f), Some(iwad)) =
+                            (current_file.as_ref(), config.base_wad_path.as_ref())
+                        {
+                            io::launch_game(f, assets, path_str, iwad);
+                        }
+                        ui.close();
+                    }
+                }
+                ui.separator();
+                if ui.button("Add New Port...").clicked() {
+                    action = MenuAction::PickPortAndRun;
+                    ui.close();
+                }
             }
 
             if !has_file {
                 ui.separator();
                 ui.label("⚠ No file loaded");
-            } else if !has_port {
-                ui.separator();
-                ui.label("Port not set (will prompt)");
             }
         });
     });
@@ -196,25 +207,10 @@ pub fn draw_settings_window(
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
-            ui.set_width(480.0);
+            ui.set_width(550.0);
             ui.add_space(4.0);
 
-            let port_desc = config
-                .source_port_path
-                .as_deref()
-                .unwrap_or("Click to browse for executable...");
-            if draw_menu_card(ui, "Source Port", port_desc) {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Executable", &["exe"])
-                    .set_title("Select Source Port (e.g., dsda-doom.exe)")
-                    .pick_file()
-                {
-                    config.source_port_path = Some(path.to_string_lossy().into_owned());
-                }
-            }
-
-            ui.add_space(8.0);
-
+            ui.heading("Global Paths");
             let iwad_desc = config
                 .base_wad_path
                 .as_deref()
@@ -225,12 +221,64 @@ pub fn draw_settings_window(
                 }
             }
 
-            ui.add_space(12.0);
+            ui.add_space(16.0);
+            ui.horizontal(|ui| {
+                ui.heading("Source Ports");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("+ Add Port").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Executable", &["exe"])
+                            .set_title("Select Source Port")
+                            .pick_file()
+                        {
+                            let path_str = path.to_string_lossy().into_owned();
+                            if !config.source_ports.contains(&path_str) {
+                                config.source_ports.push(path_str);
+                            }
+                        }
+                    }
+                });
+            });
+            ui.separator();
+            ui.add_space(4.0);
+
+            let mut to_remove = None;
+            egui::ScrollArea::vertical()
+                .max_height(240.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 8.0;
+
+                    for (idx, path_str) in config.source_ports.iter().enumerate() {
+                        let name = get_port_name(path_str);
+
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            let total_w = ui.available_width();
+                            let delete_w = 44.0;
+                            let card_w = total_w - delete_w - 4.0;
+
+                            ui.allocate_ui(egui::vec2(card_w, 54.0), |ui| {
+                                draw_menu_card(ui, &name, path_str);
+                            });
+
+                            if draw_delete_card(ui, delete_w) {
+                                to_remove = Some(idx);
+                            }
+                        });
+                    }
+                });
+
+            if let Some(idx) = to_remove {
+                config.source_ports.remove(idx);
+            }
+
+            ui.add_space(24.0);
             ui.separator();
 
             ui.vertical_centered(|ui| {
                 ui.add_space(8.0);
-                if ui.button("  Save & Close  ").clicked() {
+                if ui.button("   Save & Close   ").clicked() {
                     config.save();
                     *settings_open = false;
                 }
@@ -282,4 +330,60 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     );
 
     response.clicked()
+}
+
+pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
+    let height = 54.0;
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
+
+    let (bg_color, stroke_color) = if response.hovered() {
+        (
+            egui::Color32::from_rgb(110, 40, 40),
+            ui.visuals().widgets.hovered.bg_stroke.color,
+        )
+    } else {
+        (
+            ui.visuals().widgets.noninteractive.bg_fill,
+            ui.visuals().widgets.noninteractive.bg_stroke.color,
+        )
+    };
+
+    ui.painter().rect(
+        rect,
+        4.0,
+        bg_color,
+        egui::Stroke::new(1.0, stroke_color),
+        egui::StrokeKind::Outside,
+    );
+
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "🗑",
+        egui::FontId::proportional(18.0),
+        if response.hovered() {
+            egui::Color32::WHITE
+        } else {
+            ui.visuals().weak_text_color()
+        },
+    );
+
+    response.clicked()
+}
+
+pub fn get_port_name(path_str: &str) -> String {
+    let stem = Path::new(path_str)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Unknown Port");
+
+    if stem.is_empty() {
+        return "Unknown Port".to_string();
+    }
+
+    let mut chars = stem.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+    }
 }

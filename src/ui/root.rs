@@ -236,8 +236,11 @@ fn handle_pick_port_and_run(app: &mut CacocoApp) {
         .pick_file()
     {
         let path_str = path.to_string_lossy().into_owned();
-        app.config.source_port_path = Some(path_str.clone());
-        app.config.save();
+
+        if !app.config.source_ports.contains(&path_str) {
+            app.config.source_ports.push(path_str.clone());
+            app.config.save();
+        }
 
         if let (Some(f), Some(iwad)) = (&app.current_file, &app.config.base_wad_path) {
             crate::io::launch_game(f, &app.assets, &path_str, iwad);

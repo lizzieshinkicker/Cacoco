@@ -5,7 +5,8 @@ use std::collections::VecDeque;
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AppConfig {
     pub base_wad_path: Option<String>,
-    pub source_port_path: Option<String>,
+    #[serde(default)]
+    pub source_ports: Vec<String>,
     #[serde(default)]
     pub recent_files: VecDeque<String>,
 }
