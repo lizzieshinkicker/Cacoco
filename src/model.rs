@@ -9,6 +9,9 @@ use crate::ui::properties::editor::PropertiesUI;
 use crate::ui::properties::font_cache::FontCache;
 use crate::ui::properties::preview::PreviewContent;
 
+fn default_type() -> String { "statusbar".to_string() }
+fn default_version() -> String { "1.0.0".to_string() }
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
     pub struct Alignment: u32 {
@@ -70,8 +73,12 @@ pub enum ConditionType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SBarDefFile {
-    #[serde(default, rename = "type")] pub type_: String,
-    #[serde(default)] pub version: String,
+    #[serde(default = "default_type", rename = "type")]
+    pub type_: String,
+
+    #[serde(default = "default_version")]
+    pub version: String,
+
     pub data: StatusBarDefinition,
 }
 

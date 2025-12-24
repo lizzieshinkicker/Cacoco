@@ -130,8 +130,8 @@ impl CacocoApp {
 
     pub fn new_project(&mut self, ctx: &egui::Context) {
         self.current_file = Some(crate::model::SBarDefFile {
-            type_: "sbardef".to_string(),
-            version: "1.0".to_string(),
+            type_: "statusbar".to_string(),
+            version: "1.0.0".to_string(),
             data: crate::model::StatusBarDefinition {
                 status_bars: vec![crate::model::StatusBarLayout::default()],
                 ..Default::default()
