@@ -1,6 +1,6 @@
 {
-  "type": "sbardef",
-  "version": "1.0",
+  "type": "statusbar",
+  "version": "1.0.0",
   "data": {
     "numberfonts": [
       {
