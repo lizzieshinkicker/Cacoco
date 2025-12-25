@@ -46,6 +46,22 @@ impl HotkeyRegistry {
     pub fn check(&self, ctx: &egui::Context) -> Option<Action> {
         let redo_y = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
 
+        // Global Actions
+        if ctx.input_mut(|i| i.consume_shortcut(&self.save)) {
+            return Some(Action::Save);
+        }
+        if ctx.input_mut(|i| i.consume_shortcut(&self.open)) {
+            return Some(Action::Open);
+        }
+        if ctx.input_mut(|i| i.consume_shortcut(&self.export_json)) {
+            return Some(Action::ExportJSON);
+        }
+
+        // Editor Actions
+        if ctx.wants_keyboard_input() {
+            return None;
+        }
+
         if ctx.input_mut(|i| i.consume_shortcut(&self.redo))
             || ctx.input_mut(|i| i.consume_shortcut(&redo_y))
         {
@@ -56,25 +72,17 @@ impl HotkeyRegistry {
             return Some(Action::Undo);
         }
 
-        if ctx.input_mut(|i| i.consume_shortcut(&self.open)) {
-            return Some(Action::Open);
-        }
-
         let has_copy_event = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
-        let has_paste_event = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_))));
+        let shortcut_copy = ctx.input_mut(|i| i.consume_shortcut(&self.copy));
 
-        if ctx.input_mut(|i| i.consume_shortcut(&self.save)) {
-            return Some(Action::Save);
-        }
-        if ctx.input_mut(|i| i.consume_shortcut(&self.export_json)) {
-            return Some(Action::ExportJSON);
-        }
-
-        if has_copy_event || ctx.input_mut(|i| i.consume_shortcut(&self.copy)) {
+        if has_copy_event || shortcut_copy {
             return Some(Action::Copy);
         }
 
-        if has_paste_event || ctx.input_mut(|i| i.consume_shortcut(&self.paste)) {
+        let has_paste_event = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_))));
+        let shortcut_paste = ctx.input_mut(|i| i.consume_shortcut(&self.paste));
+
+        if has_paste_event || shortcut_paste {
             return Some(Action::Paste);
         }
 
