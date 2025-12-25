@@ -234,13 +234,27 @@ pub struct FaceDef {
     #[serde(default)] pub midoffset: i32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+fn default_maxlength() -> i32 { 3 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NumberDef {
     #[serde(flatten)] pub common: CommonAttrs,
     pub font: String,
     #[serde(rename = "type")] pub type_: NumberType,
     #[serde(default)] pub param: i32,
-    #[serde(default)] pub maxlength: i32,
+    #[serde(default = "default_maxlength")] pub maxlength: i32,
+}
+
+impl Default for NumberDef {
+    fn default() -> Self {
+        Self {
+            common: CommonAttrs::default(),
+            font: String::new(),
+            type_: NumberType::Health,
+            param: 0,
+            maxlength: 3,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
