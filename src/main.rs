@@ -42,6 +42,7 @@ fn main() -> eframe::Result<()> {
             .with_inner_size([1280.0, 720.0])
             .with_min_inner_size([1280.0, 720.0])
             .with_title("Cacoco")
+            .with_app_id("cacoco")
             .with_icon(icon_data),
         ..Default::default()
     };

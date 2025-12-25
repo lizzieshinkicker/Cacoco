@@ -8,7 +8,7 @@ Categories=Development;GUIDesigner;Utility;2DGraphics
 Keywords=doom;id24;sbardef
 
 Icon=cacoco
-Exec=cacoco %u
+Exec=cacoco
 MimeType=application/json;application/x-doom-wad
 Terminal=false
 StartupWMClass=cacoco

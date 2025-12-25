@@ -77,10 +77,16 @@ jobs:
       uses: miurahr/install-linuxdeploy-action@v1.8.0
       with:
         plugins: appimage
+    - name: Create version name file
+      id: version
+      run: |
+        SHORT_HASH=$(git rev-parse --short ${{ github.sha }})
+        echo "version=nightly-$SHORT_HASH" >> "$GITHUB_OUTPUT"
     - name: Create AppImage
       env:
         LD_BIN: ${{ steps.install-linuxdeploy.outputs.linuxdeploy }}
-        UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|*x86_64.AppImage.zsync"
+        LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|*x86_64.AppImage.zsync"
+        LDAI_VERSION: "${{ steps.version.outputs.version }}"
       run: |
         "$LD_BIN" --output appimage \
                   --executable target/x86_64-unknown-linux-gnu/release/cacoco \
@@ -91,8 +97,8 @@ jobs:
     - name: Rename binary
       run: |
         mkdir -p dist
-        mv Cacoco-x86_64.AppImage dist/Cacoco-nightly-linux-x86_64.AppImage
-        mv Cacoco-x86_64.AppImage.zsync dist/Cacoco-nightly-linux-x86_64.AppImage.zsync
+        mv Cacoco-*-x86_64.AppImage dist/Cacoco-nightly-linux-x86_64.AppImage
+        mv Cacoco-*-x86_64.AppImage.zsync dist/Cacoco-nightly-linux-x86_64.AppImage.zsync
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
