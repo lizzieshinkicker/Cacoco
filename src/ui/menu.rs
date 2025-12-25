@@ -3,6 +3,7 @@ use crate::config::AppConfig;
 use crate::io::{self, LoadedProject};
 use crate::library;
 use crate::model::SBarDefFile;
+use crate::app::PendingAction;
 use eframe::egui;
 use std::path::Path;
 
@@ -11,6 +12,8 @@ pub enum MenuAction {
     LoadProject(LoadedProject, String),
     LoadTemplate(&'static library::Template),
     NewEmpty,
+    Open,
+    RequestDiscard(PendingAction),
     SaveDone(String),
     ExportDone(String),
     PickPortAndRun,
@@ -24,6 +27,7 @@ pub fn draw_menu_bar(
     config: &mut AppConfig,
     assets: &mut AssetStore,
     settings_open: &mut bool,
+    dirty: bool,
 ) -> MenuAction {
     let mut action = MenuAction::None;
 
@@ -33,7 +37,20 @@ pub fn draw_menu_bar(
     egui::MenuBar::new().ui(ui, |ui| {
         ui.menu_button("File", |ui| {
             if ui.button("New...").clicked() {
-                template_open = true;
+                if dirty {
+                    action = MenuAction::RequestDiscard(PendingAction::New);
+                } else {
+                    template_open = true;
+                }
+                ui.close();
+            }
+
+            if ui.button("Open...").on_hover_text("Ctrl+O").clicked() {
+                if dirty {
+                    action = MenuAction::RequestDiscard(PendingAction::Load("".to_string()));
+                } else {
+                    action = MenuAction::Open;
+                }
                 ui.close();
             }
 
@@ -57,7 +74,9 @@ pub fn draw_menu_bar(
                 }
 
                 if let Some(path_to_load) = file_to_load {
-                    if let Some(loaded) = io::load_project_from_path(ctx, &path_to_load) {
+                    if dirty {
+                        action = MenuAction::RequestDiscard(PendingAction::Load(path_to_load));
+                    } else if let Some(loaded) = io::load_project_from_path(ctx, &path_to_load) {
                         action = MenuAction::LoadProject(loaded, path_to_load);
                     } else {
                         config.recent_files.retain(|p| p != &path_to_load);
@@ -67,7 +86,11 @@ pub fn draw_menu_bar(
             }
 
             ui.separator();
-            if ui.button("Save PK3...").on_hover_text("Ctrl+S").clicked() {
+            if ui.button("Save").on_hover_text("Ctrl+S").clicked() {
+                action = MenuAction::SaveDone("SILENT".to_string());
+                ui.close();
+            }
+            if ui.button("Save As...").clicked() {
                 if let Some(f) = current_file {
                     if let Some(path) = io::save_pk3_dialog(f, assets, opened_file_path.clone()) {
                         action = MenuAction::SaveDone(path);
@@ -75,6 +98,7 @@ pub fn draw_menu_bar(
                 }
                 ui.close();
             }
+
             if ui.button("Export JSON...").on_hover_text("Ctrl+E").clicked() {
                 if let Some(f) = current_file {
                     if let Some(path) = io::save_json_dialog(f, opened_file_path.clone()) {
@@ -90,7 +114,11 @@ pub fn draw_menu_bar(
             }
             ui.separator();
             if ui.button("Quit").clicked() {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                if dirty {
+                    action = MenuAction::RequestDiscard(PendingAction::Quit);
+                } else {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
             }
         });
 
@@ -157,7 +185,11 @@ pub fn draw_menu_bar(
                             "Empty",
                             "Start from scratch.",
                         ) {
-                            action = MenuAction::NewEmpty;
+                            if dirty {
+                                action = MenuAction::RequestDiscard(PendingAction::New);
+                            } else {
+                                action = MenuAction::NewEmpty;
+                            }
                             close_window = true;
                         }
 
@@ -166,7 +198,11 @@ pub fn draw_menu_bar(
 
                         for template in library::TEMPLATES {
                             if draw_menu_card(ui, template.name, template.description) {
-                                action = MenuAction::LoadTemplate(template);
+                                if dirty {
+                                    action = MenuAction::RequestDiscard(PendingAction::Template(template));
+                                } else {
+                                    action = MenuAction::LoadTemplate(template);
+                                }
                                 close_window = true;
                             }
                         }

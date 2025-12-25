@@ -15,9 +15,18 @@ use std::collections::HashSet;
 const MAX_RECENT_FILES: usize = 5;
 
 #[derive(Clone)]
+pub enum PendingAction {
+    New,
+    Load(String),
+    Template(&'static Template),
+    Quit,
+}
+
+#[derive(Clone)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
     DeleteAssets(Vec<String>),
+    DiscardChanges(PendingAction),
 }
 
 pub struct CacocoApp {
@@ -37,6 +46,7 @@ pub struct CacocoApp {
     pub history: HistoryManager,
     pub hotkeys: HotkeyRegistry,
     pub iwad_verified: bool,
+    pub dirty: bool,
 }
 
 impl Default for CacocoApp {
@@ -58,6 +68,7 @@ impl Default for CacocoApp {
             history: HistoryManager::default(),
             hotkeys: HotkeyRegistry::default(),
             iwad_verified: false,
+            dirty: false,
         }
     }
 }
@@ -123,6 +134,7 @@ impl CacocoApp {
 
         self.history.undo_stack.clear();
         self.history.redo_stack.clear();
+        self.dirty = false;
 
         self.preview_state
             .push_message(format!("Project Loaded: {}", path_str));
@@ -138,7 +150,7 @@ impl CacocoApp {
             },
         });
 
-        self.opened_file_path = Some("NewStatusBar.pk3".to_string());
+        self.opened_file_path = None;
         self.assets = AssetStore::default();
 
         self.preview_state = PreviewState::default();
@@ -155,6 +167,7 @@ impl CacocoApp {
         self.current_statusbar_idx = 0;
         self.history.undo_stack.clear();
         self.history.redo_stack.clear();
+        self.dirty = false;
         self.preview_state.push_message("Created new empty project.");
     }
 
@@ -162,7 +175,7 @@ impl CacocoApp {
         match serde_json::from_str::<SBarDefFile>(template.json_content) {
             Ok(parsed_file) => {
                 self.current_file = Some(parsed_file);
-                self.opened_file_path = Some(format!("{}.pk3", template.name));
+                self.opened_file_path = None;
 
                 self.assets = AssetStore::default();
 
@@ -179,6 +192,7 @@ impl CacocoApp {
                 self.current_statusbar_idx = 0;
                 self.history.undo_stack.clear();
                 self.history.redo_stack.clear();
+                self.dirty = false;
 
                 for prefix in template.required_prefixes {
                     for lib_asset in crate::library::ASSETS {

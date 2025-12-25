@@ -1,4 +1,4 @@
-use crate::app::{CacocoApp, ConfirmationRequest};
+use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::document;
 use crate::ui;
 use crate::ui::font_wizard;
@@ -11,12 +11,25 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         return;
     }
 
-    let file_display = if let Some(path) = &app.opened_file_path {
-        let name = Path::new(path)
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("Unknown");
-        format!("[{}] ", name)
+    if ctx.input(|i| i.viewport().close_requested()) {
+        if app.dirty {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(PendingAction::Quit));
+        }
+    }
+
+    let dirty_indicator = if app.dirty { "*" } else { "" };
+
+    let file_display = if app.current_file.is_some() {
+        if let Some(path_str) = &app.opened_file_path {
+            let name = Path::new(path_str)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or(path_str);
+            format!("[{}{}] ", dirty_indicator, name)
+        } else {
+            format!("[{}New Project] ", dirty_indicator)
+        }
     } else {
         "".to_string()
     };
@@ -30,7 +43,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     }
 
     if let Some(action) = app.hotkeys.check(ctx) {
-        handle_action(app, action);
+        handle_action(app, action, ctx);
     }
 
     app.cheat_engine.process_input(ctx, &mut app.preview_state);
@@ -45,6 +58,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             &mut app.config,
             &mut app.assets,
             &mut app.settings_open,
+            app.dirty,
         );
 
         match action {
@@ -57,10 +71,25 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             ui::MenuAction::NewEmpty => {
                 app.new_project(ctx);
             }
+            ui::MenuAction::Open => {
+                if let Some(path) = crate::io::open_project_dialog() {
+                    if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
+                        app.load_project(ctx, loaded, &path);
+                    }
+                }
+            }
+            ui::MenuAction::RequestDiscard(pending) => {
+                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
+            }
             ui::MenuAction::SaveDone(path) => {
-                app.opened_file_path = Some(path.clone());
-                app.add_to_recent(&path);
-                app.preview_state.push_message(format!("Saved: {}", path));
+                if path == "SILENT" {
+                    handle_action(app, crate::hotkeys::Action::Save, ctx);
+                } else {
+                    app.opened_file_path = Some(path.clone());
+                    app.add_to_recent(&path);
+                    app.dirty = false;
+                    app.preview_state.push_message(format!("Saved: {}", path));
+                }
             }
             ui::MenuAction::ExportDone(path) => {
                 app.add_to_recent(&path);
@@ -118,6 +147,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
 
             if let Some(f) = &mut app.current_file {
                 for action in actions {
+                    app.dirty = true;
                     if matches!(action, document::LayerAction::UndoSnapshot) {
                         app.history.take_snapshot(f, &app.selection);
                     } else {
@@ -146,6 +176,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
 
         if let Some(f) = &mut app.current_file {
             for action in actions {
+                app.dirty = true;
                 if matches!(action, document::LayerAction::UndoSnapshot) {
                     app.history.take_snapshot(f, &app.selection);
                 } else {
@@ -252,7 +283,13 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
     let mut close_modal = false;
     let mut confirmed = false;
 
-    egui::Window::new("Confirm Action")
+    let window_title = if matches!(request, ConfirmationRequest::DiscardChanges(_)) {
+        "Unsaved Changes"
+    } else {
+        "Confirm Deletion"
+    };
+
+    egui::Window::new(window_title)
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
@@ -287,6 +324,9 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
                             .size(11.0),
                     );
                 }
+                ConfirmationRequest::DiscardChanges(_) => {
+                    ui.label("You have unsaved changes. Do you want to discard them and continue?");
+                }
             });
 
             ui.add_space(12.0);
@@ -297,7 +337,13 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let btn = egui::Button::new("Confirm Deletion")
+                    let btn_text = if matches!(request, ConfirmationRequest::DiscardChanges(_)) {
+                        "Discard & Continue"
+                    } else {
+                        "Confirm Deletion"
+                    };
+
+                    let btn = egui::Button::new(btn_text)
                         .fill(egui::Color32::from_rgb(110, 40, 40));
 
                     if ui.add(btn).clicked() {
@@ -317,6 +363,7 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
                     if app.current_statusbar_idx >= f.data.status_bars.len() {
                         app.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
                     }
+                    app.dirty = true;
                 }
             }
             ConfirmationRequest::DeleteAssets(items) => {
@@ -325,7 +372,29 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
                     app.assets.raw_files.remove(key);
                     app.assets.offsets.remove(key);
                 }
+                app.dirty = true;
                 app.preview_state.push_message("Deleted assets from project.");
+            }
+            ConfirmationRequest::DiscardChanges(pending) => {
+                app.dirty = false;
+                match pending {
+                    PendingAction::New => app.new_project(ctx),
+                    PendingAction::Load(path) => {
+                        let final_path = if path.is_empty() {
+                            crate::io::open_project_dialog()
+                        } else {
+                            Some(path.clone())
+                        };
+
+                        if let Some(p) = final_path {
+                            if let Some(loaded) = crate::io::load_project_from_path(ctx, &p) {
+                                app.load_project(ctx, loaded, &p);
+                            }
+                        }
+                    }
+                    PendingAction::Template(t) => app.apply_template(ctx, t),
+                    PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                }
             }
         }
     }
@@ -335,7 +404,7 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
     }
 }
 
-fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action) {
+fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui::Context) {
     use crate::document::LayerAction;
     use crate::hotkeys::Action;
 
@@ -343,22 +412,48 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action) {
         Action::Undo => {
             if let Some(f) = &mut app.current_file {
                 app.history.undo(f, &mut app.selection);
+                app.dirty = true;
                 app.preview_state.push_message("Undo performed.");
             }
         }
         Action::Redo => {
             if let Some(f) = &mut app.current_file {
                 app.history.redo(f, &mut app.selection);
+                app.dirty = true;
                 app.preview_state.push_message("Redo performed.");
+            }
+        }
+        Action::Open => {
+            if app.dirty {
+                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(PendingAction::Load("".to_string())));
+            } else if let Some(path) = crate::io::open_project_dialog() {
+                if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
+                    app.load_project(ctx, loaded, &path);
+                }
             }
         }
         Action::Save => {
             if let Some(f) = &app.current_file {
-                let name = app.opened_file_path.clone();
-                if let Some(path) = crate::io::save_pk3_dialog(f, &app.assets, name) {
-                    app.opened_file_path = Some(path.clone());
-                    app.add_to_recent(&path);
-                    app.preview_state.push_message(format!("Saved: {}", path));
+                let needs_dialog = match &app.opened_file_path {
+                    Some(p) => !std::path::Path::new(p).is_absolute(),
+                    None => true,
+                };
+
+                if needs_dialog {
+                    if let Some(path) = crate::io::save_pk3_dialog(f, &app.assets, app.opened_file_path.clone()) {
+                        app.opened_file_path = Some(path.clone());
+                        app.add_to_recent(&path);
+                        app.dirty = false;
+                        app.preview_state.push_message(format!("Saved: {}", path));
+                    }
+                } else {
+                    let path = app.opened_file_path.as_ref().unwrap();
+                    if let Err(e) = crate::io::save_pk3_silent(f, &app.assets, path) {
+                        app.preview_state.push_message(format!("Save Failed: {}", e));
+                    } else {
+                        app.dirty = false;
+                        app.preview_state.push_message(format!("Saved: {}", path));
+                    }
                 }
             }
         }
@@ -424,6 +519,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action) {
                         insert_idx,
                         elements: pasted_elements,
                     };
+                    app.dirty = true;
                     document::execute_layer_action(f, action, &mut app.selection);
                 }
             }
@@ -433,6 +529,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action) {
                 if let Some(f) = &mut app.current_file {
                     app.history.take_snapshot(f, &app.selection);
                     let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
+                    app.dirty = true;
                     document::execute_layer_action(
                         f,
                         LayerAction::DuplicateSelection(paths),
@@ -447,6 +544,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action) {
                 if let Some(f) = &mut app.current_file {
                     app.history.take_snapshot(f, &app.selection);
                     let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
+                    app.dirty = true;
                     document::execute_layer_action(
                         f,
                         LayerAction::DeleteSelection(paths),

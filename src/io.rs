@@ -16,10 +16,21 @@ pub struct LoadedProject {
     pub assets: AssetStore,
 }
 
+pub fn open_project_dialog() -> Option<String> {
+    if let Some(path) = FileDialog::new()
+        .add_filter("SBARDEF Projects", &["pk3", "zip", "json", "txt"])
+        .set_title("Open SBARDEF Project")
+        .pick_file()
+    {
+        return Some(path.to_string_lossy().into_owned());
+    }
+    None
+}
+
 pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<LoadedProject> {
     let path = PathBuf::from(path_str);
     if !path.exists() {
-        eprintln!("Recent file not found: {}", path_str);
+        eprintln!("File not found: {}", path_str);
         return None;
     }
 
@@ -132,22 +143,23 @@ fn build_pk3<W: Write + Seek>(
     Ok(())
 }
 
-pub fn save_json_dialog(file: &SBarDefFile, suggested_path: Option<String>) -> Option<String> {
-    let default_name = suggested_path
-        .and_then(|p| {
-            Path::new(&p)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| "SBARDEF".to_string());
-
-    if let Some(path) = FileDialog::new()
+pub fn save_json_dialog(file: &SBarDefFile, opened_path: Option<String>) -> Option<String> {
+    let mut dialog = FileDialog::new()
         .add_filter("SBARDEF JSON", &["json", "txt", "JSON", "TXT"])
-        .set_file_name(format!("{}.json", default_name))
-        .set_title("Export SBARDEF JSON")
-        .save_file()
-    {
+        .set_title("Export SBARDEF JSON");
+
+    if let Some(p_str) = &opened_path {
+        let p = Path::new(p_str);
+        if let Some(parent) = p.parent() {
+            dialog = dialog.set_directory(parent);
+        }
+        let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("SBARDEF");
+        dialog = dialog.set_file_name(format!("{}.json", stem));
+    } else {
+        dialog = dialog.set_file_name("SBARDEF.json");
+    }
+
+    if let Some(path) = dialog.save_file() {
         if let Ok(json) = serde_json::to_string_pretty(file) {
             if fs::write(&path, json).is_ok() {
                 return Some(path.to_string_lossy().into_owned());
@@ -160,29 +172,28 @@ pub fn save_json_dialog(file: &SBarDefFile, suggested_path: Option<String>) -> O
 pub fn save_pk3_dialog(
     file: &SBarDefFile,
     assets: &AssetStore,
-    suggested_path: Option<String>,
+    opened_path: Option<String>,
 ) -> Option<String> {
-    let default_name = suggested_path
-        .and_then(|p| {
-            std::path::Path::new(&p)
-                .file_name()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| "status_bar.pk3".to_string());
+    let mut dialog = FileDialog::new()
+        .add_filter("Doom Package", &["pk3", "zip", "PK3", "ZIP"])
+        .set_title("Save PK3");
 
-    let mut final_name = default_name;
-    let lower = final_name.to_lowercase();
-    if !lower.ends_with(".pk3") && !lower.ends_with(".zip") {
-        final_name.push_str(".pk3");
+    if let Some(p_str) = &opened_path {
+        let p = Path::new(p_str);
+        if let Some(parent) = p.parent() {
+            dialog = dialog.set_directory(parent);
+        }
+        let mut final_name = p.file_name().and_then(|s| s.to_str()).unwrap_or("status_bar.pk3").to_string();
+        let lower = final_name.to_lowercase();
+        if !lower.ends_with(".pk3") && !lower.ends_with(".zip") {
+            final_name.push_str(".pk3");
+        }
+        dialog = dialog.set_file_name(&final_name);
+    } else {
+        dialog = dialog.set_file_name("status_bar.pk3");
     }
 
-    if let Some(path) = FileDialog::new()
-        .add_filter("Doom Package", &["pk3", "zip", "PK3", "ZIP"])
-        .set_file_name(&final_name)
-        .set_title("Save PK3")
-        .save_file()
-    {
+    if let Some(path) = dialog.save_file() {
         match fs::File::create(&path) {
             Ok(fs_file) => {
                 if let Err(e) = build_pk3(fs_file, file, assets) {
@@ -195,6 +206,13 @@ pub fn save_pk3_dialog(
         }
     }
     None
+}
+
+pub fn save_pk3_silent(file: &SBarDefFile, assets: &AssetStore, path_str: &str) -> anyhow::Result<()> {
+    let path = Path::new(path_str);
+    let fs_file = fs::File::create(path)?;
+    build_pk3(fs_file, file, assets)?;
+    Ok(())
 }
 
 pub fn load_iwad_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> Option<String> {

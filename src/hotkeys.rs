@@ -6,6 +6,7 @@ pub enum Action {
     Undo,
     Redo,
     Save,
+    Open,
     ExportJSON,
     Copy,
     Paste,
@@ -17,6 +18,7 @@ pub struct HotkeyRegistry {
     pub undo: KeyboardShortcut,
     pub redo: KeyboardShortcut,
     pub save: KeyboardShortcut,
+    pub open: KeyboardShortcut,
     pub export_json: KeyboardShortcut,
     pub copy: KeyboardShortcut,
     pub paste: KeyboardShortcut,
@@ -30,6 +32,7 @@ impl Default for HotkeyRegistry {
             undo: KeyboardShortcut::new(Modifiers::COMMAND, Key::Z),
             redo: KeyboardShortcut::new(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z),
             save: KeyboardShortcut::new(Modifiers::COMMAND, Key::S),
+            open: KeyboardShortcut::new(Modifiers::COMMAND, Key::O),
             export_json: KeyboardShortcut::new(Modifiers::COMMAND, Key::E),
             copy: KeyboardShortcut::new(Modifiers::COMMAND, Key::C),
             paste: KeyboardShortcut::new(Modifiers::COMMAND, Key::V),
@@ -51,6 +54,10 @@ impl HotkeyRegistry {
 
         if ctx.input_mut(|i| i.consume_shortcut(&self.undo)) {
             return Some(Action::Undo);
+        }
+
+        if ctx.input_mut(|i| i.consume_shortcut(&self.open)) {
+            return Some(Action::Open);
         }
 
         let has_copy_event = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
