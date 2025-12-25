@@ -143,7 +143,7 @@ pub fn save_json_dialog(file: &SBarDefFile, suggested_path: Option<String>) -> O
         .unwrap_or_else(|| "SBARDEF".to_string());
 
     if let Some(path) = FileDialog::new()
-        .add_filter("SBARDEF JSON", &["json", "txt"])
+        .add_filter("SBARDEF JSON", &["json", "txt", "JSON", "TXT"])
         .set_file_name(format!("{}.json", default_name))
         .set_title("Export SBARDEF JSON")
         .save_file()
@@ -178,7 +178,7 @@ pub fn save_pk3_dialog(
     }
 
     if let Some(path) = FileDialog::new()
-        .add_filter("Doom Package", &["pk3", "zip"])
+        .add_filter("Doom Package", &["pk3", "zip", "PK3", "ZIP"])
         .set_file_name(&final_name)
         .set_title("Save PK3")
         .save_file()
@@ -259,7 +259,7 @@ pub fn launch_game(file: &SBarDefFile, assets: &AssetStore, source_port: &str, i
 
 pub fn import_images_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> usize {
     if let Some(paths) = FileDialog::new()
-        .add_filter("Images", &["png", "jpg", "jpeg"])
+        .add_filter("Images", &["png", "jpg", "jpeg", "PNG", "JPG", "JPEG"])
         .set_title("Import Graphics")
         .pick_files()
     {
