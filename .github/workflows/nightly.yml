@@ -97,8 +97,8 @@ jobs:
     - name: Rename binary
       run: |
         mkdir -p dist
-        mv Cacoco-*-x86_64.AppImage dist/Cacoco-nightly-linux-x86_64.AppImage
-        mv Cacoco-*-x86_64.AppImage.zsync dist/Cacoco-nightly-linux-x86_64.AppImage.zsync
+        mv cacoco-*-x86_64.AppImage dist/Cacoco-nightly-linux-x86_64.AppImage
+        mv cacoco-*-x86_64.AppImage.zsync dist/Cacoco-nightly-linux-x86_64.AppImage.zsync
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
