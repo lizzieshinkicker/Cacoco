@@ -26,11 +26,6 @@ impl AppConfig {
     pub fn load() -> Self {
         if let Some(config_dir) = Self::get_config_dir()
         {
-            if let Err(e) = fs::create_dir_all(&config_dir) {
-                eprintln!("Failed to create config directory: {}", e);
-                return Self::default();
-            }
-
             if let Ok(content) = fs::read_to_string(config_dir.join(Self::FILENAME)) {
                 if let Ok(cfg) = serde_json::from_str(&content) {
                     return cfg;
@@ -43,9 +38,15 @@ impl AppConfig {
     pub fn save(&self) {
         if let Some(config_dir) = Self::get_config_dir()
         {
+            if let Err(e) = fs::create_dir_all(&config_dir) {
+                eprintln!("Failed to create config directory: {}", e);
+                return;
+            }
+
+            let filename = config_dir.join(Self::FILENAME);
             if let Ok(content) = serde_json::to_string_pretty(self) {
-                let _ = fs::write(config_dir.join(Self::FILENAME), content);
-                println!("Config saved to {}", Self::FILENAME);
+                let _ = fs::write(&filename, content);
+                println!("Config saved to {}", filename.to_string_lossy());
             }
         }
     }
