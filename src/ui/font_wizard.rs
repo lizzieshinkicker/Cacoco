@@ -32,9 +32,10 @@ pub fn draw_font_wizard(
     state: &mut Option<FontWizardState>,
     file: &mut SBarDefFile,
     assets: &AssetStore
-) {
+) -> bool {
+    let mut changed = false;
     let mut is_open = state.is_some();
-    if !is_open { return; }
+    if !is_open { return false; }
 
     let mut close = false;
     let mut register = false;
@@ -100,6 +101,7 @@ pub fn draw_font_wizard(
 
     if register {
         if let Some(data) = state {
+            changed = true;
             match data.font_type {
                 FontTypeWrapper::Number => {
                     file.data.number_fonts.push(NumberFontDef {
@@ -123,6 +125,8 @@ pub fn draw_font_wizard(
     if close || !is_open {
         *state = None;
     }
+
+    changed
 }
 
 fn analyze_selection(patches: &[String]) -> (String, FontTypeWrapper) {

@@ -20,11 +20,13 @@ impl PropertiesUI for GraphicDef {
         _: &FontCache,
         _: &AssetStore,
         _: &PreviewState,
-    ) {
+    ) -> bool {
+        let mut changed = false;
         ui.horizontal(|ui| {
             ui.label("Patch:");
-            ui.text_edit_singleline(&mut self.patch);
+            changed |= ui.text_edit_singleline(&mut self.patch).changed();
         });
+        changed
     }
 
     fn get_preview_content(
@@ -48,7 +50,7 @@ impl PropertiesUI for FaceDef {
         _: &FontCache,
         _: &AssetStore,
         _: &PreviewState,
-    ) {}
+    ) -> bool { false }
 
     fn get_preview_content(
         &self,
@@ -105,7 +107,8 @@ impl PropertiesUI for AnimationDef {
         _fonts: &FontCache,
         assets: &AssetStore,
         _state: &PreviewState,
-    ) {
+    ) -> bool {
+        let mut changed = false;
         ui.horizontal(|ui| {
             ui.heading("Frames");
 
@@ -121,12 +124,14 @@ impl PropertiesUI for AnimationDef {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if !self.frames.is_empty() && ui.button("Clear").clicked() {
                     self.frames.clear();
+                    changed = true;
                 }
                 if ui.button("Add").clicked() {
                     self.frames.push(FrameDef {
                         lump: "HICACOCO".to_string(),
                         duration: 1.0 / DOOM_TICS_PER_SEC,
                     });
+                    changed = true;
                 }
             });
         });
@@ -156,13 +161,13 @@ impl PropertiesUI for AnimationDef {
         ui.spacing_mut().item_spacing.y = 1.0;
 
         if self.frames.is_empty() {
-            draw_empty_frame_dropzone(ui, &mut actions);
+            changed |= draw_empty_frame_dropzone(ui, &mut actions);
         } else {
             for (idx, frame) in self.frames.iter_mut().enumerate() {
                 let is_active = active_idx == Some(idx);
 
                 ui.push_id(idx, |ui| {
-                    draw_frame_row(
+                    changed |= draw_frame_row(
                         ui,
                         idx,
                         frame,
@@ -177,6 +182,7 @@ impl PropertiesUI for AnimationDef {
         }
 
         for action in actions {
+            changed = true;
             match action {
                 FrameAction::MoveSelection(sources, mut target_idx) => {
                     let mut sorted_src = sources.clone();
@@ -223,6 +229,8 @@ impl PropertiesUI for AnimationDef {
             d.insert_temp(sel_id, selection);
             d.insert_temp(pivot_id, pivot);
         });
+
+        changed
     }
 
     fn get_preview_content(
@@ -249,7 +257,8 @@ fn draw_frame_row(
     selection: &mut HashSet<usize>,
     pivot: &mut Option<usize>,
     is_active: bool,
-) {
+) -> bool {
+    let mut changed = false;
     let row_height = 42.0;
     let is_selected = selection.contains(&idx);
     let spacing_offset = ui.spacing().item_spacing.y * 0.5;
@@ -318,6 +327,7 @@ fn draw_frame_row(
                         selection.iter().cloned().collect(),
                         target_idx,
                     ));
+                    changed = true;
                 }
             }
         }
@@ -336,6 +346,7 @@ fn draw_frame_row(
                 );
                 if ui.input(|i| i.pointer.any_released()) {
                     actions.push(FrameAction::Replace(idx, asset_keys[0].clone()));
+                    changed = true;
                 }
             } else {
                 let top_half = rel_y < (row_height / 2.0);
@@ -352,6 +363,7 @@ fn draw_frame_row(
                         actions.push(FrameAction::Add(target_idx, key.clone()));
                         target_idx += 1;
                     }
+                    changed = true;
                 }
             }
         }
@@ -417,6 +429,7 @@ fn draw_frame_row(
                 .changed()
             {
                 frame.duration = tic_count as f64 / DOOM_TICS_PER_SEC;
+                changed = true;
             }
         });
     });
@@ -465,6 +478,7 @@ fn draw_frame_row(
                 });
         }
     }
+    changed
 }
 
 fn draw_yellow_line(ui: &egui::Ui, rect: egui::Rect, y: f32) {
@@ -474,7 +488,8 @@ fn draw_yellow_line(ui: &egui::Ui, rect: egui::Rect, y: f32) {
     );
 }
 
-fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) {
+fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) -> bool {
+    let mut changed = false;
     let (rect, _) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 60.0),
         egui::Sense::hover(),
@@ -501,26 +516,20 @@ fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) 
                 for key in keys.iter() {
                     actions.push(FrameAction::Add(9999, key.clone()));
                 }
+                changed = true;
             }
         }
     }
+    changed
 }
 
 impl PropertiesUI for CanvasDef {
-    fn has_specific_fields(&self) -> bool {
-        false
-    }
-    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) {}
-    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> {
-        None
-    }
+    fn has_specific_fields(&self) -> bool { false }
+    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) -> bool { false }
+    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> { None }
 }
 impl PropertiesUI for CarouselDef {
-    fn has_specific_fields(&self) -> bool {
-        false
-    }
-    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) {}
-    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> {
-        None
-    }
+    fn has_specific_fields(&self) -> bool { false }
+    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) -> bool { false }
+    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> { None }
 }

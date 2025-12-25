@@ -3,26 +3,30 @@ use crate::model::{ElementWrapper, Alignment};
 use crate::assets::AssetStore;
 use crate::ui::layers::thumbnails;
 
-pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) {
+pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) -> bool {
+    let mut changed = false;
     let common = element.get_common_mut();
 
     ui.horizontal(|ui| {
         ui.label("X:");
-        ui.add(egui::DragValue::new(&mut common.x));
+        changed |= ui.add(egui::DragValue::new(&mut common.x)).changed();
 
         ui.label("Y:");
-        ui.add(egui::DragValue::new(&mut common.y));
+        changed |= ui.add(egui::DragValue::new(&mut common.y)).changed();
     });
 
     ui.add_space(4.0);
     ui.label("Alignment:");
-    draw_alignment_selector(ui, &mut common.alignment);
+    changed |= draw_alignment_selector(ui, &mut common.alignment);
 
     ui.add_space(4.0);
-    ui.checkbox(&mut common.translucency, "Translucent (Boom Style)");
+    changed |= ui.checkbox(&mut common.translucency, "Translucent (Boom Style)").changed();
+
+    changed
 }
 
-fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) {
+fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
+    let mut changed = false;
     let pos_mask = Alignment::H_CENTER | Alignment::RIGHT | Alignment::V_CENTER | Alignment::BOTTOM;
     let current_pos = *align & pos_mask;
     let extras = *align - pos_mask;
@@ -33,7 +37,10 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) {
         egui::Grid::new("align_matrix").spacing(egui::vec2(2.0, 2.0)).min_col_width(0.0).show(ui, |ui| {
             let mut toggle = |ui: &mut egui::Ui, target: Alignment| {
                 let (rect, response) = ui.allocate_exact_size(btn_size, egui::Sense::click());
-                if response.clicked() { *align = extras | target; }
+                if response.clicked() {
+                    *align = extras | target;
+                    changed = true;
+                }
                 let active = current_pos == target;
                 let bg_color = if active { ui.visuals().selection.bg_fill }
                 else if response.hovered() { ui.visuals().widgets.hovered.bg_fill }
@@ -42,18 +49,33 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) {
                 else { egui::Stroke::new(1.0, egui::Color32::from_gray(50)) };
                 ui.painter().rect(rect, 2.0, bg_color, stroke, egui::StrokeKind::Middle);
             };
-            toggle(ui, Alignment::LEFT | Alignment::TOP); toggle(ui, Alignment::H_CENTER | Alignment::TOP); toggle(ui, Alignment::RIGHT | Alignment::TOP); ui.end_row();
-            toggle(ui, Alignment::LEFT | Alignment::V_CENTER); toggle(ui, Alignment::H_CENTER | Alignment::V_CENTER); toggle(ui, Alignment::RIGHT | Alignment::V_CENTER); ui.end_row();
-            toggle(ui, Alignment::LEFT | Alignment::BOTTOM); toggle(ui, Alignment::H_CENTER | Alignment::BOTTOM); toggle(ui, Alignment::RIGHT | Alignment::BOTTOM); ui.end_row();
+            toggle(ui, Alignment::LEFT | Alignment::TOP);
+            toggle(ui, Alignment::H_CENTER | Alignment::TOP);
+            toggle(ui, Alignment::RIGHT | Alignment::TOP); ui.end_row();
+            
+            toggle(ui, Alignment::LEFT | Alignment::V_CENTER);
+            toggle(ui, Alignment::H_CENTER | Alignment::V_CENTER);
+            toggle(ui, Alignment::RIGHT | Alignment::V_CENTER); ui.end_row();
+            
+            toggle(ui, Alignment::LEFT | Alignment::BOTTOM); 
+            toggle(ui, Alignment::H_CENTER | Alignment::BOTTOM); 
+            toggle(ui, Alignment::RIGHT | Alignment::BOTTOM); ui.end_row();
         });
         ui.add_space(8.0);
         ui.vertical(|ui| {
             let mut dyn_left = align.contains(Alignment::DYNAMIC_LEFT);
-            if ui.toggle_value(&mut dyn_left, "Dynamic Left").changed() { align.set(Alignment::DYNAMIC_LEFT, dyn_left); }
+            if ui.toggle_value(&mut dyn_left, "Dynamic Left").changed() {
+                align.set(Alignment::DYNAMIC_LEFT, dyn_left);
+                changed = true;
+            }
             let mut dyn_right = align.contains(Alignment::DYNAMIC_RIGHT);
-            if ui.toggle_value(&mut dyn_right, "Dynamic Right").changed() { align.set(Alignment::DYNAMIC_RIGHT, dyn_right); }
+            if ui.toggle_value(&mut dyn_right, "Dynamic Right").changed() {
+                align.set(Alignment::DYNAMIC_RIGHT, dyn_right);
+                changed = true;
+            }
         });
     });
+    changed
 }
 
 pub(super) fn paint_thumb_content(ui: &mut egui::Ui, rect: egui::Rect, tex: Option<&egui::TextureHandle>, fallback_text: Option<&str>) {
@@ -71,19 +93,20 @@ pub(super) fn paint_thumb_content(ui: &mut egui::Ui, rect: egui::Rect, tex: Opti
     }
 }
 
-pub fn draw_root_statusbar_fields(ui: &mut egui::Ui, bar: &mut crate::model::StatusBarLayout) {
+pub fn draw_root_statusbar_fields(ui: &mut egui::Ui, bar: &mut crate::model::StatusBarLayout) -> bool {
+    let mut changed = false;
     ui.label(egui::RichText::new("Main Settings").strong());
 
     ui.horizontal(|ui| {
         ui.add_space(2.0);
         ui.label("Bar Height:");
-        ui.add(egui::DragValue::new(&mut bar.height).range(0..=200).speed(1));
+        changed |= ui.add(egui::DragValue::new(&mut bar.height).range(0..=200).speed(1)).changed();
         ui.add_space(2.0);
     });
 
     ui.horizontal(|ui| {
         ui.add_space(2.0);
-        ui.checkbox(&mut bar.fullscreen_render, "Fullscreen Render");
+        changed |= ui.checkbox(&mut bar.fullscreen_render, "Fullscreen Render").changed();
         ui.add_space(2.0);
     });
 
@@ -107,9 +130,12 @@ pub fn draw_root_statusbar_fields(ui: &mut egui::Ui, bar: &mut crate::model::Sta
             } else {
                 Some(flat_name.to_uppercase())
             };
+            changed = true;
         }
         ui.add_space(2.0);
     });
+
+    changed
 }
 
 pub fn draw_font_selection_row(
@@ -120,7 +146,8 @@ pub fn draw_font_selection_row(
     assets: &AssetStore,
     is_number_font: bool,
     index: usize,
-) {
+) -> bool {
+    let mut changed = false;
     let preview_char = if is_number_font {
         std::char::from_digit((index % 10) as u32, 10).unwrap_or('0')
     } else {
@@ -134,8 +161,11 @@ pub fn draw_font_selection_row(
         .fallback("?")
         .selected(*current_val == target_name)
         .show(ui);
+
     if response.clicked() {
         *current_val = target_name.to_string();
+        changed = true;
         ui.close();
     }
+    changed
 }

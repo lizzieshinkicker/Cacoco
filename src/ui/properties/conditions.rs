@@ -4,7 +4,8 @@ use crate::assets::AssetStore;
 use super::lookups;
 use super::common::paint_thumb_content;
 
-pub fn draw_conditions_editor(ui: &mut egui::Ui, element: &mut ElementWrapper, assets: &AssetStore, state: &crate::state::PreviewState) {
+pub fn draw_conditions_editor(ui: &mut egui::Ui, element: &mut ElementWrapper, assets: &AssetStore, state: &crate::state::PreviewState) -> bool {
+    let mut changed = false;
     let common = element.get_common_mut();
     ui.add_space(12.0);
 
@@ -12,7 +13,10 @@ pub fn draw_conditions_editor(ui: &mut egui::Ui, element: &mut ElementWrapper, a
         ui.heading(format!("Conditions ({})", common.conditions.len()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if !common.conditions.is_empty() {
-                if ui.button("Clear").clicked() { common.conditions.clear(); }
+                if ui.button("Clear").clicked() {
+                    common.conditions.clear();
+                    changed = true;
+                }
             }
             if ui.button("Add").clicked() {
                 common.conditions.push(ConditionDef {
@@ -20,6 +24,7 @@ pub fn draw_conditions_editor(ui: &mut egui::Ui, element: &mut ElementWrapper, a
                     param: 101,
                     param2: 0,
                 });
+                changed = true;
             }
         });
     });
@@ -29,14 +34,17 @@ pub fn draw_conditions_editor(ui: &mut egui::Ui, element: &mut ElementWrapper, a
     for (i, cond) in common.conditions.iter_mut().enumerate() {
         let id = ui.make_persistent_id(format!("cond_card_{}", i));
         ui.push_id(id, |ui| {
-            draw_condition_card(ui, cond, assets, &mut remove_idx, i, state);
+            changed |= draw_condition_card(ui, cond, assets, &mut remove_idx, i, state);
         });
         ui.add_space(4.0);
     }
 
     if let Some(i) = remove_idx {
         common.conditions.remove(i);
+        changed = true;
     }
+
+    changed
 }
 
 fn draw_condition_card(
@@ -46,7 +54,8 @@ fn draw_condition_card(
     remove_idx: &mut Option<usize>,
     my_idx: usize,
     state: &crate::state::PreviewState
-) {
+) -> bool {
+    let mut changed = false;
     let is_true = crate::conditions::resolve(&[cond.clone()], state);
 
     let frame = egui::Frame::new()
@@ -94,6 +103,7 @@ fn draw_condition_card(
                                                 cond.condition = new_group.variants[0].condition;
                                                 cond.param = new_group.default_param;
                                                 cond.param2 = 0;
+                                                changed = true;
                                             }
                                         }
                                     }
@@ -112,7 +122,7 @@ fn draw_condition_card(
                 ui.horizontal(|ui| {
                     let (g_idx, _) = lookups::find_group_for_type(cond.condition);
                     let group = &lookups::GROUPS[g_idx];
-                    draw_condition_predicate(ui, group, cond, assets);
+                    changed |= draw_condition_predicate(ui, group, cond, assets);
                 });
             });
         });
@@ -125,27 +135,32 @@ fn draw_condition_card(
     };
 
     ui.painter().rect_filled(response.response.rect, 4.0, tint_color);
+
+    changed
 }
 
-fn draw_condition_predicate(ui: &mut egui::Ui, group: &lookups::ConditionGroup, cond: &mut ConditionDef, assets: &AssetStore) {
+fn draw_condition_predicate(ui: &mut egui::Ui, group: &lookups::ConditionGroup, cond: &mut ConditionDef, assets: &AssetStore) -> bool {
+    let mut changed = false;
     match group.style {
         lookups::GroupStyle::Standard => {
-            draw_operator_selector(ui, group, cond, assets);
-            draw_params_for_type(ui, cond, assets);
+            changed |= draw_operator_selector(ui, group, cond, assets);
+            changed |= draw_params_for_type(ui, cond, assets);
         },
         lookups::GroupStyle::Natural => {
-            draw_params_for_type(ui, cond, assets);
-            draw_operator_selector(ui, group, cond, assets);
+            changed |= draw_params_for_type(ui, cond, assets);
+            changed |= draw_operator_selector(ui, group, cond, assets);
         },
         lookups::GroupStyle::AmmoComplex => {
-            draw_operator_selector(ui, group, cond, assets);
-            ui.add(egui::DragValue::new(&mut cond.param).speed(1).range(0..=999));
-            draw_lookup_param_dd(ui, "param2", &mut cond.param2, lookups::AMMO_TYPES, assets);
+            changed |= draw_operator_selector(ui, group, cond, assets);
+            changed |= ui.add(egui::DragValue::new(&mut cond.param).speed(1).range(0..=999)).changed();
+            changed |= draw_lookup_param_dd(ui, "param2", &mut cond.param2, lookups::AMMO_TYPES, assets);
         }
     }
+    changed
 }
 
-fn draw_operator_selector(ui: &mut egui::Ui, group: &lookups::ConditionGroup, cond: &mut ConditionDef, _assets: &AssetStore) {
+fn draw_operator_selector(ui: &mut egui::Ui, group: &lookups::ConditionGroup, cond: &mut ConditionDef, _assets: &AssetStore) -> bool {
+    let mut changed = false;
     let current_variant = group.variants.iter()
         .find(|v| v.condition == cond.condition)
         .unwrap_or(&group.variants[0]);
@@ -161,49 +176,53 @@ fn draw_operator_selector(ui: &mut egui::Ui, group: &lookups::ConditionGroup, co
         .height(600.0)
         .show_ui(ui, |ui| {
             for v in group.variants {
-                ui.selectable_value(&mut cond.condition, v.condition, v.label);
+                changed |= ui.selectable_value(&mut cond.condition, v.condition, v.label).changed();
             }
         });
+    changed
 }
 
-fn draw_params_for_type(ui: &mut egui::Ui, cond: &mut ConditionDef, assets: &AssetStore) {
+fn draw_params_for_type(ui: &mut egui::Ui, cond: &mut ConditionDef, assets: &AssetStore) -> bool {
     use crate::model::ConditionType::*;
     use lookups::*;
 
+    let mut changed = false;
     match cond.condition {
         WeaponOwned | WeaponNotOwned | WeaponSelected | WeaponNotSelected | WeaponHasAmmo => {
-            draw_lookup_param_dd(ui, "param1", &mut cond.param, WEAPONS, assets);
+            changed |= draw_lookup_param_dd(ui, "param1", &mut cond.param, WEAPONS, assets);
         },
         ItemOwned | ItemNotOwned => {
-            draw_lookup_param_dd(ui, "param1", &mut cond.param, ITEMS, assets);
+            changed |= draw_lookup_param_dd(ui, "param1", &mut cond.param, ITEMS, assets);
         },
         AmmoMatch => {
-            draw_lookup_param_dd(ui, "param1", &mut cond.param, AMMO_TYPES, assets);
+            changed |= draw_lookup_param_dd(ui, "param1", &mut cond.param, AMMO_TYPES, assets);
         },
         SessionTypeEq | SessionTypeNeq => {
-            draw_lookup_param_dd(ui, "param1", &mut cond.param, SESSION_TYPES, assets);
+            changed |= draw_lookup_param_dd(ui, "param1", &mut cond.param, SESSION_TYPES, assets);
         },
         HudModeEq => {
-            draw_lookup_param_dd(ui, "param1", &mut cond.param, HUD_MODES, assets);
+            changed |= draw_lookup_param_dd(ui, "param1", &mut cond.param, HUD_MODES, assets);
         },
         WidescreenModeEq => {
-            draw_lookup_param_dd(ui, "param1", &mut cond.param, WIDESCREEN_MODES, assets);
+            changed |= draw_lookup_param_dd(ui, "param1", &mut cond.param, WIDESCREEN_MODES, assets);
         },
         AutomapModeEq => {
-            draw_automap_param(ui, &mut cond.param);
+            changed |= draw_automap_param(ui, &mut cond.param);
         },
         SlotOwned | SlotNotOwned | SlotSelected | SlotNotSelected => {
-            ui.add(egui::DragValue::new(&mut cond.param).range(1..=9));
+            changed |= ui.add(egui::DragValue::new(&mut cond.param).range(1..=9)).changed();
         }
         _ => {
             if matches!(get_param_usage(cond.condition), ParamUsage::Param1 | ParamUsage::Both) {
-                ui.add(egui::DragValue::new(&mut cond.param).speed(1).range(0..=999));
+                changed |= ui.add(egui::DragValue::new(&mut cond.param).speed(1).range(0..=999)).changed();
             }
         }
     }
+    changed
 }
 
-fn draw_lookup_param_dd(ui: &mut egui::Ui, salt: &str, param: &mut i32, items: &[lookups::LookupItem], _assets: &AssetStore) {
+fn draw_lookup_param_dd(ui: &mut egui::Ui, salt: &str, param: &mut i32, items: &[lookups::LookupItem], _assets: &AssetStore) -> bool {
+    let mut changed = false;
     let current_name = items.iter().find(|i| i.id == *param).map(|i| i.name).unwrap_or("Unknown");
 
     egui::ComboBox::from_id_salt(salt)
@@ -211,19 +230,23 @@ fn draw_lookup_param_dd(ui: &mut egui::Ui, salt: &str, param: &mut i32, items: &
         .height(600.0)
         .show_ui(ui, |ui| {
             for item in items {
-                ui.selectable_value(param, item.id, item.name);
+                changed |= ui.selectable_value(param, item.id, item.name).changed();
             }
         });
+    changed
 }
 
-pub fn draw_automap_param(ui: &mut egui::Ui, param: &mut i32) {
+pub fn draw_automap_param(ui: &mut egui::Ui, param: &mut i32) -> bool {
+    let mut changed = false;
     ui.menu_button("Flags...", |ui| {
         ui.set_min_width(120.0);
         for flag in lookups::AUTOMAP_FLAGS {
             let mut is_set = (*param & flag.id) != 0;
             if ui.checkbox(&mut is_set, flag.name).changed() {
                 if is_set { *param |= flag.id; } else { *param &= !flag.id; }
+                changed = true;
             }
         }
     });
+    changed
 }

@@ -111,11 +111,12 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             ui.vertical(|ui| {
                 ui.set_height(available_height);
 
+                let mut props_changed = false;
                 egui::ScrollArea::vertical()
                     .id_salt("properties_scroll")
                     .max_height(available_height * 0.60)
                     .show(ui, |ui| {
-                        ui::draw_properties_panel(
+                        props_changed = ui::draw_properties_panel(
                             ui,
                             &mut app.current_file,
                             &app.selection,
@@ -123,6 +124,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                             &app.preview_state,
                         );
                     });
+
+                if props_changed {
+                    app.dirty = true;
+                }
 
                 ui.separator();
                 ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
@@ -133,7 +138,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         .resizable(false)
         .exact_width(320.0)
         .show(ctx, |ui| {
-            let actions = ui::draw_layers_panel(
+            let (actions, layers_changed) = ui::draw_layers_panel(
                 ui,
                 &mut app.current_file,
                 &mut app.selection,
@@ -144,6 +149,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 &mut app.font_wizard,
                 &mut app.confirmation_modal,
             );
+
+            if layers_changed {
+                app.dirty = true;
+            }
 
             if let Some(f) = &mut app.current_file {
                 for action in actions {
@@ -191,7 +200,9 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     }
 
     if let Some(f) = &mut app.current_file {
-        font_wizard::draw_font_wizard(ctx, &mut app.font_wizard, f, &app.assets);
+        if font_wizard::draw_font_wizard(ctx, &mut app.font_wizard, f, &app.assets) {
+            app.dirty = true;
+        }
     }
 
     if let Some(request) = app.confirmation_modal.clone() {

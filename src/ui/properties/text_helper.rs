@@ -60,14 +60,16 @@ pub fn draw_text_helper_editor(
     element: &mut ElementWrapper,
     fonts: &FontCache,
     assets: &AssetStore
-) {
+) -> bool {
     let mut bake_needed = false;
+    let mut changed = false;
     let helper = element._cacoco_text.as_mut().unwrap();
 
     ui.horizontal(|ui| {
         ui.label("Text:");
         if ui.text_edit_singleline(&mut helper.text).changed() {
             bake_needed = true;
+            changed = true;
         }
     });
 
@@ -85,31 +87,38 @@ pub fn draw_text_helper_editor(
 
                 for (i, name) in fonts.hud_font_names.iter().enumerate() {
                     let stem = fonts.get_hud_stem(name);
-                    common::draw_font_selection_row(ui, &mut helper.font, name, stem.as_ref(), assets, false, i);
+                    changed |= common::draw_font_selection_row(ui, &mut helper.font, name, stem.as_ref(), assets, false, i);
                 }
 
                 for (i, name) in fonts.number_font_names.iter().enumerate() {
                     let stem = fonts.get_number_stem(name);
-                    common::draw_font_selection_row(ui, &mut helper.font, name, stem.as_ref(), assets, true, i);
+                    changed |= common::draw_font_selection_row(ui, &mut helper.font, name, stem.as_ref(), assets, true, i);
                 }
             });
 
-        if helper.font != old_font { bake_needed = true; }
+        if helper.font != old_font {
+            bake_needed = true;
+            changed = true;
+        }
     });
 
     ui.horizontal(|ui| {
         ui.label("Spacing:");
         if ui.add(egui::DragValue::new(&mut helper.spacing)).changed() {
             bake_needed = true;
+            changed = true;
         }
     });
 
     ui.add_space(8.0);
     if ui.button("Explode to Graphics").clicked() {
         element._cacoco_text = None;
+        changed = true;
     }
 
     if bake_needed {
         rebake_text(element, assets, fonts);
     }
+
+    changed
 }
