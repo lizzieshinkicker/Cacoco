@@ -1,11 +1,11 @@
 use crate::assets::AssetStore;
 use crate::model::{ComponentDef, ComponentType, ElementWrapper, NumberDef, NumberType, Element};
 use crate::state::PreviewState;
-use crate::ui::layers::thumbnails;
 use eframe::egui;
 use super::editor::PropertiesUI;
 use super::preview::PreviewContent;
 use super::FontCache;
+use super::common;
 
 const HEADER_MENU_KEY: &str = "cacoco_prop_header_menu_id";
 
@@ -16,7 +16,8 @@ impl PropertiesUI for NumberDef {
         fonts: &FontCache,
         assets: &AssetStore,
         _state: &PreviewState,
-    ) {
+    ) -> bool {
+        let mut changed = false;
         ui.horizontal(|ui| {
             ui.label("Font:");
             egui::ComboBox::from_id_salt("num_font_selector")
@@ -27,7 +28,7 @@ impl PropertiesUI for NumberDef {
                     ui.set_min_height(h);
                     for (i, name) in fonts.number_font_names.iter().enumerate() {
                         let stem = fonts.get_number_stem(name);
-                        draw_font_selection_row(
+                        changed |= common::draw_font_selection_row(
                             ui,
                             &mut self.font,
                             name,
@@ -42,13 +43,15 @@ impl PropertiesUI for NumberDef {
 
         ui.horizontal(|ui| {
             ui.label("Param:");
-            ui.add(egui::DragValue::new(&mut self.param));
+            changed |= ui.add(egui::DragValue::new(&mut self.param)).changed();
         });
 
         ui.horizontal(|ui| {
             ui.label("Max Len:");
-            ui.add(egui::DragValue::new(&mut self.maxlength));
+            changed |= ui.add(egui::DragValue::new(&mut self.maxlength)).changed();
         });
+
+        changed
     }
 
     fn get_preview_content(
@@ -87,7 +90,8 @@ impl PropertiesUI for ComponentDef {
         fonts: &FontCache,
         assets: &AssetStore,
         _state: &PreviewState,
-    ) {
+    ) -> bool {
+        let mut changed = false;
         ui.horizontal(|ui| {
             ui.label("Font:");
             egui::ComboBox::from_id_salt("hud_font_selector")
@@ -97,7 +101,7 @@ impl PropertiesUI for ComponentDef {
                 .show_ui(ui, |ui| {
                     for (i, name) in fonts.hud_font_names.iter().enumerate() {
                         let stem = fonts.get_hud_stem(name);
-                        draw_font_selection_row(
+                        changed |= common::draw_font_selection_row(
                             ui,
                             &mut self.font,
                             name,
@@ -109,6 +113,7 @@ impl PropertiesUI for ComponentDef {
                     }
                 });
         });
+        changed
     }
 
     fn get_preview_content(
@@ -143,7 +148,8 @@ pub fn draw_interactive_header(
     element: &mut ElementWrapper,
     helper_text: &str,
     frame_color: egui::Color32,
-) {
+) -> bool {
+    let mut changed = false;
     let frame = egui::Frame::new()
         .inner_margin(8.0)
         .corner_radius(4.0)
@@ -213,9 +219,9 @@ pub fn draw_interactive_header(
                         ui.set_max_width(200.0);
                         let mut close = false;
                         match &mut element.data {
-                            Element::Number(n) => close = draw_number_options(ui, &mut n.type_),
-                            Element::Percent(p) => close = draw_number_options(ui, &mut p.type_),
-                            Element::Component(c) => close = draw_component_options(ui, &mut c.type_),
+                            Element::Number(n) => if draw_number_options(ui, &mut n.type_) { close = true; changed = true; },
+                            Element::Percent(p) => if draw_number_options(ui, &mut p.type_) { close = true; changed = true; },
+                            Element::Component(c) => if draw_component_options(ui, &mut c.type_) { close = true; changed = true; },
                             _ => {}
                         }
                         if close {
@@ -253,12 +259,14 @@ pub fn draw_interactive_header(
                 if ui.input(|i| i.pointer.any_released()) {
                     if let Some(key) = asset_keys.get(0) {
                         g.patch = key.clone();
+                        changed = true;
                     }
                     egui::DragAndDrop::clear_payload(ui.ctx());
                 }
             }
         }
     }
+    changed
 }
 
 fn number_type_name(t: NumberType) -> &'static str {
@@ -384,32 +392,4 @@ fn draw_component_options(ui: &mut egui::Ui, type_: &mut ComponentType) -> bool 
         changed = true;
     }
     changed
-}
-
-pub fn draw_font_selection_row(
-    ui: &mut egui::Ui,
-    current_val: &mut String,
-    target_name: &str,
-    stem: Option<&String>,
-    assets: &AssetStore,
-    is_number_font: bool,
-    index: usize,
-) {
-    let preview_char = if is_number_font {
-        std::char::from_digit((index % 10) as u32, 10).unwrap_or('0')
-    } else {
-        (b'A' + (index % 26) as u8) as char
-    };
-    let patch_name = stem.map(|s| assets.resolve_patch_name(s, preview_char, is_number_font));
-    let texture = patch_name.and_then(|n| assets.textures.get(&n));
-    let response = thumbnails::ListRow::new(target_name)
-        .subtitle(format!("({})", stem.unwrap_or(&"???".to_string())))
-        .texture(texture)
-        .fallback("?")
-        .selected(*current_val == target_name)
-        .show(ui);
-    if response.clicked() {
-        *current_val = target_name.to_string();
-        ui.close();
-    }
 }

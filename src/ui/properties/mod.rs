@@ -25,13 +25,14 @@ pub fn draw_properties_panel(
     selection: &HashSet<Vec<usize>>,
     assets: &AssetStore,
     state: &PreviewState,
-) {
+) -> bool {
+    let mut changed = false;
     ui.heading("Properties");
     ui.separator();
 
     let file_ref = match file {
         Some(f) => f,
-        None => { ui.label("No file loaded."); return; }
+        None => { ui.label("No file loaded."); return false; }
     };
 
     if selection.len() > 1 {
@@ -40,12 +41,12 @@ pub fn draw_properties_panel(
             ui.label(egui::RichText::new("Multiple Objects Selected").strong().size(16.0));
             ui.label(format!("{} objects", selection.len()));
         });
-        return;
+        return false;
     }
 
     let path = match selection.iter().next() {
         Some(p) => p,
-        None => { ui.label("Select a layer to edit."); return; }
+        None => { ui.label("Select a layer to edit."); return false; }
     };
 
     let font_cache = FontCache::new(file_ref);
@@ -62,7 +63,7 @@ pub fn draw_properties_panel(
                 .map(|c| c.linear_multiply(0.05))
                 .unwrap_or_else(|| ui.visuals().widgets.noninteractive.bg_fill);
 
-            text::draw_interactive_header(ui, element, helper_text, frame_color);
+            changed |= text::draw_interactive_header(ui, element, helper_text, frame_color);
             ui.separator();
 
             if element._cacoco_text.is_none() {
@@ -71,27 +72,28 @@ pub fn draw_properties_panel(
                     let mut name = element._cacoco_name.clone().unwrap_or_default();
                     if ui.text_edit_singleline(&mut name).changed() {
                         element._cacoco_name = if name.is_empty() { None } else { Some(name) };
+                        changed = true;
                     }
                 });
                 ui.add_space(4.0);
             }
 
-            common::draw_transform_editor(ui, element);
+            changed |= common::draw_transform_editor(ui, element);
             ui.add_space(4.0);
 
             let has_content = element._cacoco_text.is_some() || element.has_specific_fields();
             if has_content {
                 ui.group(|ui| {
                     if element._cacoco_text.is_some() {
-                        text_helper::draw_text_helper_editor(ui, element, &font_cache, assets);
+                        changed |= text_helper::draw_text_helper_editor(ui, element, &font_cache, assets);
                     } else {
-                        element.draw_specific_fields(ui, &font_cache, assets, state);
+                        changed |= element.draw_specific_fields(ui, &font_cache, assets, state);
                     }
                 });
                 ui.add_space(4.0);
             }
 
-            conditions::draw_conditions_editor(ui, element, assets, state);
+            changed |= conditions::draw_conditions_editor(ui, element, assets, state);
         });
     } else {
         let bar_idx = path[0];
@@ -99,8 +101,10 @@ pub fn draw_properties_panel(
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.heading(format!("Status Bar #{} Layout", bar_idx));
                 ui.separator();
-                common::draw_root_statusbar_fields(ui, bar);
+                changed |= common::draw_root_statusbar_fields(ui, bar);
             });
         }
     }
+
+    changed
 }

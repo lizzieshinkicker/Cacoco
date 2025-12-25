@@ -36,7 +36,8 @@ const LIB_GROUPS: &[LibraryGroup] = &[
     },
 ];
 
-pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &AssetStore) {
+pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &AssetStore) -> bool {
+    let mut changed = false;
     let mut remove_num = None;
     let mut remove_hud = None;
 
@@ -46,6 +47,7 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
             let preview_char = (b'A' + (i % 26) as u8) as char;
             if draw_registered_font_row(ui, &font.name, &font.stem, false, preview_char, assets) {
                 remove_hud = Some(i);
+                changed = true;
             }
         }
     }
@@ -60,6 +62,7 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
             let preview_char = std::char::from_digit((i % 10) as u32, 10).unwrap_or('0');
             if draw_registered_font_row(ui, &font.name, &font.stem, true, preview_char, assets) {
                 remove_num = Some(i);
+                changed = true;
             }
         }
     }
@@ -70,6 +73,8 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
     if let Some(i) = remove_hud {
         file.data.hud_fonts.remove(i);
     }
+
+    changed
 }
 
 fn draw_registered_font_row(
@@ -111,7 +116,8 @@ pub fn draw_filtered_browser(
     wizard_state: &mut Option<FontWizardState>,
     confirmation_modal: &mut Option<ConfirmationRequest>,
     show_fonts_toggle: bool,
-) {
+) -> bool {
+    let mut changed = false;
     if !show_project_assets {
         ui.heading("Base IWAD Browser");
         ui.separator();
@@ -123,7 +129,7 @@ pub fn draw_filtered_browser(
             .iter()
             .filter(|f| f.source == FontSource::Internal && f.is_hud);
         for (i, font) in iwad_hud.enumerate() {
-            draw_unified_font_row(ui, assets, file, font, i);
+            changed |= draw_unified_font_row(ui, assets, file, font, i);
         }
 
         ui.add_space(8.0);
@@ -133,7 +139,7 @@ pub fn draw_filtered_browser(
             .iter()
             .filter(|f| f.source == FontSource::Internal && !f.is_hud);
         for (i, font) in iwad_num.enumerate() {
-            draw_unified_font_row(ui, assets, file, font, i);
+            changed |= draw_unified_font_row(ui, assets, file, font, i);
         }
 
         ui.add_space(12.0);
@@ -195,7 +201,7 @@ pub fn draw_filtered_browser(
             ui.add_space(20.0);
             ui.label(egui::RichText::new("No assets found.").weak());
         });
-        return;
+        return false;
     }
     draw_asset_grid(
         ui,
@@ -206,6 +212,8 @@ pub fn draw_filtered_browser(
         confirmation_modal,
         show_project_assets,
     );
+
+    changed
 }
 
 pub fn draw_library_browser(
@@ -213,7 +221,8 @@ pub fn draw_library_browser(
     assets: &mut AssetStore,
     file: &mut Option<SBarDefFile>,
     zoom: f32,
-) {
+) -> bool {
+    let mut changed = false;
     ui.heading("Library Browser");
     ui.separator();
     ui.add_space(4.0);
@@ -224,7 +233,7 @@ pub fn draw_library_browser(
         .iter()
         .filter(|f| f.source == FontSource::Package && f.is_hud);
     for (i, font) in lib_hud.enumerate() {
-        draw_unified_font_row(ui, assets, file, font, i);
+        changed |= draw_unified_font_row(ui, assets, file, font, i);
     }
 
     ui.add_space(8.0);
@@ -234,7 +243,7 @@ pub fn draw_library_browser(
         .iter()
         .filter(|f| f.source == FontSource::Package && !f.is_hud);
     for (i, font) in lib_num.enumerate() {
-        draw_unified_font_row(ui, assets, file, font, i);
+        changed |= draw_unified_font_row(ui, assets, file, font, i);
     }
 
     ui.add_space(12.0);
@@ -258,12 +267,14 @@ pub fn draw_library_browser(
                         let is_not_font =
                             !matches!(lib_asset.category, library::AssetCategory::Font);
                         if is_match && is_not_font {
-                            draw_library_item(ui, assets, lib_asset, size);
+                            changed |= draw_library_item(ui, assets, lib_asset, size);
                         }
                     }
                 });
             });
     }
+
+    changed
 }
 
 fn draw_unified_font_row(
@@ -272,7 +283,8 @@ fn draw_unified_font_row(
     file: &mut Option<SBarDefFile>,
     font: &FontDefinition,
     index: usize,
-) {
+) -> bool {
+    let mut changed = false;
     let is_installed = file.as_ref().map_or(false, |f| {
         if font.is_hud {
             f.data.hud_fonts.iter().any(|def| def.name == font.name)
@@ -335,9 +347,11 @@ fn draw_unified_font_row(
                     stem: stem_upper,
                 });
             }
+            changed = true;
         }
     }
     ui.add_space(8.0);
+    changed
 }
 
 fn draw_asset_grid(
@@ -531,7 +545,8 @@ fn draw_library_item(
     assets: &mut AssetStore,
     lib_asset: &library::LibraryAsset,
     size: f32,
-) {
+) -> bool {
+    let mut changed = false;
     let stem = AssetStore::stem(lib_asset.name);
     let texture = assets.textures.get(&stem);
     let is_project = assets.raw_files.contains_key(&stem);
@@ -565,12 +580,14 @@ fn draw_library_item(
     if response.drag_started() {
         if !is_project {
             assets.load_image(ui.ctx(), &stem, lib_asset.bytes);
+            changed = true;
         }
         egui::DragAndDrop::set_payload(ui.ctx(), vec![stem.clone()]);
     }
 
     if response.clicked() && !is_project {
         assets.load_image(ui.ctx(), &stem, lib_asset.bytes);
+        changed = true;
     }
 
     if response.hovered() {
@@ -589,4 +606,6 @@ fn draw_library_item(
             ui.label(egui::RichText::new(msg).color(color).size(11.0));
         });
     }
+
+    changed
 }

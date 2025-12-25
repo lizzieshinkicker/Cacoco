@@ -356,7 +356,7 @@ impl SBarDefFile {
 }
 
 impl PropertiesUI for ElementWrapper {
-    fn draw_specific_fields(&mut self, ui: &mut egui::Ui, fonts: &FontCache, assets: &AssetStore, state: &PreviewState) {
+    fn draw_specific_fields(&mut self, ui: &mut egui::Ui, fonts: &FontCache, assets: &AssetStore, state: &PreviewState) -> bool {
         match &mut self.data {
             Element::Canvas(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Graphic(e) => e.draw_specific_fields(ui, fonts, assets, state),

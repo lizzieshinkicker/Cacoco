@@ -37,7 +37,8 @@ pub fn draw_layers_panel(
     state: &mut PreviewState,
     wizard_state: &mut Option<FontWizardState>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
-) -> Vec<LayerAction> {
+) -> (Vec<LayerAction>, bool) {
+    let mut changed = false;
     let split_id = ui.make_persistent_id("layers_panel_split");
     let mut split_fraction = ui.ctx().data(|d| d.get_temp::<f32>(split_id).unwrap_or(0.30));
 
@@ -101,7 +102,7 @@ pub fn draw_layers_panel(
                 match current_tab {
                     BrowserTab::Fonts => {
                         if let Some(f) = file {
-                            browser::draw_fonts_content(ui, f, assets);
+                            changed |= browser::draw_fonts_content(ui, f, assets);
                         } else {
                             ui.vertical_centered(|ui| {
                                 ui.add_space(10.0);
@@ -110,7 +111,7 @@ pub fn draw_layers_panel(
                         }
                     }
                     BrowserTab::Graphics => {
-                        browser::draw_filtered_browser(
+                        changed |= browser::draw_filtered_browser(
                             ui,
                             assets,
                             file,
@@ -122,7 +123,7 @@ pub fn draw_layers_panel(
                         );
                     }
                     BrowserTab::IWAD => {
-                        browser::draw_filtered_browser(
+                        changed |= browser::draw_filtered_browser(
                             ui,
                             assets,
                             file,
@@ -134,7 +135,7 @@ pub fn draw_layers_panel(
                         );
                     }
                     BrowserTab::Library => {
-                        browser::draw_library_browser(ui, assets, file, zoom);
+                        changed |= browser::draw_library_browser(ui, assets, file, zoom);
                     }
                 }
             });
@@ -171,6 +172,7 @@ pub fn draw_layers_panel(
                                     let count = crate::io::import_images_dialog(ui.ctx(), assets);
                                     if count > 0 {
                                         state.push_message(format!("Imported {} images.", count));
+                                        changed = true;
                                     }
                                     ui.close();
                                 }
@@ -179,6 +181,7 @@ pub fn draw_layers_panel(
                                     if count > 0 {
                                         state
                                             .push_message(format!("Imported {} images from folder.", count));
+                                        changed = true;
                                     }
                                     ui.close();
                                 }
@@ -376,6 +379,7 @@ pub fn draw_layers_panel(
             bottom_ui.label("No status bars defined.");
             if bottom_ui.button("Add Status Bar").clicked() {
                 f.data.status_bars.push(StatusBarLayout::default());
+                changed = true;
             }
         } else {
             bottom_ui.horizontal(|ui| {
@@ -394,6 +398,7 @@ pub fn draw_layers_panel(
                 if ui.button(" + ").on_hover_text("Add New Status Bar").clicked() {
                     f.data.status_bars.push(StatusBarLayout::default());
                     *current_bar_idx = f.data.status_bars.len() - 1;
+                    changed = true;
                 }
 
                 let can_delete = f.data.status_bars.len() > 1;
@@ -408,6 +413,7 @@ pub fn draw_layers_panel(
                         if *current_bar_idx >= f.data.status_bars.len() {
                             *current_bar_idx = f.data.status_bars.len().saturating_sub(1);
                         }
+                        changed = true;
                     } else {
                         *confirmation_modal = Some(
                             crate::app::ConfirmationRequest::DeleteStatusBar(*current_bar_idx),
@@ -426,7 +432,7 @@ pub fn draw_layers_panel(
                 egui::CollapsingHeader::new("Layout Settings")
                     .default_open(false)
                     .show(&mut bottom_ui, |ui| {
-                        common::draw_root_statusbar_fields(ui, bar);
+                        changed |= common::draw_root_statusbar_fields(ui, bar);
                     });
             }
 
@@ -461,5 +467,5 @@ pub fn draw_layers_panel(
         });
     }
 
-    actions
+    (actions, changed)
 }
