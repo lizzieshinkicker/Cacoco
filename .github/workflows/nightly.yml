@@ -142,7 +142,7 @@ jobs:
         make_latest: false
         draft: false
         overwrite_files: true
-        generate_release_notes: false
+        generate_release_notes: true
         body: ""
         files: |
           artifacts/**/*
