@@ -19,7 +19,7 @@ impl AppConfig {
         ProjectDirs::from(
             "io.github",
             "lizzieshinkicker",
-            "cacoco"
+            "Cacoco"
         ).map(|proj_dirs| proj_dirs.config_local_dir().to_path_buf())
     }
 
