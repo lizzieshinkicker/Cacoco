@@ -199,7 +199,7 @@ pub fn save_pk3_dialog(
 
 pub fn load_iwad_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> Option<String> {
     if let Some(path) = FileDialog::new()
-        .add_filter("Doom WAD", &["wad"])
+        .add_filter("Doom WAD", &["wad", "WAD"])
         .set_title("Select Base WAD (e.g., DOOM2.WAD)")
         .pick_file()
     {

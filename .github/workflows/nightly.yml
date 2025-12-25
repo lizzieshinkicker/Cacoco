@@ -8,70 +8,105 @@ on:
   schedule:
     - cron: '0 10 * * *'
   workflow_dispatch:
-  
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-20.04
-            target: x86_64-unknown-linux-gnu
-            appname: cacoco
-            extension: ""
-            platform: linux
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            appname: cacoco
-            extension: .exe
-            platform: windows
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            target2: x86_64-apple-darwin
-            appname: cacoco
-            extension: ""
-            platform: macos
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
     - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
       with:
-        target: ${{ matrix.target }}
-    - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
-      if: ${{ matrix.os == 'macos-latest' }}
-      with:
-        target: ${{ matrix.target2 }}
-    - name: Run tests
-      run: cargo test --verbose
+        target: x86_64-pc-windows-msvc
     - name: Build release binary
-      run: cargo build --release --target ${{ matrix.target }}
-    - name: Build release binary
-      if: ${{ matrix.os == 'macos-latest' }}
-      run: cargo build --release --target ${{ matrix.target2 }}
-    - name: Create macOS universal binary
-      if: ${{ matrix.os == 'macos-latest' }}
+      run: cargo build --release --target x86_64-pc-windows-msvc
+    - name: Rename binary
       run: |
         mkdir -p dist
-        lipo -create \
-          target/aarch64-apple-darwin/release/${{ matrix.appname }} \
-          target/x86_64-apple-darwin/release/${{ matrix.appname }} \
-          -output dist/${{ matrix.appname }}-${{ matrix.platform }}
-    - name: Package (Linux / Windows)
-      if: ${{ matrix.os != 'macos-latest' }}
-      run: |
-        mkdir -p dist
-        cp target/${{ matrix.target }}/release/${{ matrix.appname }}${{ matrix.extension }} dist/${{ matrix.appname }}-${{ matrix.platform }}${{ matrix.extension }}
+        mv target/x86_64-pc-windows-msvc/release/cacoco.exe dist/cacoco-nightly-windows.exe
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
-        name: cacoco-${{ matrix.platform }}
+        name: windows-nightly
+        path: dist/*
+
+  build-mac:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+      with:
+        target: |
+          aarch64-apple-darwin
+          x86_64-apple-darwin
+    - name: Build release binary (ARM)
+      run: cargo build --release --target aarch64-apple-darwin
+    - name: Build release binary (x86_64)
+      run: cargo build --release --target x86_64-apple-darwin
+    - name: Create macOS universal binary
+      run: |
+        mkdir -p dist
+        lipo -create \
+          target/aarch64-apple-darwin/release/cacoco \
+          target/x86_64-apple-darwin/release/cacoco \
+          -output dist/cacoco-nightly-mac
+    - name: Upload artifact
+      uses: actions/upload-artifact@v6
+      with:
+        name: nightly-macos
+        path: dist/*
+
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build release binary (Debian Bullseye)
+      run: |
+        docker run --rm \
+          -v "$PWD:/build" \
+          -w /build \
+          rust:bullseye \
+          cargo build --release --target x86_64-unknown-linux-gnu
+    - name: Install LinuxDeploy
+      id: install-linuxdeploy
+      uses: miurahr/install-linuxdeploy-action@v1.8.0
+      with:
+        plugins: appimage
+    - name: Create version name file
+      id: version
+      run: |
+        SHORT_HASH=$(git rev-parse --short ${{ github.sha }})
+        echo "version=nightly-$SHORT_HASH" >> "$GITHUB_OUTPUT"
+    - name: Create AppImage
+      env:
+        LD_BIN: ${{ steps.install-linuxdeploy.outputs.linuxdeploy }}
+        LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|*x86_64.AppImage.zsync"
+        LDAI_VERSION: "${{ steps.version.outputs.version }}"
+      run: |
+        "$LD_BIN" --output appimage \
+                  --executable target/x86_64-unknown-linux-gnu/release/cacoco \
+                  --desktop-file packaging/linux/cacoco.desktop \
+                  --icon-file ./icon.png \
+                  --icon-filename cacoco \
+                  --appdir ./AppDir
+    - name: Rename binary
+      run: |
+        mkdir -p dist
+        mv Cacoco-*-x86_64.AppImage dist/cacoco-nightly-linux-x86_64.AppImage
+        mv Cacoco-*-x86_64.AppImage.zsync dist/cacoco-nightly-linux-x86_64.AppImage.zsync
+    - name: Upload artifact
+      uses: actions/upload-artifact@v6
+      with:
+        name: linux-nightly
         path: dist/*
 
   release-nightly:
-    needs: build
+    needs: [ build-windows, build-mac, build-linux ]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
