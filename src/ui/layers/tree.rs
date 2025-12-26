@@ -132,7 +132,7 @@ fn draw_layer_row(
     let is_container = matches!(element.data, Element::Canvas(_) | Element::Carousel(_));
 
     let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), ROW_HEIGHT),
+        egui::vec2(ui.available_width() - 8.0, ROW_HEIGHT),
         egui::Sense::click_and_drag(),
     );
 

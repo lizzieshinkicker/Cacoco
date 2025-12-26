@@ -31,8 +31,10 @@ pub(super) fn draw_number(
     };
 
     if def.maxlength > 0 {
-        let max_val = 10_i32.pow(def.maxlength as u32) - 1;
-        let min_val = -10_i32.pow((def.maxlength - 1) as u32) + 1;
+        let clean_len = def.maxlength.clamp(0, 9) as u32;
+        let max_val = 10_i32.saturating_pow(clean_len) - 1;
+        let min_val = -(10_i32.saturating_pow(clean_len.saturating_sub(1))) + 1;
+
         if val > max_val { val = max_val; }
         if val < min_val { val = min_val; }
     }
