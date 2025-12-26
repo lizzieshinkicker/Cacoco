@@ -1,24 +1,26 @@
+use crate::assets::AssetStore;
+use crate::render::palette::DoomPalette;
+use crate::render::patch;
+use eframe::egui;
+use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
-use crate::assets::AssetStore;
-use crate::render::patch;
-use crate::render::palette::DoomPalette;
-use eframe::egui;
-use once_cell::sync::Lazy;
 
 static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     let prefixes = [
-        "ST", "WI", "M_", "BRDR", "DGT", "NUM", "PRCN", "MINUS",
-        "PUNG", "SAWG", "PISG", "SHTG", "SHT2", "CHGG", "MISG", "PLSG", "BFGG",
-        "BKEY", "YKEY", "RKEY", "BSKU", "YSKU", "RSKU",
-        "PINV", "PSTR", "PINS", "SUIT", "PMAP", "PVIS",
-        "ARM", "MEDI", "BPAK", "AMMO", "SHEL", "CELL", "ROCK",
-        "INTER", "FINALE", "TITLE", "PAT", "GRN",
+        "ST", "WI", "M_", "BRDR", "DGT", "NUM", "PRCN", "MINUS", "PUNG", "SAWG", "PISG", "SHTG",
+        "SHT2", "CHGG", "MISG", "PLSG", "BFGG", "BKEY", "YKEY", "RKEY", "BSKU", "YSKU", "RSKU",
+        "PINV", "PSTR", "PINS", "SUIT", "PMAP", "PVIS", "ARM", "MEDI", "BPAK", "AMMO", "SHEL",
+        "CELL", "ROCK", "INTER", "FINALE", "TITLE", "PAT", "GRN",
     ];
     prefixes.into_iter().collect()
 });
-pub fn load_wad_into_store(ctx: &egui::Context, file: &mut fs::File, assets: &mut AssetStore) -> anyhow::Result<()> {
+pub fn load_wad_into_store(
+    ctx: &egui::Context,
+    file: &mut fs::File,
+    assets: &mut AssetStore,
+) -> anyhow::Result<()> {
     let mut header = [0u8; 12];
     file.read_exact(&mut header).ok();
 
@@ -51,7 +53,9 @@ pub fn load_wad_into_store(ctx: &egui::Context, file: &mut fs::File, assets: &mu
         }
     }
 
-    if found_pal { println!("WAD: Found PLAYPAL."); }
+    if found_pal {
+        println!("WAD: Found PLAYPAL.");
+    }
 
     for i in 0..num_lumps {
         let entry = &dir_buffer[i * 16..(i + 1) * 16];
@@ -59,14 +63,18 @@ pub fn load_wad_into_store(ctx: &egui::Context, file: &mut fs::File, assets: &mu
         let size = i32::from_le_bytes(entry[4..8].try_into()?) as usize;
         let file_pos = i32::from_le_bytes(entry[0..4].try_into()?) as u64;
 
-        if size == 0 { continue; }
+        if size == 0 {
+            continue;
+        }
 
         if is_graphic_lump(&name) {
             let mut lump_data = vec![0u8; size];
             file.seek(SeekFrom::Start(file_pos))?;
             file.read_exact(&mut lump_data)?;
 
-            if let Some((width, height, left, top, pixels)) = patch::decode_doom_patch(&lump_data, &palette) {
+            if let Some((width, height, left, top, pixels)) =
+                patch::decode_doom_patch(&lump_data, &palette)
+            {
                 assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
             } else if size == 4096 {
                 if let Some((w, h, pixels)) = patch::decode_doom_flat(&lump_data, &palette) {
@@ -83,9 +91,13 @@ pub fn load_wad_into_store(ctx: &egui::Context, file: &mut fs::File, assets: &mu
 
 fn parse_lump_name(bytes: &[u8]) -> String {
     let len = bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len());
-    String::from_utf8_lossy(&bytes[0..len]).to_string().to_uppercase()
+    String::from_utf8_lossy(&bytes[0..len])
+        .to_string()
+        .to_uppercase()
 }
 
 fn is_graphic_lump(name: &str) -> bool {
-    GRAPHIC_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+    GRAPHIC_PREFIXES
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
 }

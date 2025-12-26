@@ -40,17 +40,15 @@ impl PropertiesUI for GraphicDef {
 }
 
 impl PropertiesUI for FaceDef {
-    fn has_specific_fields(&self) -> bool {
-        false
-    }
-
     fn draw_specific_fields(
         &mut self,
         _: &mut egui::Ui,
         _: &FontCache,
         _: &AssetStore,
         _: &PreviewState,
-    ) -> bool { false }
+    ) -> bool {
+        false
+    }
 
     fn get_preview_content(
         &self,
@@ -58,7 +56,11 @@ impl PropertiesUI for FaceDef {
         _: &FontCache,
         state: &PreviewState,
     ) -> Option<PreviewContent> {
-        let screen_w = if state.engine.widescreen_mode { DOOM_W_WIDE } else { DOOM_W };
+        let screen_w = if state.engine.widescreen_mode {
+            DOOM_W_WIDE
+        } else {
+            DOOM_W
+        };
 
         let mut anchor_x = 0.0;
         if self.common.alignment.contains(Alignment::RIGHT) {
@@ -81,7 +83,9 @@ impl PropertiesUI for FaceDef {
         };
 
         let is_button_down = ui.input(|i| i.pointer.button_down(egui::PointerButton::Primary));
-        let viewport_rect: Option<egui::Rect> = ui.ctx().data(|d| d.get_temp(egui::Id::new(VIEWPORT_RECT_ID)));
+        let viewport_rect: Option<egui::Rect> = ui
+            .ctx()
+            .data(|d| d.get_temp(egui::Id::new(VIEWPORT_RECT_ID)));
         let pointer_pos = ui.input(|i| i.pointer.latest_pos());
 
         let is_ouched = if let (Some(rect), Some(pos)) = (viewport_rect, pointer_pos) {
@@ -90,7 +94,13 @@ impl PropertiesUI for FaceDef {
             false
         };
 
-        Some(PreviewContent::Image(state.get_face_sprite(is_ouched, look_dir)))
+        Some(PreviewContent::Image(
+            state.get_face_sprite(is_ouched, look_dir),
+        ))
+    }
+
+    fn has_specific_fields(&self) -> bool {
+        false
     }
 }
 
@@ -471,7 +481,9 @@ fn draw_frame_row(
                                 },
                             );
                             ui.label(
-                                egui::RichText::new(label).strong().color(egui::Color32::WHITE),
+                                egui::RichText::new(label)
+                                    .strong()
+                                    .color(egui::Color32::WHITE),
                             );
                         });
                     });
@@ -490,10 +502,8 @@ fn draw_yellow_line(ui: &egui::Ui, rect: egui::Rect, y: f32) {
 
 fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) -> bool {
     let mut changed = false;
-    let (rect, _) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), 60.0),
-        egui::Sense::hover(),
-    );
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
     ui.painter().rect_stroke(
         rect,
         4.0,
@@ -524,12 +534,46 @@ fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) 
 }
 
 impl PropertiesUI for CanvasDef {
-    fn has_specific_fields(&self) -> bool { false }
-    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) -> bool { false }
-    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> { None }
+    fn draw_specific_fields(
+        &mut self,
+        _: &mut egui::Ui,
+        _: &FontCache,
+        _: &AssetStore,
+        _: &PreviewState,
+    ) -> bool {
+        false
+    }
+    fn get_preview_content(
+        &self,
+        _: &egui::Ui,
+        _: &FontCache,
+        _: &PreviewState,
+    ) -> Option<PreviewContent> {
+        None
+    }
+    fn has_specific_fields(&self) -> bool {
+        false
+    }
 }
 impl PropertiesUI for CarouselDef {
-    fn has_specific_fields(&self) -> bool { false }
-    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) -> bool { false }
-    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> { None }
+    fn draw_specific_fields(
+        &mut self,
+        _: &mut egui::Ui,
+        _: &FontCache,
+        _: &AssetStore,
+        _: &PreviewState,
+    ) -> bool {
+        false
+    }
+    fn get_preview_content(
+        &self,
+        _: &egui::Ui,
+        _: &FontCache,
+        _: &PreviewState,
+    ) -> Option<PreviewContent> {
+        None
+    }
+    fn has_specific_fields(&self) -> bool {
+        false
+    }
 }

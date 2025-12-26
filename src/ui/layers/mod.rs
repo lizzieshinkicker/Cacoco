@@ -10,8 +10,8 @@ use crate::ui::properties::common;
 use eframe::egui;
 use std::collections::HashSet;
 
-pub(crate) mod colors;
 mod browser;
+pub(crate) mod colors;
 pub mod thumbnails;
 mod tree;
 
@@ -40,7 +40,9 @@ pub fn draw_layers_panel(
 ) -> (Vec<LayerAction>, bool) {
     let mut changed = false;
     let split_id = ui.make_persistent_id("layers_panel_split");
-    let mut split_fraction = ui.ctx().data(|d| d.get_temp::<f32>(split_id).unwrap_or(0.30));
+    let mut split_fraction = ui
+        .ctx()
+        .data(|d| d.get_temp::<f32>(split_id).unwrap_or(0.30));
 
     let available_height = ui.available_height();
     let min_h = 100.0;
@@ -61,8 +63,7 @@ pub fn draw_layers_panel(
             .unwrap_or(BrowserTab::Graphics)
     });
     let mut zoom = top_ui.data(|d| d.get_temp(egui::Id::new(THUMB_ZOOM_KEY)).unwrap_or(1.0f32));
-    let mut show_fonts =
-        top_ui.data(|d| d.get_temp(egui::Id::new(SHOW_FONTS_KEY)).unwrap_or(true));
+    let mut show_fonts = top_ui.data(|d| d.get_temp(egui::Id::new(SHOW_FONTS_KEY)).unwrap_or(true));
 
     top_ui.add_space(3.0);
 
@@ -179,8 +180,10 @@ pub fn draw_layers_panel(
                                 if ui.button("Folder").clicked() {
                                     let count = crate::io::import_folder_dialog(ui.ctx(), assets);
                                     if count > 0 {
-                                        state
-                                            .push_message(format!("Imported {} images from folder.", count));
+                                        state.push_message(format!(
+                                            "Imported {} images from folder.",
+                                            count
+                                        ));
                                         changed = true;
                                     }
                                     ui.close();
@@ -228,7 +231,8 @@ pub fn draw_layers_panel(
     }
     if response.dragged() {
         split_fraction += response.drag_delta().y / available_height;
-        ui.ctx().data_mut(|d| d.insert_temp(split_id, split_fraction));
+        ui.ctx()
+            .data_mut(|d| d.insert_temp(split_id, split_fraction));
     }
 
     let remaining_h = ui.available_height();
@@ -252,7 +256,8 @@ pub fn draw_layers_panel(
                     let mut new_element = None;
 
                     let default_hud_font = f.data.hud_fonts.first().map(|font| font.name.clone());
-                    let default_num_font = f.data.number_fonts.first().map(|font| font.name.clone());
+                    let default_num_font =
+                        f.data.number_fonts.first().map(|font| font.name.clone());
                     let has_hud = default_hud_font.is_some();
                     let has_num = default_num_font.is_some();
 
@@ -395,7 +400,11 @@ pub fn draw_layers_panel(
                         }
                     });
 
-                if ui.button(" + ").on_hover_text("Add New Status Bar").clicked() {
+                if ui
+                    .button(" + ")
+                    .on_hover_text("Add New Status Bar")
+                    .clicked()
+                {
                     f.data.status_bars.push(StatusBarLayout::default());
                     *current_bar_idx = f.data.status_bars.len() - 1;
                     changed = true;

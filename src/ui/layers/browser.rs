@@ -1,3 +1,4 @@
+use super::thumbnails::{self, ListRow};
 use crate::app::ConfirmationRequest;
 use crate::assets::AssetStore;
 use crate::library::{self, FontDefinition, FontSource};
@@ -7,7 +8,6 @@ use crate::ui::font_wizard::FontWizardState;
 use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
-use super::thumbnails::{self, ListRow};
 
 const ASSET_SEL_KEY: &str = "cacoco_asset_selection";
 const ASSET_PIVOT_KEY: &str = "cacoco_asset_pivot";
@@ -175,10 +175,16 @@ pub fn draw_filtered_browser(
         .filter(|k| !k.starts_with('_'))
         .filter(|key| {
             if !show_fonts_toggle {
-                if registered_font_stems.iter().any(|stem| key.starts_with(stem)) {
+                if registered_font_stems
+                    .iter()
+                    .any(|stem| key.starts_with(stem))
+                {
                     return false;
                 }
-                if library::FONTS.iter().any(|f| key.starts_with(&f.stem.to_uppercase())) {
+                if library::FONTS
+                    .iter()
+                    .any(|f| key.starts_with(&f.stem.to_uppercase()))
+                {
                     return false;
                 }
             }
@@ -366,12 +372,12 @@ fn draw_asset_grid(
     let available_w = ui.available_width() - 12.0;
     let target_size = thumbnails::THUMB_SIZE * zoom;
 
-    let mut selection: HashSet<String> = ui.data(|d| {
-        d.get_temp(egui::Id::new(ASSET_SEL_KEY))
+    let mut selection: HashSet<String> =
+        ui.data(|d| d.get_temp(egui::Id::new(ASSET_SEL_KEY)).unwrap_or_default());
+    let mut pivot: Option<String> = ui.data(|d| {
+        d.get_temp(egui::Id::new(ASSET_PIVOT_KEY))
             .unwrap_or_default()
     });
-    let mut pivot: Option<String> =
-        ui.data(|d| d.get_temp(egui::Id::new(ASSET_PIVOT_KEY)).unwrap_or_default());
 
     let cols = ((available_w + 4.0) / (target_size + 4.0)).floor().max(1.0);
     let size = (available_w - ((cols - 1.0) * 4.0)) / cols;
@@ -562,8 +568,8 @@ fn draw_library_item(
     }
 
     if let Some(tex) = texture {
-        let scaled_size = tex.size_vec2() * (size - 4.0)
-            / tex.size_vec2().x.max(tex.size_vec2().y).max(1.0);
+        let scaled_size =
+            tex.size_vec2() * (size - 4.0) / tex.size_vec2().x.max(tex.size_vec2().y).max(1.0);
         let tint = if is_project {
             egui::Color32::WHITE
         } else {

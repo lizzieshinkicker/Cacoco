@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::model::SBarDefFile;
+use std::collections::HashMap;
 
 pub struct FontCache {
     number_fonts: HashMap<String, String>,
@@ -24,7 +24,12 @@ impl FontCache {
             hud_font_names.push(f.name.clone());
         }
 
-        Self { number_fonts, hud_fonts, number_font_names, hud_font_names }
+        Self {
+            number_fonts,
+            hud_fonts,
+            number_font_names,
+            hud_font_names,
+        }
     }
 
     pub fn get_number_stem(&self, name: &str) -> Option<String> {

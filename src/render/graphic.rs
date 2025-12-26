@@ -1,13 +1,8 @@
+use super::{RenderContext, get_alignment_anchor_offset};
 use crate::model::*;
 use eframe::egui;
-use super::{get_alignment_anchor_offset, RenderContext};
 
-pub(super) fn draw_graphic(
-    ctx: &RenderContext,
-    def: &GraphicDef,
-    mut pos: egui::Pos2,
-    alpha: f32
-) {
+pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, mut pos: egui::Pos2, alpha: f32) {
     if def.midoffset != 0 {
         pos.x += def.midoffset as f32;
     }
@@ -37,7 +32,7 @@ pub(super) fn draw_simple_graphic_patch(
 
         let final_pos = egui::pos2(
             pos.x + align_offset.x - off_x,
-            pos.y + align_offset.y - off_y
+            pos.y + align_offset.y - off_y,
         );
 
         let screen_pos = ctx.to_screen(final_pos);

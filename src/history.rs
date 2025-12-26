@@ -1,5 +1,5 @@
-use std::collections::{VecDeque, HashSet};
-use crate::model::{SBarDefFile, ElementWrapper, new_uid};
+use crate::model::{ElementWrapper, SBarDefFile, new_uid};
+use std::collections::{HashSet, VecDeque};
 
 const MAX_UNDO: usize = 50;
 
@@ -26,7 +26,11 @@ impl Default for HistoryManager {
 }
 
 impl HistoryManager {
-    pub fn take_snapshot(&mut self, current_file: &SBarDefFile, current_selection: &HashSet<Vec<usize>>) {
+    pub fn take_snapshot(
+        &mut self,
+        current_file: &SBarDefFile,
+        current_selection: &HashSet<Vec<usize>>,
+    ) {
         self.undo_stack.push_back(Snapshot {
             file: current_file.clone(),
             selection: current_selection.clone(),
@@ -38,7 +42,11 @@ impl HistoryManager {
         self.redo_stack.clear();
     }
 
-    pub fn undo(&mut self, current_file: &mut SBarDefFile, current_selection: &mut HashSet<Vec<usize>>) {
+    pub fn undo(
+        &mut self,
+        current_file: &mut SBarDefFile,
+        current_selection: &mut HashSet<Vec<usize>>,
+    ) {
         if let Some(prev) = self.undo_stack.pop_back() {
             self.redo_stack.push_back(Snapshot {
                 file: current_file.clone(),
@@ -50,7 +58,11 @@ impl HistoryManager {
         }
     }
 
-    pub fn redo(&mut self, current_file: &mut SBarDefFile, current_selection: &mut HashSet<Vec<usize>>) {
+    pub fn redo(
+        &mut self,
+        current_file: &mut SBarDefFile,
+        current_selection: &mut HashSet<Vec<usize>>,
+    ) {
         if let Some(next) = self.redo_stack.pop_back() {
             self.undo_stack.push_back(Snapshot {
                 file: current_file.clone(),

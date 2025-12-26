@@ -24,8 +24,12 @@ impl ContextMenu {
     pub fn get(ui: &egui::Ui, response_id: egui::Id) -> Option<Self> {
         let open_id: Option<egui::Id> = ui.data(|d| d.get_temp(egui::Id::new(MENU_ID_KEY)));
         if open_id == Some(response_id) {
-            let pos: egui::Pos2 = ui.data(|d| d.get_temp(egui::Id::new(MENU_POS_KEY)).unwrap_or_default());
-            Some(Self { id: response_id, pos })
+            let pos: egui::Pos2 =
+                ui.data(|d| d.get_temp(egui::Id::new(MENU_POS_KEY)).unwrap_or_default());
+            Some(Self {
+                id: response_id,
+                pos,
+            })
         } else {
             None
         }
@@ -36,7 +40,8 @@ impl ContextMenu {
     }
 
     pub fn show<F>(ui: &egui::Ui, state: Self, just_opened: bool, add_contents: F)
-    where F: FnOnce(&mut egui::Ui)
+    where
+        F: FnOnce(&mut egui::Ui),
     {
         let area_res = egui::Area::new(state.id.with("context_menu"))
             .fixed_pos(state.pos)
@@ -66,11 +71,12 @@ impl ContextMenu {
         let height = 24.0;
         let (rect, response) = ui.allocate_exact_size(
             egui::vec2(ui.available_width(), height),
-            egui::Sense::click()
+            egui::Sense::click(),
         );
 
         if enabled && response.hovered() {
-            ui.painter().rect_filled(rect, 4.0, egui::Color32::from_gray(60));
+            ui.painter()
+                .rect_filled(rect, 4.0, egui::Color32::from_gray(60));
         }
 
         let text_color = if enabled {

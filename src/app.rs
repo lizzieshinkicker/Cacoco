@@ -93,11 +93,8 @@ impl CacocoApp {
             "_BG_MASTER",
             include_bytes!("../assets/background.png"),
         );
-        self.assets.load_reference_image(
-            ctx,
-            "HICACOCO",
-            include_bytes!("../assets/HICACOCO.png"),
-        );
+        self.assets
+            .load_reference_image(ctx, "HICACOCO", include_bytes!("../assets/HICACOCO.png"));
         self.assets.load_system_assets(ctx);
 
         for asset in crate::library::ASSETS {
@@ -168,7 +165,8 @@ impl CacocoApp {
         self.history.undo_stack.clear();
         self.history.redo_stack.clear();
         self.dirty = false;
-        self.preview_state.push_message("Created new empty project.");
+        self.preview_state
+            .push_message("Created new empty project.");
     }
 
     pub fn apply_template(&mut self, ctx: &egui::Context, template: &Template) {

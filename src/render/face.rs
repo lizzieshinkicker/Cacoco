@@ -1,7 +1,7 @@
-use eframe::egui;
-use crate::model::*;
 use super::RenderContext;
 use super::graphic::draw_simple_graphic_patch;
+use crate::model::*;
+use eframe::egui;
 
 pub(super) fn draw_face(
     ctx: &RenderContext,
@@ -32,7 +32,7 @@ pub(super) fn draw_face_background(
     ctx: &RenderContext,
     def: &FaceDef,
     pos: egui::Pos2,
-    alpha: f32
+    alpha: f32,
 ) {
     draw_simple_graphic_patch(ctx, "STFB0", pos, def.common.alignment, alpha);
 }

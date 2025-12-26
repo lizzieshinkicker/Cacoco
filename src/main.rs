@@ -1,24 +1,24 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod model;
-mod config;
 mod app;
 mod assets;
-mod io;
-mod ui;
-mod state;
-mod wad;
-mod render;
 mod cheats;
 mod conditions;
-mod library;
-mod document;
+mod config;
 mod constants;
+mod document;
 mod history;
 mod hotkeys;
+mod io;
+mod library;
+mod model;
+mod render;
+mod state;
+mod ui;
+mod wad;
 
 use app::CacocoApp;
-use eframe::{egui, NativeOptions};
+use eframe::{NativeOptions, egui};
 use rand::seq::IndexedRandom;
 
 const TITLES: &[&str] = &[
@@ -29,7 +29,7 @@ const TITLES: &[&str] = &[
     "I feel silly saying SBARDEF out loud. SBARDEF. SBARDEF...",
     "I wouldn't leave if I were you. JSON is much worse.",
     "*Cacodemon noise*",
-    "Proudly made in a programming language!"
+    "Proudly made in a programming language!",
 ];
 
 fn main() -> eframe::Result<()> {
@@ -52,7 +52,8 @@ fn main() -> eframe::Result<()> {
         "Cacoco",
         native_options,
         Box::new(move |cc| {
-            cc.egui_ctx.data_mut(|d| d.insert_temp(egui::Id::new("random_title"), title_flavor));
+            cc.egui_ctx
+                .data_mut(|d| d.insert_temp(egui::Id::new("random_title"), title_flavor));
             Ok(Box::new(CacocoApp::new(cc)))
         }),
     )

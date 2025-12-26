@@ -1,9 +1,9 @@
+use crate::app::PendingAction;
 use crate::assets::AssetStore;
 use crate::config::AppConfig;
 use crate::io::{self, LoadedProject};
 use crate::library;
 use crate::model::SBarDefFile;
-use crate::app::PendingAction;
 use eframe::egui;
 use std::path::Path;
 
@@ -99,7 +99,11 @@ pub fn draw_menu_bar(
                 ui.close();
             }
 
-            if ui.button("Export JSON...").on_hover_text("Ctrl+E").clicked() {
+            if ui
+                .button("Export JSON...")
+                .on_hover_text("Ctrl+E")
+                .clicked()
+            {
                 if let Some(f) = current_file {
                     if let Some(path) = io::save_json_dialog(f, opened_file_path.clone()) {
                         action = MenuAction::ExportDone(path);
@@ -180,11 +184,7 @@ pub fn draw_menu_bar(
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing.y = 8.0;
 
-                        if draw_menu_card(
-                            ui,
-                            "Empty",
-                            "Start from scratch.",
-                        ) {
+                        if draw_menu_card(ui, "Empty", "Start from scratch.") {
                             if dirty {
                                 action = MenuAction::RequestDiscard(PendingAction::New);
                             } else {
@@ -199,7 +199,9 @@ pub fn draw_menu_bar(
                         for template in library::TEMPLATES {
                             if draw_menu_card(ui, template.name, template.description) {
                                 if dirty {
-                                    action = MenuAction::RequestDiscard(PendingAction::Template(template));
+                                    action = MenuAction::RequestDiscard(PendingAction::Template(
+                                        template,
+                                    ));
                                 } else {
                                     action = MenuAction::LoadTemplate(template);
                                 }

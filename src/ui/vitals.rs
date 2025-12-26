@@ -40,9 +40,21 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                                 })
                                 .width(110.0)
                                 .show_ui(ui, |ui| {
-                                    ui.selectable_value(&mut state.world.session_type, 0, "Single Player");
-                                    ui.selectable_value(&mut state.world.session_type, 1, "Cooperative");
-                                    ui.selectable_value(&mut state.world.session_type, 2, "Deathmatch");
+                                    ui.selectable_value(
+                                        &mut state.world.session_type,
+                                        0,
+                                        "Single Player",
+                                    );
+                                    ui.selectable_value(
+                                        &mut state.world.session_type,
+                                        1,
+                                        "Cooperative",
+                                    );
+                                    ui.selectable_value(
+                                        &mut state.world.session_type,
+                                        2,
+                                        "Deathmatch",
+                                    );
                                 });
                             ui.end_row();
 
@@ -81,11 +93,15 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                             .spacing(egui::vec2(4.0, 4.0))
                             .show(ui, |ui| {
                                 ui.label("Health:");
-                                ui.add(egui::DragValue::new(&mut state.player.health).range(0..=200));
+                                ui.add(
+                                    egui::DragValue::new(&mut state.player.health).range(0..=200),
+                                );
                                 ui.end_row();
 
                                 ui.label("Armor:");
-                                ui.add(egui::DragValue::new(&mut state.player.armor).range(0..=200));
+                                ui.add(
+                                    egui::DragValue::new(&mut state.player.armor).range(0..=200),
+                                );
                                 ui.end_row();
                             });
 
@@ -128,16 +144,28 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                                 .spacing(egui::vec2(4.0, 1.0))
                                 .show(ui, |ui| {
                                     ui.label("Bullets:");
-                                    ui.add(egui::DragValue::new(&mut state.inventory.ammo_bullets).range(0..=m_bul));
+                                    ui.add(
+                                        egui::DragValue::new(&mut state.inventory.ammo_bullets)
+                                            .range(0..=m_bul),
+                                    );
                                     ui.end_row();
                                     ui.label("Shells:");
-                                    ui.add(egui::DragValue::new(&mut state.inventory.ammo_shells).range(0..=m_shl));
+                                    ui.add(
+                                        egui::DragValue::new(&mut state.inventory.ammo_shells)
+                                            .range(0..=m_shl),
+                                    );
                                     ui.end_row();
                                     ui.label("Rockets:");
-                                    ui.add(egui::DragValue::new(&mut state.inventory.ammo_rockets).range(0..=m_rkt));
+                                    ui.add(
+                                        egui::DragValue::new(&mut state.inventory.ammo_rockets)
+                                            .range(0..=m_rkt),
+                                    );
                                     ui.end_row();
                                     ui.label("Cells:");
-                                    ui.add(egui::DragValue::new(&mut state.inventory.ammo_cells).range(0..=m_cel));
+                                    ui.add(
+                                        egui::DragValue::new(&mut state.inventory.ammo_cells)
+                                            .range(0..=m_cel),
+                                    );
                                     ui.end_row();
                                 });
                         });
@@ -145,7 +173,15 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                         ui.vertical(|ui| {
                             ui.set_width(42.0);
                             ui.vertical_centered(|ui| {
-                                if draw_icon_button(ui, assets, "BPAKA0", state.inventory.has_backpack, "Pack").clicked() {
+                                if draw_icon_button(
+                                    ui,
+                                    assets,
+                                    "BPAKA0",
+                                    state.inventory.has_backpack,
+                                    "Pack",
+                                )
+                                .clicked()
+                                {
                                     state.inventory.has_backpack = !state.inventory.has_backpack;
                                 }
                                 ui.label(egui::RichText::new("Backpack").weak().size(10.0));
@@ -163,7 +199,11 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                         ui.label("HUD Style:");
                         ui.add_space(8.0);
 
-                        let hud_text = if state.engine.hud_mode == 0 { "Standard" } else { "Compact" };
+                        let hud_text = if state.engine.hud_mode == 0 {
+                            "Standard"
+                        } else {
+                            "Compact"
+                        };
                         if ui.button(hud_text).clicked() {
                             state.engine.hud_mode = 1 - state.engine.hud_mode;
                         }
@@ -173,7 +213,10 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
 
                     ui.label("Automap:");
                     ui.horizontal(|ui| {
-                        if ui.toggle_value(&mut state.engine.automap_active, "Active").changed() {
+                        if ui
+                            .toggle_value(&mut state.engine.automap_active, "Active")
+                            .changed()
+                        {
                             if !state.engine.automap_active {
                                 state.engine.automap_overlay = false;
                             }
@@ -185,7 +228,7 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                         }
                     });
                 });
-            } );
+            });
         });
     });
 
@@ -197,14 +240,26 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
         state.push_message("Doomguy was killed by a cruel SBARDEF editor.");
     }
 
-    if state.player.armor > old_a { state.push_message("Picked up an armor bonus."); }
+    if state.player.armor > old_a {
+        state.push_message("Picked up an armor bonus.");
+    }
 
-    if state.inventory.ammo_bullets > old_bul { state.push_message("Picked up a clip."); }
-    if state.inventory.ammo_shells > old_shl { state.push_message("Picked up 4 shotgun shells."); }
-    if state.inventory.ammo_rockets > old_rkt { state.push_message("Picked up a rocket."); }
-    if state.inventory.ammo_cells > old_cel { state.push_message("Picked up an energy cell."); }
+    if state.inventory.ammo_bullets > old_bul {
+        state.push_message("Picked up a clip.");
+    }
+    if state.inventory.ammo_shells > old_shl {
+        state.push_message("Picked up 4 shotgun shells.");
+    }
+    if state.inventory.ammo_rockets > old_rkt {
+        state.push_message("Picked up a rocket.");
+    }
+    if state.inventory.ammo_cells > old_cel {
+        state.push_message("Picked up an energy cell.");
+    }
 
-    if state.inventory.has_backpack && !old_pack { state.push_message("Picked up a backpack full of ammo!"); }
+    if state.inventory.has_backpack && !old_pack {
+        state.push_message("Picked up a backpack full of ammo!");
+    }
 }
 
 fn draw_dash_column<F>(ui: &mut egui::Ui, width: f32, title: &str, add_contents: F)

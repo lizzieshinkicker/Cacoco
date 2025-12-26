@@ -1,7 +1,7 @@
-use crate::model::{ElementWrapper, GraphicDef, CommonAttrs, Element};
 use crate::assets::AssetStore;
-use crate::ui::properties::font_cache::FontCache;
+use crate::model::{CommonAttrs, Element, ElementWrapper, GraphicDef};
 use crate::ui::properties::common;
+use crate::ui::properties::font_cache::FontCache;
 use eframe::egui;
 
 pub fn rebake_text(element: &mut ElementWrapper, assets: &AssetStore, fonts: &FontCache) {
@@ -59,7 +59,7 @@ pub fn draw_text_helper_editor(
     ui: &mut egui::Ui,
     element: &mut ElementWrapper,
     fonts: &FontCache,
-    assets: &AssetStore
+    assets: &AssetStore,
 ) -> bool {
     let mut bake_needed = false;
     let mut changed = false;
@@ -87,12 +87,28 @@ pub fn draw_text_helper_editor(
 
                 for (i, name) in fonts.hud_font_names.iter().enumerate() {
                     let stem = fonts.get_hud_stem(name);
-                    changed |= common::draw_font_selection_row(ui, &mut helper.font, name, stem.as_ref(), assets, false, i);
+                    changed |= common::draw_font_selection_row(
+                        ui,
+                        &mut helper.font,
+                        name,
+                        stem.as_ref(),
+                        assets,
+                        false,
+                        i,
+                    );
                 }
 
                 for (i, name) in fonts.number_font_names.iter().enumerate() {
                     let stem = fonts.get_number_stem(name);
-                    changed |= common::draw_font_selection_row(ui, &mut helper.font, name, stem.as_ref(), assets, true, i);
+                    changed |= common::draw_font_selection_row(
+                        ui,
+                        &mut helper.font,
+                        name,
+                        stem.as_ref(),
+                        assets,
+                        true,
+                        i,
+                    );
                 }
             });
 

@@ -183,7 +183,11 @@ pub fn save_pk3_dialog(
         if let Some(parent) = p.parent() {
             dialog = dialog.set_directory(parent);
         }
-        let mut final_name = p.file_name().and_then(|s| s.to_str()).unwrap_or("status_bar.pk3").to_string();
+        let mut final_name = p
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("status_bar.pk3")
+            .to_string();
         let lower = final_name.to_lowercase();
         if !lower.ends_with(".pk3") && !lower.ends_with(".zip") {
             final_name.push_str(".pk3");
@@ -208,7 +212,11 @@ pub fn save_pk3_dialog(
     None
 }
 
-pub fn save_pk3_silent(file: &SBarDefFile, assets: &AssetStore, path_str: &str) -> anyhow::Result<()> {
+pub fn save_pk3_silent(
+    file: &SBarDefFile,
+    assets: &AssetStore,
+    path_str: &str,
+) -> anyhow::Result<()> {
     let path = Path::new(path_str);
     let fs_file = fs::File::create(path)?;
     build_pk3(fs_file, file, assets)?;

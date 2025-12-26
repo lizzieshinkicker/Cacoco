@@ -187,7 +187,15 @@ fn draw_layer_row(
     );
 
     if response.dragged() {
-        render_drag_ghost(ui, element, assets, file, state, is_visible, selection.len());
+        render_drag_ghost(
+            ui,
+            element,
+            assets,
+            file,
+            state,
+            is_visible,
+            selection.len(),
+        );
     }
 
     response
@@ -390,7 +398,11 @@ fn render_row_contents(
     let res = if element._cacoco_text.is_some() {
         thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some("T"), !is_visible)
     } else if matches!(element.data, Element::Canvas(_)) {
-        let icon = if folder_state.is_open() { "📂" } else { "📁" };
+        let icon = if folder_state.is_open() {
+            "📂"
+        } else {
+            "📁"
+        };
         thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some(icon), !is_visible)
     } else {
         thumbnails::draw_thumbnail(

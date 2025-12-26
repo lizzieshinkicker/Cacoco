@@ -1,4 +1,4 @@
-<p align="center">
+<p style="text-align: center;">
 <img width="256" height="256" alt="cacoco256" src="https://github.com/user-attachments/assets/663c0caf-d179-4124-9818-3dd09ef6c4ae" />
 </p>
 

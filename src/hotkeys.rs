@@ -79,7 +79,8 @@ impl HotkeyRegistry {
             return Some(Action::Copy);
         }
 
-        let has_paste_event = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_))));
+        let has_paste_event =
+            ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_))));
         let shortcut_paste = ctx.input_mut(|i| i.consume_shortcut(&self.paste));
 
         if has_paste_event || shortcut_paste {

@@ -290,7 +290,9 @@ pub fn draw_live_patches(
     }
 
     let content_size = THUMB_SIZE - (INNER_MARGIN * 2.0);
-    let scale = (content_size / total_width).min(content_size / max_height).min(4.0);
+    let scale = (content_size / total_width)
+        .min(content_size / max_height)
+        .min(4.0);
 
     let mut current_x = rect.center().x - (total_width * scale / 2.0);
     let center_y = rect.center().y;

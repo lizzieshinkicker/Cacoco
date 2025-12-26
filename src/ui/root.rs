@@ -93,7 +93,8 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             }
             ui::MenuAction::ExportDone(path) => {
                 app.add_to_recent(&path);
-                app.preview_state.push_message(format!("Exported: {}", path));
+                app.preview_state
+                    .push_message(format!("Exported: {}", path));
             }
             ui::MenuAction::PickPortAndRun => {
                 handle_pick_port_and_run(app);
@@ -196,7 +197,12 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     });
 
     if app.settings_open {
-        ui::draw_settings_window(ctx, &mut app.settings_open, &mut app.config, &mut app.assets);
+        ui::draw_settings_window(
+            ctx,
+            &mut app.settings_open,
+            &mut app.config,
+            &mut app.assets,
+        );
     }
 
     if let Some(f) = &mut app.current_file {
@@ -290,7 +296,11 @@ fn handle_pick_port_and_run(app: &mut CacocoApp) {
     }
 }
 
-fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &ConfirmationRequest) {
+fn draw_confirmation_modal(
+    ctx: &egui::Context,
+    app: &mut CacocoApp,
+    request: &ConfirmationRequest,
+) {
     let mut close_modal = false;
     let mut confirmed = false;
 
@@ -384,7 +394,8 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
                     app.assets.offsets.remove(key);
                 }
                 app.dirty = true;
-                app.preview_state.push_message("Deleted assets from project.");
+                app.preview_state
+                    .push_message("Deleted assets from project.");
             }
             ConfirmationRequest::DiscardChanges(pending) => {
                 app.dirty = false;
@@ -436,7 +447,9 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Open => {
             if app.dirty {
-                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(PendingAction::Load("".to_string())));
+                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(
+                    PendingAction::Load("".to_string()),
+                ));
             } else if let Some(path) = crate::io::open_project_dialog() {
                 if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
                     app.load_project(ctx, loaded, &path);
@@ -451,7 +464,9 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 };
 
                 if needs_dialog {
-                    if let Some(path) = crate::io::save_pk3_dialog(f, &app.assets, app.opened_file_path.clone()) {
+                    if let Some(path) =
+                        crate::io::save_pk3_dialog(f, &app.assets, app.opened_file_path.clone())
+                    {
                         app.opened_file_path = Some(path.clone());
                         app.add_to_recent(&path);
                         app.dirty = false;
@@ -460,7 +475,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 } else {
                     let path = app.opened_file_path.as_ref().unwrap();
                     if let Err(e) = crate::io::save_pk3_silent(f, &app.assets, path) {
-                        app.preview_state.push_message(format!("Save Failed: {}", e));
+                        app.preview_state
+                            .push_message(format!("Save Failed: {}", e));
                     } else {
                         app.dirty = false;
                         app.preview_state.push_message(format!("Saved: {}", path));
@@ -473,7 +489,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 let name = app.opened_file_path.clone();
                 if let Some(path) = crate::io::save_json_dialog(f, name) {
                     app.add_to_recent(&path);
-                    app.preview_state.push_message(format!("Exported: {}", path));
+                    app.preview_state
+                        .push_message(format!("Exported: {}", path));
                 }
             }
         }

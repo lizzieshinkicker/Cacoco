@@ -1,10 +1,15 @@
-use eframe::egui;
-use crate::model::{ElementWrapper, ConditionType, ConditionDef};
-use crate::assets::AssetStore;
-use super::lookups;
 use super::common::{self, paint_thumb_content};
+use super::lookups;
+use crate::assets::AssetStore;
+use crate::model::{ConditionDef, ConditionType, ElementWrapper};
+use eframe::egui;
 
-pub fn draw_conditions_editor(ui: &mut egui::Ui, element: &mut ElementWrapper, assets: &AssetStore, state: &crate::state::PreviewState) -> bool {
+pub fn draw_conditions_editor(
+    ui: &mut egui::Ui,
+    element: &mut ElementWrapper,
+    assets: &AssetStore,
+    state: &crate::state::PreviewState,
+) -> bool {
     let mut changed = false;
     let common = element.get_common_mut();
     ui.add_space(12.0);
@@ -53,7 +58,7 @@ fn draw_condition_card(
     assets: &AssetStore,
     remove_idx: &mut Option<usize>,
     my_idx: usize,
-    state: &crate::state::PreviewState
+    state: &crate::state::PreviewState,
 ) -> bool {
     let mut changed = false;
     let is_true = crate::conditions::resolve(&[cond.clone()], state);
@@ -70,12 +75,20 @@ fn draw_condition_card(
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 let box_size = 44.0;
-                let (rect, _) = ui.allocate_exact_size(egui::vec2(box_size, box_size), egui::Sense::hover());
-                ui.painter().rect_filled(rect, 4.0, egui::Color32::from_gray(45));
+                let (rect, _) =
+                    ui.allocate_exact_size(egui::vec2(box_size, box_size), egui::Sense::hover());
+                ui.painter()
+                    .rect_filled(rect, 4.0, egui::Color32::from_gray(45));
                 let tex = master_icon_name.and_then(|n| assets.textures.get(n));
                 paint_thumb_content(ui, rect, tex, None);
                 if tex.is_none() {
-                    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "?", egui::FontId::proportional(18.0), egui::Color32::from_gray(100));
+                    ui.painter().text(
+                        rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        "?",
+                        egui::FontId::proportional(18.0),
+                        egui::Color32::from_gray(100),
+                    );
                 }
             });
 
@@ -86,7 +99,11 @@ fn draw_condition_card(
                     let group = &lookups::GROUPS[g_idx];
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("X").on_hover_text("Remove Condition").clicked() {
+                        if ui
+                            .small_button("X")
+                            .on_hover_text("Remove Condition")
+                            .clicked()
+                        {
                             *remove_idx = Some(my_idx);
                         }
 
@@ -113,10 +130,16 @@ fn draw_condition_card(
                 });
 
                 let stroke_color = ui.visuals().widgets.noninteractive.bg_stroke.color;
-                let (div_rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 2.0), egui::Sense::hover());
+                let (div_rect, _) = ui.allocate_exact_size(
+                    egui::vec2(ui.available_width(), 2.0),
+                    egui::Sense::hover(),
+                );
                 ui.painter().line_segment(
-                    [egui::pos2(div_rect.min.x, div_rect.center().y), egui::pos2(div_rect.max.x, div_rect.center().y)],
-                    egui::Stroke::new(1.0, stroke_color.gamma_multiply(0.5))
+                    [
+                        egui::pos2(div_rect.min.x, div_rect.center().y),
+                        egui::pos2(div_rect.max.x, div_rect.center().y),
+                    ],
+                    egui::Stroke::new(1.0, stroke_color.gamma_multiply(0.5)),
                 );
 
                 ui.horizontal(|ui| {
@@ -134,34 +157,59 @@ fn draw_condition_card(
         egui::Color32::from_rgba_unmultiplied(140, 40, 40, 30)
     };
 
-    ui.painter().rect_filled(response.response.rect, 4.0, tint_color);
+    ui.painter()
+        .rect_filled(response.response.rect, 4.0, tint_color);
 
     changed
 }
 
-fn draw_condition_predicate(ui: &mut egui::Ui, group: &lookups::ConditionGroup, cond: &mut ConditionDef, assets: &AssetStore) -> bool {
+fn draw_condition_predicate(
+    ui: &mut egui::Ui,
+    group: &lookups::ConditionGroup,
+    cond: &mut ConditionDef,
+    assets: &AssetStore,
+) -> bool {
     let mut changed = false;
     match group.style {
         lookups::GroupStyle::Standard => {
             changed |= draw_operator_selector(ui, group, cond, assets);
             changed |= draw_params_for_type(ui, cond, assets);
-        },
+        }
         lookups::GroupStyle::Natural => {
             changed |= draw_params_for_type(ui, cond, assets);
             changed |= draw_operator_selector(ui, group, cond, assets);
-        },
+        }
         lookups::GroupStyle::AmmoComplex => {
             changed |= draw_operator_selector(ui, group, cond, assets);
-            changed |= ui.add(egui::DragValue::new(&mut cond.param).speed(1).range(0..=999)).changed();
-            changed |= common::draw_lookup_param_dd(ui, "param2", &mut cond.param2, lookups::AMMO_TYPES, assets);
+            changed |= ui
+                .add(
+                    egui::DragValue::new(&mut cond.param)
+                        .speed(1)
+                        .range(0..=999),
+                )
+                .changed();
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                "param2",
+                &mut cond.param2,
+                lookups::AMMO_TYPES,
+                assets,
+            );
         }
     }
     changed
 }
 
-fn draw_operator_selector(ui: &mut egui::Ui, group: &lookups::ConditionGroup, cond: &mut ConditionDef, _assets: &AssetStore) -> bool {
+fn draw_operator_selector(
+    ui: &mut egui::Ui,
+    group: &lookups::ConditionGroup,
+    cond: &mut ConditionDef,
+    _assets: &AssetStore,
+) -> bool {
     let mut changed = false;
-    let current_variant = group.variants.iter()
+    let current_variant = group
+        .variants
+        .iter()
         .find(|v| v.condition == cond.condition)
         .unwrap_or(&group.variants[0]);
 
@@ -176,7 +224,9 @@ fn draw_operator_selector(ui: &mut egui::Ui, group: &lookups::ConditionGroup, co
         .height(600.0)
         .show_ui(ui, |ui| {
             for v in group.variants {
-                changed |= ui.selectable_value(&mut cond.condition, v.condition, v.label).changed();
+                changed |= ui
+                    .selectable_value(&mut cond.condition, v.condition, v.label)
+                    .changed();
             }
         });
     changed
@@ -190,31 +240,51 @@ fn draw_params_for_type(ui: &mut egui::Ui, cond: &mut ConditionDef, assets: &Ass
     match cond.condition {
         WeaponOwned | WeaponNotOwned | WeaponSelected | WeaponNotSelected | WeaponHasAmmo => {
             changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, WEAPONS, assets);
-        },
+        }
         ItemOwned | ItemNotOwned => {
             changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, ITEMS, assets);
-        },
+        }
         AmmoMatch => {
-            changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, AMMO_TYPES, assets);
-        },
+            changed |=
+                common::draw_lookup_param_dd(ui, "param1", &mut cond.param, AMMO_TYPES, assets);
+        }
         SessionTypeEq | SessionTypeNeq => {
-            changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, SESSION_TYPES, assets);
-        },
+            changed |=
+                common::draw_lookup_param_dd(ui, "param1", &mut cond.param, SESSION_TYPES, assets);
+        }
         HudModeEq => {
-            changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, HUD_MODES, assets);
-        },
+            changed |=
+                common::draw_lookup_param_dd(ui, "param1", &mut cond.param, HUD_MODES, assets);
+        }
         WidescreenModeEq => {
-            changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, WIDESCREEN_MODES, assets);
-        },
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                "param1",
+                &mut cond.param,
+                WIDESCREEN_MODES,
+                assets,
+            );
+        }
         AutomapModeEq => {
             changed |= draw_automap_param(ui, &mut cond.param);
-        },
+        }
         SlotOwned | SlotNotOwned | SlotSelected | SlotNotSelected => {
-            changed |= ui.add(egui::DragValue::new(&mut cond.param).range(1..=9)).changed();
+            changed |= ui
+                .add(egui::DragValue::new(&mut cond.param).range(1..=9))
+                .changed();
         }
         _ => {
-            if matches!(get_param_usage(cond.condition), ParamUsage::Param1 | ParamUsage::Both) {
-                changed |= ui.add(egui::DragValue::new(&mut cond.param).speed(1).range(0..=999)).changed();
+            if matches!(
+                get_param_usage(cond.condition),
+                ParamUsage::Param1 | ParamUsage::Both
+            ) {
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut cond.param)
+                            .speed(1)
+                            .range(0..=999),
+                    )
+                    .changed();
             }
         }
     }
@@ -228,7 +298,11 @@ pub fn draw_automap_param(ui: &mut egui::Ui, param: &mut i32) -> bool {
         for flag in lookups::AUTOMAP_FLAGS {
             let mut is_set = (*param & flag.id) != 0;
             if ui.checkbox(&mut is_set, flag.name).changed() {
-                if is_set { *param |= flag.id; } else { *param &= !flag.id; }
+                if is_set {
+                    *param |= flag.id;
+                } else {
+                    *param &= !flag.id;
+                }
                 changed = true;
             }
         }

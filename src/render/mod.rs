@@ -139,7 +139,10 @@ pub(super) fn resolve_position(
     common: &CommonAttrs,
     parent_pos: egui::Pos2,
 ) -> egui::Pos2 {
-    let mut pos = egui::pos2(parent_pos.x + common.x as f32, parent_pos.y + common.y as f32);
+    let mut pos = egui::pos2(
+        parent_pos.x + common.x as f32,
+        parent_pos.y + common.y as f32,
+    );
 
     if ctx.proj.origin_x > 0.0 {
         let dl = common.alignment.contains(Alignment::DYNAMIC_LEFT);

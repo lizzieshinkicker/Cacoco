@@ -1,16 +1,20 @@
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde_repr::{Deserialize_repr, Serialize_repr};
-use bitflags::bitflags;
-use rand::Rng;
-use eframe::egui;
 use crate::assets::AssetStore;
 use crate::state::PreviewState;
 use crate::ui::properties::editor::PropertiesUI;
 use crate::ui::properties::font_cache::FontCache;
 use crate::ui::properties::preview::PreviewContent;
+use bitflags::bitflags;
+use eframe::egui;
+use rand::Rng;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-fn default_type() -> String { "statusbar".to_string() }
-fn default_version() -> String { "1.0.0".to_string() }
+fn default_type() -> String {
+    "statusbar".to_string()
+}
+fn default_version() -> String {
+    "1.0.0".to_string()
+}
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -28,47 +32,102 @@ bitflags! {
 
 impl Serialize for Alignment {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_u32(self.bits())
     }
 }
 
 impl<'de> Deserialize<'de> for Alignment {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de> {
-        Ok(Alignment::from_bits_truncate(u32::deserialize(deserializer)?))
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Alignment::from_bits_truncate(u32::deserialize(
+            deserializer,
+        )?))
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ComponentType {
-    #[default] Unknown,
-    StatTotals, Time, Coordinates, Speedometer, LevelTitle, FpsCounter, Message,
-    AnnounceLevelTitle, RenderStats, CommandHistory, Chat,
+    #[default]
+    Unknown,
+    StatTotals,
+    Time,
+    Coordinates,
+    Speedometer,
+    LevelTitle,
+    FpsCounter,
+    Message,
+    AnnounceLevelTitle,
+    RenderStats,
+    CommandHistory,
+    Chat,
 }
 
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
 pub enum NumberType {
-    #[default] Health = 0, Armor = 1, Frags = 2,
-    Ammo = 3, AmmoSelected = 4, MaxAmmo = 5, AmmoWeapon = 6, MaxAmmoWeapon = 7,
+    #[default]
+    Health = 0,
+    Armor = 1,
+    Frags = 2,
+    Ammo = 3,
+    AmmoSelected = 4,
+    MaxAmmo = 5,
+    AmmoWeapon = 6,
+    MaxAmmoWeapon = 7,
 }
 
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ConditionType {
-    WeaponOwned = 0, WeaponSelected = 1, WeaponNotSelected = 2, WeaponHasAmmo = 3,
-    SelectedWeaponHasAmmo = 4, AmmoMatch = 5, SlotOwned = 6, SlotNotOwned = 7,
-    SlotSelected = 8, SlotNotSelected = 9, ItemOwned = 10, ItemNotOwned = 11,
-    GameVersionGe = 12, GameVersionLt = 13, SessionTypeEq = 14, SessionTypeNeq = 15,
-    GameModeEq = 16, GameModeNeq = 17, HudModeEq = 18, AutomapModeEq = 19,
-    WidgetEnabled = 20, WidgetDisabled = 21, WeaponNotOwned = 22, HealthGe = 23,
-    HealthLt = 24, HealthPercentGe = 25, HealthPercentLt = 26, ArmorGe = 27,
-    ArmorLt = 28, ArmorPercentGe = 29, ArmorPercentLt = 30, SelectedAmmoGe = 31,
-    SelectedAmmoLt = 32, SelectedAmmoPercentGe = 33, SelectedAmmoPercentLt = 34,
-    AmmoGe = 35, AmmoLt = 36, AmmoPercentGe = 37, AmmoPercentLt = 38,
-    WidescreenModeEq = 39, EpisodeEq = 40, LevelGe = 41, LevelLt = 42,
+    WeaponOwned = 0,
+    WeaponSelected = 1,
+    WeaponNotSelected = 2,
+    WeaponHasAmmo = 3,
+    SelectedWeaponHasAmmo = 4,
+    AmmoMatch = 5,
+    SlotOwned = 6,
+    SlotNotOwned = 7,
+    SlotSelected = 8,
+    SlotNotSelected = 9,
+    ItemOwned = 10,
+    ItemNotOwned = 11,
+    GameVersionGe = 12,
+    GameVersionLt = 13,
+    SessionTypeEq = 14,
+    SessionTypeNeq = 15,
+    GameModeEq = 16,
+    GameModeNeq = 17,
+    HudModeEq = 18,
+    AutomapModeEq = 19,
+    WidgetEnabled = 20,
+    WidgetDisabled = 21,
+    WeaponNotOwned = 22,
+    HealthGe = 23,
+    HealthLt = 24,
+    HealthPercentGe = 25,
+    HealthPercentLt = 26,
+    ArmorGe = 27,
+    ArmorLt = 28,
+    ArmorPercentGe = 29,
+    ArmorPercentLt = 30,
+    SelectedAmmoGe = 31,
+    SelectedAmmoLt = 32,
+    SelectedAmmoPercentGe = 33,
+    SelectedAmmoPercentLt = 34,
+    AmmoGe = 35,
+    AmmoLt = 36,
+    AmmoPercentGe = 37,
+    AmmoPercentLt = 38,
+    WidescreenModeEq = 39,
+    EpisodeEq = 40,
+    LevelGe = 41,
+    LevelLt = 42,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -84,31 +143,39 @@ pub struct SBarDefFile {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct StatusBarDefinition {
-    #[serde(default, rename = "numberfonts")] pub number_fonts: Vec<NumberFontDef>,
-    #[serde(default, rename = "hudfonts")] pub hud_fonts: Vec<HudFontDef>,
-    #[serde(default, rename = "statusbars")] pub status_bars: Vec<StatusBarLayout>,
+    #[serde(default, rename = "numberfonts")]
+    pub number_fonts: Vec<NumberFontDef>,
+    #[serde(default, rename = "hudfonts")]
+    pub hud_fonts: Vec<HudFontDef>,
+    #[serde(default, rename = "statusbars")]
+    pub status_bars: Vec<StatusBarLayout>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NumberFontDef {
     pub name: String,
-    #[serde(rename = "type")] pub type_: u8,
+    #[serde(rename = "type")]
+    pub type_: u8,
     pub stem: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HudFontDef {
     pub name: String,
-    #[serde(rename = "type")] pub type_: u8,
+    #[serde(rename = "type")]
+    pub type_: u8,
     pub stem: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StatusBarLayout {
     pub height: i32,
-    #[serde(rename = "fullscreenrender", default)] pub fullscreen_render: bool,
-    #[serde(rename = "fillflat")] pub fill_flat: Option<String>,
-    #[serde(default)] pub children: Vec<ElementWrapper>,
+    #[serde(rename = "fullscreenrender", default)]
+    pub fullscreen_render: bool,
+    #[serde(rename = "fillflat")]
+    pub fill_flat: Option<String>,
+    #[serde(default)]
+    pub children: Vec<ElementWrapper>,
 }
 
 impl Default for StatusBarLayout {
@@ -176,47 +243,68 @@ impl Default for ElementWrapper {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CommonAttrs {
-    #[serde(default)] pub x: i32,
-    #[serde(default)] pub y: i32,
-    #[serde(default)] pub alignment: Alignment,
-    #[serde(default, skip_serializing_if = "Option::is_none")] pub tranmap: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")] pub translation: Option<String>,
-    #[serde(default)] pub translucency: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")] pub conditions: Vec<ConditionDef>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")] pub children: Vec<ElementWrapper>,
+    #[serde(default)]
+    pub x: i32,
+    #[serde(default)]
+    pub y: i32,
+    #[serde(default)]
+    pub alignment: Alignment,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tranmap: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub translation: Option<String>,
+    #[serde(default)]
+    pub translucency: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conditions: Vec<ConditionDef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<ElementWrapper>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConditionDef {
     pub condition: ConditionType,
-    #[serde(default)] pub param: i32,
-    #[serde(default)] pub param2: i32,
+    #[serde(default)]
+    pub param: i32,
+    #[serde(default)]
+    pub param2: i32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CanvasDef {
-    #[serde(flatten)] pub common: CommonAttrs,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GraphicDef {
-    #[serde(flatten)] pub common: CommonAttrs,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
     pub patch: String,
-    #[serde(default)] pub width: i32,
-    #[serde(default)] pub height: i32,
-    #[serde(default)] pub topoffset: i32,
-    #[serde(default)] pub leftoffset: i32,
-    #[serde(default)] pub midoffset: i32,
+    #[serde(default)]
+    pub width: i32,
+    #[serde(default)]
+    pub height: i32,
+    #[serde(default)]
+    pub topoffset: i32,
+    #[serde(default)]
+    pub leftoffset: i32,
+    #[serde(default)]
+    pub midoffset: i32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AnimationDef {
-    #[serde(flatten)] pub common: CommonAttrs,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
     pub frames: Vec<FrameDef>,
-    #[serde(default = "default_fps")] pub framerate: f64,
+    #[serde(default = "default_fps")]
+    pub framerate: f64,
 }
 
-fn default_fps() -> f64 { 10.0 }
+fn default_fps() -> f64 {
+    10.0
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FrameDef {
@@ -226,23 +314,35 @@ pub struct FrameDef {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FaceDef {
-    #[serde(flatten)] pub common: CommonAttrs,
-    #[serde(default)] pub width: i32,
-    #[serde(default)] pub height: i32,
-    #[serde(default)] pub topoffset: i32,
-    #[serde(default)] pub leftoffset: i32,
-    #[serde(default)] pub midoffset: i32,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    #[serde(default)]
+    pub width: i32,
+    #[serde(default)]
+    pub height: i32,
+    #[serde(default)]
+    pub topoffset: i32,
+    #[serde(default)]
+    pub leftoffset: i32,
+    #[serde(default)]
+    pub midoffset: i32,
 }
 
-fn default_maxlength() -> i32 { 3 }
+fn default_maxlength() -> i32 {
+    3
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NumberDef {
-    #[serde(flatten)] pub common: CommonAttrs,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
     pub font: String,
-    #[serde(rename = "type")] pub type_: NumberType,
-    #[serde(default)] pub param: i32,
-    #[serde(default = "default_maxlength")] pub maxlength: i32,
+    #[serde(rename = "type")]
+    pub type_: NumberType,
+    #[serde(default)]
+    pub param: i32,
+    #[serde(default = "default_maxlength")]
+    pub maxlength: i32,
 }
 
 impl Default for NumberDef {
@@ -259,16 +359,21 @@ impl Default for NumberDef {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ComponentDef {
-    #[serde(flatten)] pub common: CommonAttrs,
-    #[serde(rename = "type")] pub type_: ComponentType,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    #[serde(rename = "type")]
+    pub type_: ComponentType,
     pub font: String,
-    #[serde(default)] pub vertical: bool,
-    #[serde(default)] pub duration: f64,
+    #[serde(default)]
+    pub vertical: bool,
+    #[serde(default)]
+    pub duration: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CarouselDef {
-    #[serde(flatten)] pub common: CommonAttrs,
+    #[serde(flatten)]
+    pub common: CommonAttrs,
 }
 
 impl ElementWrapper {
@@ -338,17 +443,26 @@ impl ElementWrapper {
 
 impl SBarDefFile {
     pub fn get_element_mut(&mut self, path: &[usize]) -> Option<&mut ElementWrapper> {
-        if path.is_empty() { return None; }
+        if path.is_empty() {
+            return None;
+        }
         let bar_idx = path[0];
-        if bar_idx >= self.data.status_bars.len() { return None; }
+        if bar_idx >= self.data.status_bars.len() {
+            return None;
+        }
 
         let bar = &mut self.data.status_bars[bar_idx];
-        if path.len() == 1 { return None; }
+        if path.len() == 1 {
+            return None;
+        }
 
         let mut current_element = bar.children.get_mut(path[1])?;
 
         for &child_idx in &path[2..] {
-            current_element = current_element.get_common_mut().children.get_mut(child_idx)?;
+            current_element = current_element
+                .get_common_mut()
+                .children
+                .get_mut(child_idx)?;
         }
 
         Some(current_element)
@@ -356,7 +470,13 @@ impl SBarDefFile {
 }
 
 impl PropertiesUI for ElementWrapper {
-    fn draw_specific_fields(&mut self, ui: &mut egui::Ui, fonts: &FontCache, assets: &AssetStore, state: &PreviewState) -> bool {
+    fn draw_specific_fields(
+        &mut self,
+        ui: &mut egui::Ui,
+        fonts: &FontCache,
+        assets: &AssetStore,
+        state: &PreviewState,
+    ) -> bool {
         match &mut self.data {
             Element::Canvas(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Graphic(e) => e.draw_specific_fields(ui, fonts, assets, state),
@@ -370,7 +490,12 @@ impl PropertiesUI for ElementWrapper {
         }
     }
 
-    fn get_preview_content(&self, ui: &egui::Ui, fonts: &FontCache, state: &PreviewState) -> Option<PreviewContent> {
+    fn get_preview_content(
+        &self,
+        ui: &egui::Ui,
+        fonts: &FontCache,
+        state: &PreviewState,
+    ) -> Option<PreviewContent> {
         match &self.data {
             Element::Canvas(e) => e.get_preview_content(ui, fonts, state),
             Element::Graphic(e) => e.get_preview_content(ui, fonts, state),

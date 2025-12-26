@@ -1,5 +1,5 @@
+use crate::model::{Element, ElementWrapper};
 use eframe::egui::Color32;
-use crate::model::{ElementWrapper, Element};
 
 pub fn get_layer_color(element: &ElementWrapper) -> Option<Color32> {
     if element._cacoco_text.is_some() {

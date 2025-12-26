@@ -1,7 +1,7 @@
-use crate::constants::{DEFAULT_GLYPH_W, DEFAULT_GLYPH_H};
+use super::{RenderContext, get_alignment_anchor_offset};
+use crate::constants::{DEFAULT_GLYPH_H, DEFAULT_GLYPH_W};
 use crate::model::*;
 use eframe::egui;
-use super::{get_alignment_anchor_offset, RenderContext};
 
 pub(super) fn draw_number(
     ctx: &RenderContext,
@@ -33,10 +33,14 @@ pub(super) fn draw_number(
     if def.maxlength > 0 {
         let clean_len = def.maxlength.clamp(0, 9) as u32;
         let max_val = 10_i32.saturating_pow(clean_len) - 1;
-        let min_val = -(10_i32.saturating_pow(clean_len.saturating_sub(1))) + 1;
+        let min_val = -10_i32.saturating_pow(clean_len.saturating_sub(1)) + 1;
 
-        if val > max_val { val = max_val; }
-        if val < min_val { val = min_val; }
+        if val > max_val {
+            val = max_val;
+        }
+        if val < min_val {
+            val = min_val;
+        }
     }
 
     let text = if is_percent {
@@ -44,7 +48,15 @@ pub(super) fn draw_number(
     } else {
         format!("{}", val)
     };
-    draw_text_line(ctx, &text, &def.font, pos, def.common.alignment, true, alpha);
+    draw_text_line(
+        ctx,
+        &text,
+        &def.font,
+        pos,
+        def.common.alignment,
+        true,
+        alpha,
+    );
 }
 
 pub fn draw_text_line(
@@ -87,7 +99,8 @@ pub fn draw_text_line(
                 glyph.tex_w * ctx.proj.final_scale_x,
                 glyph.h * ctx.proj.final_scale_y,
             );
-            ctx.painter.image(tex.id(), egui::Rect::from_min_size(s_pos, s_size), uv, tint);
+            ctx.painter
+                .image(tex.id(), egui::Rect::from_min_size(s_pos, s_size), uv, tint);
         }
         cur_x += glyph.advance;
     }
@@ -147,7 +160,7 @@ fn layout_text_line<'a>(
             // Hardcode vertical offsets specifically for the IWAD HUD font characters.
             if stem_upper == "STCFN" {
                 match c {
-                    '.' | ','  => y_offset = 4.0,
+                    '.' | ',' => y_offset = 4.0,
                     '-' => y_offset = 2.0,
                     _ => {}
                 }
@@ -162,7 +175,9 @@ fn layout_text_line<'a>(
             });
 
             total_w += advance;
-            if (sz.y + y_offset) > max_h { max_h = sz.y + y_offset; }
+            if (sz.y + y_offset) > max_h {
+                max_h = sz.y + y_offset;
+            }
         } else {
             glyphs.push(Glyph {
                 texture: None,
@@ -175,7 +190,9 @@ fn layout_text_line<'a>(
         }
     }
 
-    if max_h == 0.0 { max_h = DEFAULT_GLYPH_H; }
+    if max_h == 0.0 {
+        max_h = DEFAULT_GLYPH_H;
+    }
     Some(TextLayout {
         glyphs,
         size: egui::vec2(total_w, max_h),

@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::document::{determine_insertion_point, LayerAction};
+use crate::document::{LayerAction, determine_insertion_point};
 use crate::model::*;
 use crate::render::projection::ViewportProjection;
 use crate::render::{self, RenderPass};
@@ -31,7 +31,10 @@ pub fn draw_viewport(
     ui.horizontal(|ui| {
         ui.heading(format!("Viewport ({}x Scale)", proj.final_scale_x));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.checkbox(&mut preview_state.engine.widescreen_mode, "Widescreen (16:9)");
+            ui.checkbox(
+                &mut preview_state.engine.widescreen_mode,
+                "Widescreen (16:9)",
+            );
             ui.checkbox(
                 &mut preview_state.engine.aspect_correction,
                 "Aspect Correct (4:3)",
@@ -56,8 +59,11 @@ pub fn draw_viewport(
     };
 
     let sense = egui::Sense::click_and_drag();
-    let viewport_res =
-        ui.interact(background_rect, ui.make_persistent_id("viewport_interact"), sense);
+    let viewport_res = ui.interact(
+        background_rect,
+        ui.make_persistent_id("viewport_interact"),
+        sense,
+    );
 
     let is_dragging = viewport_res.dragged_by(egui::PointerButton::Primary);
 
@@ -99,7 +105,8 @@ pub fn draw_viewport(
         ui.data_mut(|d| d.remove::<egui::Vec2>(accum_id));
     }
 
-    ui.painter().rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
+    ui.painter()
+        .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
 
     let bar_idx = if current_bar_idx < file_ref.data.status_bars.len() {
         current_bar_idx
@@ -116,7 +123,11 @@ pub fn draw_viewport(
         fill_flat_name = bar.fill_flat.clone();
     }
 
-    let h_view = if is_fullscreen { 200.0 } else { 200.0 - bar_height };
+    let h_view = if is_fullscreen {
+        200.0
+    } else {
+        200.0 - bar_height
+    };
     let y_center = h_view / 2.0;
     let y_offset_from_top = y_center - 100.0;
 
@@ -139,7 +150,9 @@ pub fn draw_viewport(
         let mut draw_rect = proj.screen_rect;
         draw_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
 
-        screen_ui.painter().image(tex.id(), draw_rect, uv_rect, egui::Color32::WHITE);
+        screen_ui
+            .painter()
+            .image(tex.id(), draw_rect, uv_rect, egui::Color32::WHITE);
     }
 
     if !is_fullscreen && bar_height > 0.0 {
@@ -147,8 +160,11 @@ pub fn draw_viewport(
         if let Some(tex) = assets.textures.get(&flat_key.to_uppercase()) {
             let tile_size_px = 64.0 * proj.final_scale_x;
             let bar_area_rect = egui::Rect::from_min_max(
-                egui::pos2(proj.screen_rect.left(), proj.screen_rect.bottom() - (bar_height * proj.final_scale_y)),
-                egui::pos2(proj.screen_rect.right(), proj.screen_rect.bottom())
+                egui::pos2(
+                    proj.screen_rect.left(),
+                    proj.screen_rect.bottom() - (bar_height * proj.final_scale_y),
+                ),
+                egui::pos2(proj.screen_rect.right(), proj.screen_rect.bottom()),
             );
 
             let mut y = bar_area_rect.min.y;
@@ -164,7 +180,7 @@ pub fn draw_viewport(
                         tex.id(),
                         egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(draw_w, draw_h)),
                         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(uv_w, uv_h)),
-                        egui::Color32::WHITE
+                        egui::Color32::WHITE,
                     );
                     x += tile_size_px;
                 }
@@ -183,7 +199,11 @@ pub fn draw_viewport(
     }
 
     if let Some(bar) = file_ref.data.status_bars.get(bar_idx) {
-        let root_y = if is_fullscreen { 0.0 } else { 200.0 - bar_height };
+        let root_y = if is_fullscreen {
+            0.0
+        } else {
+            200.0 - bar_height
+        };
         ui.ctx().request_repaint();
 
         let mouse_pos = ui
@@ -333,11 +353,14 @@ fn render_player_weapon(
     if let Some(lump) = weapon_lump_name {
         if let Some(tex) = assets.textures.get(lump) {
             let tex_size = tex.size_vec2();
-            let scaled_size =
-                egui::vec2(tex_size.x * proj.final_scale_x, tex_size.y * proj.final_scale_y);
+            let scaled_size = egui::vec2(
+                tex_size.x * proj.final_scale_x,
+                tex_size.y * proj.final_scale_y,
+            );
             let draw_x = proj.screen_rect.center().x - (scaled_size.x / 2.0);
 
-            let total_offset_y = (state.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
+            let total_offset_y =
+                (state.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
             let draw_y = (proj.screen_rect.max.y - scaled_size.y) + total_offset_y;
 
             ui.painter().image(
