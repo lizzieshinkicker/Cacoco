@@ -13,11 +13,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  activity-check:
+    name: Check for repo activity
+    runs-on: ubuntu-latest
+    outputs:
+      nightly-outdated: ${{ steps.check.outputs.nightly-outdated }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check latest nightly commit
+        id: check
+        run: |
+          if git fetch --quiet origin refs/tags/nightly:refs/tags/nightly; then
+            TAG_COMMIT=$(git rev-list -n 1 refs/tags/nightly)
+
+            if [[ "$TAG_COMMIT" != "${{ github.sha }}" ]]; then
+              echo "nightly-outdated=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "nightly-outdated=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "nightly-outdated=true" >> "$GITHUB_OUTPUT"
+          fi
+
+
   build-windows:
     name: Build (Windows)
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
       with:
         target: x86_64-pc-windows-msvc
@@ -37,7 +62,7 @@ jobs:
     name: Build (macOS)
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
       with:
         target: |
@@ -63,8 +88,10 @@ jobs:
   build-linux:
     name: Build (Linux)
     runs-on: ubuntu-latest
+    env:
+      ARTIFACT_NAME: cacoco-nightly-linux-x86_64.AppImage
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build release binary (Debian Bullseye)
       run: |
         docker run --rm \
@@ -85,7 +112,7 @@ jobs:
     - name: Create AppImage
       env:
         LD_BIN: ${{ steps.install-linuxdeploy.outputs.linuxdeploy }}
-        LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|*x86_64.AppImage.zsync"
+        LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|${{ env.ARTIFACT_NAME }}.zsync"
         LDAI_VERSION: "${{ steps.version.outputs.version }}"
       run: |
         "$LD_BIN" --output appimage \
@@ -97,8 +124,8 @@ jobs:
     - name: Rename binary
       run: |
         mkdir -p dist
-        mv Cacoco-*-x86_64.AppImage dist/cacoco-nightly-linux-x86_64.AppImage
-        mv Cacoco-*-x86_64.AppImage.zsync dist/cacoco-nightly-linux-x86_64.AppImage.zsync
+        mv Cacoco-*-x86_64.AppImage "dist/${ARTIFACT_NAME}"
+        mv Cacoco-*-x86_64.AppImage.zsync "dist/${ARTIFACT_NAME}.zsync"
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
@@ -106,16 +133,17 @@ jobs:
         path: dist/*
 
   release-nightly:
-    needs: [ build-windows, build-mac, build-linux ]
+    needs: [ build-windows, build-mac, build-linux, activity-check ]
+    if: ${{ needs.activity-check.outputs.nightly-outdated }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Check existing nightly release commit
       id: check
       run: |
         existing_sha=$(gh release view nightly --json targetCommitish --jq .targetCommitish 2>/dev/null || echo "")
         echo "existing_sha=$existing_sha"
-        if [ "$existing_sha" = "${{ github.sha }}" ]; then
+        if [[ "$existing_sha" = "${{ github.sha }}" ]]; then
           echo "release-exists=true" >> $GITHUB_OUTPUT
         else
           echo "release-exists=false" >> $GITHUB_OUTPUT

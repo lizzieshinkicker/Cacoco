@@ -21,7 +21,7 @@ jobs:
           - os: macos-latest
             platform: macOS
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
     - name: Run build
       run: cargo build --verbose
