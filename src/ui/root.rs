@@ -1,6 +1,6 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
-use crate::{document, ui};
 use crate::ui::font_wizard;
+use crate::{document, ui};
 use eframe::egui;
 use std::path::Path;
 

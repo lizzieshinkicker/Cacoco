@@ -1,6 +1,7 @@
 use crate::assets::AssetStore;
 use crate::cheats::CheatEngine;
 use crate::config::AppConfig;
+use crate::document::{self, LayerAction};
 use crate::history::HistoryManager;
 use crate::hotkeys::HotkeyRegistry;
 use crate::io;
@@ -11,7 +12,6 @@ use crate::ui;
 use crate::ui::font_wizard::FontWizardState;
 use eframe::egui;
 use std::collections::HashSet;
-use crate::document::{self, LayerAction};
 
 const MAX_RECENT_FILES: usize = 5;
 
@@ -212,7 +212,9 @@ impl CacocoApp {
 
     /// Centralized handler for executing a batch of editor actions.
     pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
-        let Some(f) = &mut self.current_file else { return };
+        let Some(f) = &mut self.current_file else {
+            return;
+        };
 
         for action in actions {
             self.dirty = true;

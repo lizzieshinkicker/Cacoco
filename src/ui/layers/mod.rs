@@ -7,9 +7,9 @@ use crate::model::{
 use crate::state::PreviewState;
 use crate::ui::font_wizard::FontWizardState;
 use crate::ui::properties::common;
+use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
-use crate::ui::shared;
 
 mod browser;
 pub(crate) mod colors;

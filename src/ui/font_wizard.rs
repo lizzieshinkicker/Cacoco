@@ -187,7 +187,9 @@ fn analyze_selection(patches: &[String]) -> (String, FontTypeWrapper) {
         }
     }
 
-    let mut stem = common.trim_end_matches(|c: char| c.is_ascii_digit()).to_string();
+    let mut stem = common
+        .trim_end_matches(|c: char| c.is_ascii_digit())
+        .to_string();
 
     if looks_like_hud {
         (stem, FontTypeWrapper::Hud)

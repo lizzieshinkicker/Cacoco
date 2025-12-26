@@ -490,8 +490,12 @@ fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) 
 }
 
 impl PropertiesUI for CanvasDef {
-    fn has_specific_fields(&self) -> bool { false }
+    fn has_specific_fields(&self) -> bool {
+        false
+    }
 }
 impl PropertiesUI for CarouselDef {
-    fn has_specific_fields(&self) -> bool { false }
+    fn has_specific_fields(&self) -> bool {
+        false
+    }
 }
