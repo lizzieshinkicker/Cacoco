@@ -27,6 +27,7 @@ pub fn draw_layer_tree_root(
     assets: &AssetStore,
     state: &PreviewState,
     actions: &mut Vec<LayerAction>,
+    confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     ui.style_mut().spacing.item_spacing.y = 1.0;
 
@@ -43,6 +44,7 @@ pub fn draw_layer_tree_root(
             file,
             state,
             actions,
+            confirmation_modal,
         );
     }
 }
@@ -57,6 +59,7 @@ pub fn draw_layer_tree_recursive(
     file: &SBarDefFile,
     state: &PreviewState,
     actions: &mut Vec<LayerAction>,
+    confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     for (idx, element) in elements.iter().enumerate() {
         let mut my_path = current_path.clone();
@@ -84,6 +87,7 @@ pub fn draw_layer_tree_recursive(
             actions,
             idx == 0,
             idx == elements.len() - 1,
+            confirmation_modal,
         );
 
         let is_text_helper = element._cacoco_text.is_some();
@@ -105,6 +109,7 @@ pub fn draw_layer_tree_recursive(
                     file,
                     state,
                     actions,
+                    confirmation_modal,
                 );
             });
         }
@@ -126,6 +131,7 @@ fn draw_layer_row(
     actions: &mut Vec<LayerAction>,
     is_first: bool,
     is_last: bool,
+    confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) -> egui::Response {
     let is_selected = selection.contains(my_path);
     let common = element.get_common();
@@ -185,6 +191,8 @@ fn draw_layer_row(
         actions,
         is_first,
         is_last,
+        file,
+        confirmation_modal,
     );
 
     if response.dragged() {
@@ -451,6 +459,8 @@ fn handle_context_menu(
     actions: &mut Vec<LayerAction>,
     is_first: bool,
     is_last: bool,
+    file: &SBarDefFile,
+    confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     let just_opened = ContextMenu::check(ui, response);
     if let Some(menu) = ContextMenu::get(ui, response.id) {
@@ -480,10 +490,16 @@ fn handle_context_menu(
             }
             ui.separator();
             if ContextMenu::button(ui, "Delete", true) {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::DeleteSelection(
-                    selection.iter().cloned().collect(),
-                ));
+                if deletion_needs_confirmation(file, selection) {
+                    let paths: Vec<Vec<usize>> = selection.iter().cloned().collect();
+                    *confirmation_modal =
+                        Some(crate::app::ConfirmationRequest::DeleteLayers(paths));
+                } else {
+                    actions.push(LayerAction::UndoSnapshot);
+                    actions.push(LayerAction::DeleteSelection(
+                        selection.iter().cloned().collect(),
+                    ));
+                }
                 ContextMenu::close(ui);
             }
         });
@@ -593,4 +609,20 @@ fn calculate_drop_target(
             Some(DropTarget::Child)
         }
     }
+}
+
+/// Helper to check if any part of the selection contains children, requiring deletion confirmation.
+pub fn deletion_needs_confirmation(file: &SBarDefFile, selection: &HashSet<Vec<usize>>) -> bool {
+    for path in selection {
+        if path.len() < 2 {
+            continue;
+        }
+
+        if let Some(el) = file.get_element(path) {
+            if !el.children().is_empty() {
+                return true;
+            }
+        }
+    }
+    false
 }

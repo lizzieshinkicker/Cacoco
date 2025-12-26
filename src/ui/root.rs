@@ -298,11 +298,21 @@ fn draw_confirmation_modal(
                 ConfirmationRequest::DeleteStatusBar(_) => {
                     ui.label("Are you sure you want to delete this status bar?");
                     ui.label(
-                        egui::RichText::new(
-                            "This will permanently remove all layers and components contained within this layout.",
-                        )
-                            .weak()
-                            .size(11.0),
+                        egui::RichText::new("All layers and components inside this layout will be permanently removed.")
+                            .weak().size(11.0),
+                    );
+                }
+                ConfirmationRequest::DeleteLayers(paths) => {
+                    let count = paths.len();
+                    let msg = if count == 1 {
+                        "Are you sure you want to delete this layer?".to_string()
+                    } else {
+                        format!("Are you sure you want to delete {} layers?", count)
+                    };
+                    ui.label(msg);
+                    ui.label(
+                        egui::RichText::new("This will also delete all children nested inside the selection.")
+                            .weak().size(11.0),
                     );
                 }
                 ConfirmationRequest::DeleteAssets(items) => {
@@ -355,14 +365,12 @@ fn draw_confirmation_modal(
     if confirmed {
         match request {
             ConfirmationRequest::DeleteStatusBar(idx) => {
-                if let Some(f) = &mut app.current_file {
-                    app.history.take_snapshot(f, &app.selection);
-                    f.data.status_bars.remove(*idx);
-                    if app.current_statusbar_idx >= f.data.status_bars.len() {
-                        app.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
-                    }
-                    app.dirty = true;
-                }
+                app.execute_actions(vec![document::LayerAction::DeleteStatusBar(*idx)]);
+                app.preview_state.push_message("Layout deleted.");
+            }
+            ConfirmationRequest::DeleteLayers(paths) => {
+                app.execute_actions(vec![document::LayerAction::DeleteSelection(paths.clone())]);
+                app.preview_state.push_message("Layers deleted.");
             }
             ConfirmationRequest::DeleteAssets(items) => {
                 for key in items {
@@ -466,8 +474,9 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         Action::Copy => {
             if let Some(f) = &mut app.current_file {
                 app.history.clipboard.clear();
-                let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
+                app.history.bar_clipboard.clear();
 
+                let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
                 let mut filtered_paths: Vec<Vec<usize>> = paths
                     .iter()
                     .filter(|p| {
@@ -477,47 +486,56 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     })
                     .cloned()
                     .collect();
-
                 filtered_paths.sort();
 
                 for path in filtered_paths {
-                    if let Some(el) = f.get_element_mut(&path) {
+                    if path.len() == 1 {
+                        if let Some(bar) = f.data.status_bars.get(path[0]) {
+                            app.history.bar_clipboard.push(bar.clone());
+                        }
+                    } else if let Some(el) = f.get_element_mut(&path) {
                         app.history.clipboard.push(el.clone());
                     }
                 }
-                app.preview_state.push_message(format!(
-                    "Clipboard: Copied {} elements.",
-                    app.history.clipboard.len()
-                ));
+
+                let msg = if !app.history.bar_clipboard.is_empty() {
+                    format!(
+                        "Clipboard: Copied {} layouts.",
+                        app.history.bar_clipboard.len()
+                    )
+                } else {
+                    format!(
+                        "Clipboard: Copied {} elements.",
+                        app.history.clipboard.len()
+                    )
+                };
+                app.preview_state.push_message(msg);
             }
         }
         Action::Paste => {
-            if !app.history.clipboard.is_empty() {
-                if let Some(f) = &mut app.current_file {
+            if let Some(f) = &mut app.current_file {
+                if !app.history.bar_clipboard.is_empty() {
+                    app.history.take_snapshot(f, &app.selection);
+                    let pasted = app.history.prepare_bar_clipboard_for_paste();
+                    app.preview_state
+                        .push_message(format!("Clipboard: Pasted {} layouts.", pasted.len()));
+                    app.execute_actions(vec![LayerAction::PasteStatusBars(pasted)]);
+                } else if !app.history.clipboard.is_empty() {
                     app.history.take_snapshot(f, &app.selection);
                     let pasted_elements = app.history.prepare_clipboard_for_paste();
-
-                    if app.current_statusbar_idx >= f.data.status_bars.len() {
-                        app.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
-                    }
-
                     let (parent_path, insert_idx) = document::determine_insertion_point(
                         &app.selection,
                         app.current_statusbar_idx,
                     );
-
                     app.preview_state.push_message(format!(
                         "Clipboard: Pasted {} elements.",
                         pasted_elements.len()
                     ));
-
-                    let action = LayerAction::Paste {
+                    app.execute_actions(vec![LayerAction::Paste {
                         parent_path,
                         insert_idx,
                         elements: pasted_elements,
-                    };
-                    app.dirty = true;
-                    document::execute_layer_action(f, action, &mut app.selection);
+                    }]);
                 }
             }
         }
@@ -526,12 +544,24 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 if let Some(f) = &mut app.current_file {
                     app.history.take_snapshot(f, &app.selection);
                     let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
-                    app.dirty = true;
-                    document::execute_layer_action(
-                        f,
-                        LayerAction::DuplicateSelection(paths),
-                        &mut app.selection,
-                    );
+
+                    let mut bar_actions = Vec::new();
+                    let mut layer_paths = Vec::new();
+
+                    for path in paths {
+                        if path.len() == 1 {
+                            bar_actions.push(LayerAction::DuplicateStatusBar(path[0]));
+                        } else {
+                            layer_paths.push(path);
+                        }
+                    }
+
+                    if !bar_actions.is_empty() {
+                        app.execute_actions(bar_actions);
+                    }
+                    if !layer_paths.is_empty() {
+                        app.execute_actions(vec![LayerAction::DuplicateSelection(layer_paths)]);
+                    }
                     app.preview_state.push_message("Duplicate performed.");
                 }
             }
@@ -539,15 +569,34 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         Action::Delete => {
             if !app.selection.is_empty() {
                 if let Some(f) = &mut app.current_file {
-                    app.history.take_snapshot(f, &app.selection);
                     let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
-                    app.dirty = true;
-                    document::execute_layer_action(
-                        f,
-                        LayerAction::DeleteSelection(paths),
-                        &mut app.selection,
-                    );
-                    app.preview_state.push_message("Delete performed.");
+
+                    let mut bar_to_delete = None;
+                    let mut needs_layer_confirm = false;
+
+                    for path in &paths {
+                        if path.len() == 1 {
+                            bar_to_delete = Some(path[0]);
+                        } else if let Some(el) = f.get_element(path) {
+                            if !el.children().is_empty() {
+                                needs_layer_confirm = true;
+                            }
+                        }
+                    }
+
+                    if let Some(idx) = bar_to_delete {
+                        let bar = &f.data.status_bars[idx];
+                        if !bar.children.is_empty() {
+                            app.confirmation_modal =
+                                Some(ConfirmationRequest::DeleteStatusBar(idx));
+                        } else if f.data.status_bars.len() > 1 {
+                            app.execute_actions(vec![LayerAction::DeleteStatusBar(idx)]);
+                        }
+                    } else if needs_layer_confirm {
+                        app.confirmation_modal = Some(ConfirmationRequest::DeleteLayers(paths));
+                    } else {
+                        app.execute_actions(vec![LayerAction::DeleteSelection(paths)]);
+                    }
                 }
             }
         }

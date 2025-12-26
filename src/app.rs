@@ -26,6 +26,7 @@ pub enum PendingAction {
 #[derive(Clone)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
+    DeleteLayers(Vec<Vec<usize>>),
     DeleteAssets(Vec<String>),
     DiscardChanges(PendingAction),
 }
@@ -222,7 +223,18 @@ impl CacocoApp {
                 self.history.take_snapshot(f, &self.selection);
             } else {
                 document::execute_layer_action(f, action, &mut self.selection);
+
+                if self.selection.len() == 1 {
+                    let path = self.selection.iter().next().unwrap();
+                    if path.len() == 1 {
+                        self.current_statusbar_idx = path[0];
+                    }
+                }
             }
+        }
+
+        if self.current_statusbar_idx >= f.data.status_bars.len() {
+            self.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
         }
     }
 

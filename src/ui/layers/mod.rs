@@ -2,19 +2,19 @@ use crate::assets::AssetStore;
 use crate::document::{self, LayerAction};
 use crate::model::{
     AnimationDef, CanvasDef, ComponentDef, ComponentType, Element, ElementWrapper, FaceDef,
-    GraphicDef, NumberDef, NumberType, SBarDefFile, StatusBarLayout, TextHelperDef,
+    GraphicDef, NumberDef, NumberType, SBarDefFile, TextHelperDef,
 };
 use crate::state::PreviewState;
 use crate::ui::font_wizard::FontWizardState;
-use crate::ui::properties::common;
 use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
 
 mod browser;
 pub(crate) mod colors;
+mod layouts;
 pub mod thumbnails;
-mod tree;
+pub(crate) mod tree;
 
 const TAB_STATE_KEY: &str = "cacoco_layers_tab_state";
 const THUMB_ZOOM_KEY: &str = "cacoco_layers_thumb_zoom";
@@ -22,6 +22,7 @@ const SHOW_FONTS_KEY: &str = "cacoco_show_fonts_state";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum BrowserTab {
+    Layouts,
     Graphics,
     Fonts,
     IWAD,
@@ -43,7 +44,7 @@ pub fn draw_layers_panel(
     let split_id = ui.make_persistent_id("layers_panel_split");
     let mut split_fraction = ui
         .ctx()
-        .data(|d| d.get_temp::<f32>(split_id).unwrap_or(0.30));
+        .data(|d| d.get_temp::<f32>(split_id).unwrap_or(0.35));
 
     let available_height = ui.available_height();
     let min_h = 100.0;
@@ -61,34 +62,39 @@ pub fn draw_layers_panel(
 
     let mut current_tab = top_ui.data(|d| {
         d.get_temp(egui::Id::new(TAB_STATE_KEY))
-            .unwrap_or(BrowserTab::Graphics)
+            .unwrap_or(BrowserTab::Layouts)
     });
     let mut zoom = top_ui.data(|d| d.get_temp(egui::Id::new(THUMB_ZOOM_KEY)).unwrap_or(1.0f32));
     let mut show_fonts = top_ui.data(|d| d.get_temp(egui::Id::new(SHOW_FONTS_KEY)).unwrap_or(true));
+
+    let mut actions = Vec::new();
 
     top_ui.add_space(3.0);
 
     top_ui.horizontal(|ui| {
         ui.add_space(4.0);
-        ui.spacing_mut().item_spacing = egui::vec2(4.0, 0.0);
-        ui.selectable_value(&mut current_tab, BrowserTab::Graphics, " Graphics ");
-        ui.add(egui::Separator::default().vertical().spacing(10.0));
-        ui.selectable_value(&mut current_tab, BrowserTab::Fonts, " Fonts ");
-        ui.add(egui::Separator::default().vertical().spacing(10.0));
-        ui.selectable_value(&mut current_tab, BrowserTab::IWAD, " IWAD ");
-        ui.add(egui::Separator::default().vertical().spacing(10.0));
-        ui.selectable_value(&mut current_tab, BrowserTab::Library, " Library ");
+        ui.spacing_mut().item_spacing = egui::vec2(2.0, 0.0);
+
+        let mut tab_btn =
+            |ui: &mut egui::Ui, value, label| ui.selectable_value(&mut current_tab, value, label);
+
+        tab_btn(ui, BrowserTab::Layouts, "Layouts");
+        ui.add(egui::Separator::default().vertical().spacing(6.0));
+        tab_btn(ui, BrowserTab::Graphics, "Graphics");
+        ui.add(egui::Separator::default().vertical().spacing(6.0));
+        tab_btn(ui, BrowserTab::Fonts, "Fonts");
+        ui.add(egui::Separator::default().vertical().spacing(6.0));
+        tab_btn(ui, BrowserTab::IWAD, "IWAD");
+        ui.add(egui::Separator::default().vertical().spacing(6.0));
+        tab_btn(ui, BrowserTab::Library, "Library");
     });
 
     top_ui.add_space(1.0);
     top_ui.separator();
 
     let header_bottom = top_ui.cursor().min.y;
-    let footer_h = if current_tab != BrowserTab::Fonts {
-        32.0
-    } else {
-        0.0
-    };
+    let has_footer = !matches!(current_tab, BrowserTab::Fonts | BrowserTab::Layouts);
+    let footer_h = if has_footer { 32.0 } else { 0.0 };
 
     let scroll_rect = egui::Rect::from_min_max(
         egui::pos2(top_rect.min.x, header_bottom),
@@ -102,6 +108,22 @@ pub fn draw_layers_panel(
             .show(ui, |ui| {
                 ui.add_space(4.0);
                 match current_tab {
+                    BrowserTab::Layouts => {
+                        if let Some(f) = file {
+                            ui.vertical(|ui| {
+                                changed |= layouts::draw_layouts_browser(
+                                    ui,
+                                    f,
+                                    selection,
+                                    current_bar_idx,
+                                    &mut actions,
+                                    confirmation_modal,
+                                );
+                            });
+                        } else {
+                            shared::draw_no_file_placeholder(ui);
+                        }
+                    }
                     BrowserTab::Fonts => {
                         if let Some(f) = file {
                             changed |= browser::draw_fonts_content(ui, f, assets);
@@ -140,7 +162,7 @@ pub fn draw_layers_panel(
             });
     });
 
-    if current_tab != BrowserTab::Fonts {
+    if has_footer {
         let footer_rect = egui::Rect::from_min_max(
             egui::pos2(top_rect.min.x, top_rect.max.y - footer_h),
             egui::pos2(top_rect.max.x, top_rect.max.y),
@@ -241,8 +263,6 @@ pub fn draw_layers_panel(
     ui.allocate_rect(bottom_rect, egui::Sense::hover());
     let mut bottom_ui = ui.new_child(egui::UiBuilder::new().max_rect(bottom_rect));
     bottom_ui.set_clip_rect(bottom_rect);
-
-    let mut actions = Vec::new();
 
     if let Some(f) = file {
         bottom_ui.horizontal(|ui| {
@@ -379,72 +399,10 @@ pub fn draw_layers_panel(
         bottom_ui.separator();
 
         if f.data.status_bars.is_empty() {
-            bottom_ui.label("No status bars defined.");
-            if bottom_ui.button("Add Status Bar").clicked() {
-                f.data.status_bars.push(StatusBarLayout::default());
-                changed = true;
-            }
         } else {
-            bottom_ui.horizontal(|ui| {
-                ui.add_space(1.0);
-                let combo_width = ui.available_width() - 64.0;
-
-                egui::ComboBox::from_id_salt("statusbar_selector")
-                    .width(combo_width)
-                    .selected_text(format!("Status Bar #{}", *current_bar_idx))
-                    .show_ui(ui, |ui| {
-                        for i in 0..f.data.status_bars.len() {
-                            ui.selectable_value(current_bar_idx, i, format!("Status Bar #{}", i));
-                        }
-                    });
-
-                if ui
-                    .button(" + ")
-                    .on_hover_text("Add New Status Bar")
-                    .clicked()
-                {
-                    f.data.status_bars.push(StatusBarLayout::default());
-                    *current_bar_idx = f.data.status_bars.len() - 1;
-                    changed = true;
-                }
-
-                let can_delete = f.data.status_bars.len() > 1;
-                if ui
-                    .add_enabled(can_delete, egui::Button::new(" 🗑 "))
-                    .on_hover_text("Delete Current Status Bar")
-                    .clicked()
-                {
-                    let bar = &f.data.status_bars[*current_bar_idx];
-                    if bar.children.is_empty() {
-                        f.data.status_bars.remove(*current_bar_idx);
-                        if *current_bar_idx >= f.data.status_bars.len() {
-                            *current_bar_idx = f.data.status_bars.len().saturating_sub(1);
-                        }
-                        changed = true;
-                    } else {
-                        *confirmation_modal = Some(
-                            crate::app::ConfirmationRequest::DeleteStatusBar(*current_bar_idx),
-                        );
-                    }
-                }
-            });
-
             if *current_bar_idx >= f.data.status_bars.len() {
                 *current_bar_idx = 0;
             }
-
-            {
-                let bar = &mut f.data.status_bars[*current_bar_idx];
-                bottom_ui.add_space(4.0);
-                egui::CollapsingHeader::new("Layout Settings")
-                    .default_open(false)
-                    .show(&mut bottom_ui, |ui| {
-                        changed |= common::draw_root_statusbar_fields(ui, bar);
-                    });
-            }
-
-            bottom_ui.add_space(4.0);
-            bottom_ui.separator();
 
             egui::ScrollArea::vertical()
                 .id_salt("layers_scroll")
@@ -462,6 +420,7 @@ pub fn draw_layers_panel(
                                 assets,
                                 state,
                                 &mut actions,
+                                confirmation_modal,
                             );
                         });
                     ui.add_space(2.0);

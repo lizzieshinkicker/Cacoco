@@ -131,13 +131,28 @@ pub fn draw_root_statusbar_fields(
     bar: &mut crate::model::StatusBarLayout,
 ) -> bool {
     let mut changed = false;
-    ui.label(egui::RichText::new("Main Settings").strong());
+
+    ui.horizontal(|ui| {
+        ui.add_space(2.0);
+        ui.label("Layout Name:");
+        let mut name_buf = bar.name.clone().unwrap_or_default();
+        if ui.text_edit_singleline(&mut name_buf).changed() {
+            bar.name = if name_buf.is_empty() {
+                None
+            } else {
+                Some(name_buf)
+            };
+            changed = true;
+        }
+    });
+    ui.add_space(4.0);
 
     ui.horizontal(|ui| {
         ui.add_space(2.0);
         ui.label("Bar Height:");
         changed |= ui
-            .add(
+            .add_enabled(
+                !bar.fullscreen_render,
                 egui::DragValue::new(&mut bar.height)
                     .range(0..=200)
                     .speed(1),
@@ -154,19 +169,14 @@ pub fn draw_root_statusbar_fields(
         ui.add_space(2.0);
     });
 
-    ui.separator();
-
-    ui.label(egui::RichText::new("Widescreen Filling").strong());
+    ui.add_space(8.0);
 
     ui.horizontal(|ui| {
         ui.add_space(2.0);
         ui.label("Fill Flat:");
 
         let mut flat_name = bar.fill_flat.clone().unwrap_or_default();
-        let edit_res = ui.add_sized(
-            [ui.available_width() - 4.0, 20.0],
-            egui::TextEdit::singleline(&mut flat_name),
-        );
+        let edit_res = ui.add_sized([120.0, 20.0], egui::TextEdit::singleline(&mut flat_name));
 
         if edit_res.changed() {
             bar.fill_flat = if flat_name.is_empty() {

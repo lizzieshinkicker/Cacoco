@@ -364,11 +364,7 @@ impl<'a> ListRow<'a> {
         draw_thumbnail_widget(&mut thumb_ui, self.texture, self.fallback_icon, self.dimmed);
 
         let title_pos_x = rect.min.x + 44.0;
-        let text_color = if self.selected {
-            ui.visuals().selection.stroke.color
-        } else {
-            ui.visuals().text_color()
-        };
+        let text_color = ui.visuals().text_color();
 
         if let Some(sub) = self.subtitle {
             ui.painter().text(

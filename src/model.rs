@@ -169,6 +169,8 @@ pub struct HudFontDef {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StatusBarLayout {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     pub height: i32,
     #[serde(rename = "fullscreenrender", default)]
     pub fullscreen_render: bool,
@@ -181,10 +183,20 @@ pub struct StatusBarLayout {
 impl Default for StatusBarLayout {
     fn default() -> Self {
         Self {
+            name: None,
             height: 32,
             fullscreen_render: true,
             fill_flat: None,
             children: Vec::new(),
+        }
+    }
+}
+
+impl StatusBarLayout {
+    /// Recursively reassigns all UIDs for every element within this layout.
+    pub fn reassign_all_uids(&mut self) {
+        for child in self.children.iter_mut() {
+            child.reassign_uids();
         }
     }
 }
@@ -439,6 +451,14 @@ impl ElementWrapper {
             Element::Carousel(e) => &e.common,
         }
     }
+
+    /// Recursively reassigns UIDs for this element and all its children.
+    pub fn reassign_uids(&mut self) {
+        self.uid = new_uid();
+        for child in self.get_common_mut().children.iter_mut() {
+            child.reassign_uids();
+        }
+    }
 }
 
 impl SBarDefFile {
@@ -463,6 +483,24 @@ impl SBarDefFile {
                 .get_common_mut()
                 .children
                 .get_mut(child_idx)?;
+        }
+
+        Some(current_element)
+    }
+
+    pub fn get_element(&self, path: &[usize]) -> Option<&ElementWrapper> {
+        if path.is_empty() {
+            return None;
+        }
+        let bar_idx = path[0];
+        let bar = self.data.status_bars.get(bar_idx)?;
+        if path.len() == 1 {
+            return None;
+        }
+
+        let mut current_element = bar.children.get(path[1])?;
+        for &child_idx in &path[2..] {
+            current_element = current_element.get_common().children.get(child_idx)?;
         }
 
         Some(current_element)

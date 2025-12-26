@@ -1,4 +1,4 @@
-use crate::model::{ElementWrapper, SBarDefFile, new_uid};
+use crate::model::{ElementWrapper, SBarDefFile, StatusBarLayout};
 use std::collections::{HashSet, VecDeque};
 
 const MAX_UNDO: usize = 50;
@@ -13,6 +13,7 @@ pub struct HistoryManager {
     pub undo_stack: VecDeque<Snapshot>,
     pub redo_stack: VecDeque<Snapshot>,
     pub clipboard: Vec<ElementWrapper>,
+    pub bar_clipboard: Vec<StatusBarLayout>,
 }
 
 impl Default for HistoryManager {
@@ -21,6 +22,7 @@ impl Default for HistoryManager {
             undo_stack: VecDeque::with_capacity(MAX_UNDO),
             redo_stack: VecDeque::with_capacity(MAX_UNDO),
             clipboard: Vec::new(),
+            bar_clipboard: Vec::new(),
         }
     }
 }
@@ -77,15 +79,16 @@ impl HistoryManager {
     pub fn prepare_clipboard_for_paste(&self) -> Vec<ElementWrapper> {
         let mut pasted = self.clipboard.clone();
         for item in pasted.iter_mut() {
-            Self::reassign_uids(item);
+            item.reassign_uids();
         }
         pasted
     }
 
-    fn reassign_uids(element: &mut ElementWrapper) {
-        element.uid = new_uid();
-        for child in element.get_common_mut().children.iter_mut() {
-            Self::reassign_uids(child);
+    pub fn prepare_bar_clipboard_for_paste(&self) -> Vec<StatusBarLayout> {
+        let mut pasted = self.bar_clipboard.clone();
+        for item in pasted.iter_mut() {
+            item.reassign_all_uids();
         }
+        pasted
     }
 }

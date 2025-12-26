@@ -110,7 +110,7 @@ pub fn draw_properties_panel(
         let bar_idx = path[0];
         if let Some(bar) = file_ref.data.status_bars.get_mut(bar_idx) {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading(format!("Status Bar #{} Layout", bar_idx));
+                ui.heading(format!("Layout #{}", bar_idx));
                 ui.separator();
                 changed |= common::draw_root_statusbar_fields(ui, bar);
             });
