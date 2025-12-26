@@ -6,6 +6,7 @@ use super::editor::PropertiesUI;
 use super::preview::PreviewContent;
 use super::FontCache;
 use super::common;
+use super::lookups;
 
 const HEADER_MENU_KEY: &str = "cacoco_prop_header_menu_id";
 
@@ -41,14 +42,25 @@ impl PropertiesUI for NumberDef {
                 });
         });
 
-        ui.horizontal(|ui| {
-            ui.label("Param:");
-            changed |= ui.add(egui::DragValue::new(&mut self.param)).changed();
-        });
+        match self.type_ {
+            NumberType::Ammo | NumberType::MaxAmmo => {
+                ui.horizontal(|ui| {
+                    ui.label("Ammo Type:");
+                    changed |= common::draw_lookup_param_dd(ui, "num_param_ammo", &mut self.param, lookups::AMMO_TYPES, assets);
+                });
+            }
+            NumberType::AmmoWeapon | NumberType::MaxAmmoWeapon => {
+                ui.horizontal(|ui| {
+                    ui.label("Weapon Source:");
+                    changed |= common::draw_lookup_param_dd(ui, "num_param_weapon", &mut self.param, lookups::WEAPONS, assets);
+                });
+            }
+            _ => {}
+        }
 
         ui.horizontal(|ui| {
-            ui.label("Max Len:");
-            changed |= ui.add(egui::DragValue::new(&mut self.maxlength)).changed();
+            ui.label("Max Length:");
+            changed |= ui.add(egui::DragValue::new(&mut self.maxlength).range(0..=9)).changed();
         });
 
         changed
@@ -219,8 +231,8 @@ pub fn draw_interactive_header(
                         ui.set_max_width(200.0);
                         let mut close = false;
                         match &mut element.data {
-                            Element::Number(n) => if draw_number_options(ui, &mut n.type_) { close = true; changed = true; },
-                            Element::Percent(p) => if draw_number_options(ui, &mut p.type_) { close = true; changed = true; },
+                            Element::Number(n) => if draw_number_options(ui, &mut n.type_, &mut n.param) { close = true; changed = true; },
+                            Element::Percent(p) => if draw_number_options(ui, &mut p.type_, &mut p.param) { close = true; changed = true; },
                             Element::Component(c) => if draw_component_options(ui, &mut c.type_) { close = true; changed = true; },
                             _ => {}
                         }
@@ -314,7 +326,7 @@ fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
     response.clicked()
 }
 
-fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType) -> bool {
+fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i32) -> bool {
     let mut changed = false;
     if custom_menu_item(ui, "Health", *type_ == NumberType::Health) {
         *type_ = NumberType::Health;
@@ -333,6 +345,7 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType) -> bool {
     ui.add_space(4.0);
     if custom_menu_item(ui, "Ammo (by Type)", *type_ == NumberType::Ammo) {
         *type_ = NumberType::Ammo;
+        if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) { *param = 0; }
         changed = true;
     }
     if custom_menu_item(ui, "Selected Ammo", *type_ == NumberType::AmmoSelected) {
@@ -341,6 +354,7 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType) -> bool {
     }
     if custom_menu_item(ui, "Max Ammo (by Type)", *type_ == NumberType::MaxAmmo) {
         *type_ = NumberType::MaxAmmo;
+        if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) { *param = 0; }
         changed = true;
     }
     ui.add_space(4.0);
@@ -348,10 +362,12 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType) -> bool {
     ui.add_space(4.0);
     if custom_menu_item(ui, "Ammo (by Weapon)", *type_ == NumberType::AmmoWeapon) {
         *type_ = NumberType::AmmoWeapon;
+        if !lookups::WEAPONS.iter().any(|i| i.id == *param) { *param = 101; }
         changed = true;
     }
     if custom_menu_item(ui, "Max Ammo (by Weapon)", *type_ == NumberType::MaxAmmoWeapon) {
         *type_ = NumberType::MaxAmmoWeapon;
+        if !lookups::WEAPONS.iter().any(|i| i.id == *param) { *param = 101; }
         changed = true;
     }
     changed

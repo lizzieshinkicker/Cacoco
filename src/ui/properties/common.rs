@@ -2,6 +2,7 @@ use eframe::egui;
 use crate::model::{ElementWrapper, Alignment};
 use crate::assets::AssetStore;
 use crate::ui::layers::thumbnails;
+use super::lookups;
 
 pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) -> bool {
     let mut changed = false;
@@ -167,5 +168,25 @@ pub fn draw_font_selection_row(
         changed = true;
         ui.close();
     }
+    changed
+}
+
+pub fn draw_lookup_param_dd(
+    ui: &mut egui::Ui,
+    salt: &str,
+    param: &mut i32,
+    items: &[lookups::LookupItem],
+    _assets: &AssetStore
+) -> bool {
+    let mut changed = false;
+    let current_name = items.iter().find(|i| i.id == *param).map(|i| i.name).unwrap_or("Unknown");
+
+    egui::ComboBox::from_id_salt(salt)
+        .selected_text(current_name)
+        .show_ui(ui, |ui| {
+            for item in items {
+                changed |= ui.selectable_value(param, item.id, item.name).changed();
+            }
+        });
     changed
 }
