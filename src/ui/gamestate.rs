@@ -1,5 +1,6 @@
 use crate::assets::AssetStore;
 use crate::state::PreviewState;
+use crate::ui::shared;
 use eframe::egui;
 
 const BTN_SIZE: f32 = 52.0;
@@ -509,23 +510,9 @@ fn draw_asset_button(
     } else {
         egui::Color32::from_gray(100)
     };
-    let content_size = BTN_SIZE - (INNER_MARGIN * 2.0);
 
-    if let Some(key) = patch_key.and_then(|k| assets.textures.get(k)) {
-        let tex_size = key.size_vec2();
-        if tex_size.x > 0.0 && tex_size.y > 0.0 {
-            let scale = (content_size / tex_size.x)
-                .min(content_size / tex_size.y)
-                .min(4.0);
-            let final_size = tex_size * scale;
-            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
-            ui.painter().image(
-                key.id(),
-                draw_rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                tint,
-            );
-        }
+    if let Some(tex) = patch_key.and_then(|k| assets.textures.get(k)) {
+        shared::draw_scaled_image(ui, rect.shrink(INNER_MARGIN), tex, tint, 4.0);
     } else {
         ui.painter().text(
             rect.center(),

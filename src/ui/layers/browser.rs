@@ -209,6 +209,7 @@ pub fn draw_filtered_browser(
         });
         return false;
     }
+
     draw_asset_grid(
         ui,
         assets,
@@ -218,6 +219,8 @@ pub fn draw_filtered_browser(
         confirmation_modal,
         show_project_assets,
     );
+
+    render_asset_drag_ghost(ui, assets);
 
     changed
 }
@@ -279,6 +282,8 @@ pub fn draw_library_browser(
                 });
             });
     }
+
+    render_asset_drag_ghost(ui, assets);
 
     changed
 }
@@ -521,25 +526,6 @@ fn draw_asset_grid(
         }
     });
 
-    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
-        let count = asset_keys.len();
-        let label = if count > 1 {
-            format!("{} assets", count)
-        } else {
-            asset_keys[0].clone()
-        };
-        let first_key = asset_keys[0].clone();
-        let texture = assets.textures.get(&first_key);
-
-        shared::draw_drag_ghost(
-            ui.ctx(),
-            |ui| {
-                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false);
-            },
-            &label,
-        );
-    }
-
     ui.data_mut(|d| {
         d.insert_temp(egui::Id::new(ASSET_SEL_KEY), selection);
         d.insert_temp(egui::Id::new(ASSET_PIVOT_KEY), pivot);
@@ -614,4 +600,26 @@ fn draw_library_item(
     }
 
     changed
+}
+
+/// Helper to render the drag ghost for any asset drag operation (Graphics or Library).
+fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
+    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
+        let count = asset_keys.len();
+        let label = if count > 1 {
+            format!("{} assets", count)
+        } else {
+            asset_keys[0].clone()
+        };
+        let first_key = asset_keys[0].clone();
+        let texture = assets.textures.get(&first_key);
+
+        shared::draw_drag_ghost(
+            ui.ctx(),
+            |ui| {
+                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false);
+            },
+            &label,
+        );
+    }
 }

@@ -5,7 +5,7 @@ use crate::model::{
 };
 use crate::state::PreviewState;
 use crate::ui::layers::thumbnails;
-use crate::ui::shared::VIEWPORT_RECT_ID;
+use crate::ui::shared::{self, VIEWPORT_RECT_ID};
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -446,49 +446,26 @@ fn draw_frame_row(
 
     if response.dragged() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-        if let Some(pointer_pos) = ui.ctx().input(|i| i.pointer.latest_pos()) {
-            let count = selection.len();
-            let label = if count > 1 {
-                format!("{} frames", count)
-            } else {
-                frame.lump.clone()
-            };
+        let count = selection.len();
+        let label = if count > 1 {
+            format!("{} frames", count)
+        } else {
+            frame.lump.clone()
+        };
 
-            egui::Area::new(egui::Id::new("frame_drag_ghost"))
-                .interactable(false)
-                .pivot(egui::Align2::CENTER_CENTER)
-                .fixed_pos(pointer_pos)
-                .order(egui::Order::Tooltip)
-                .show(ui.ctx(), |ui| {
-                    let frame_ui = egui::Frame::default()
-                        .inner_margin(6.0)
-                        .corner_radius(4.0)
-                        .fill(egui::Color32::from_black_alpha(200))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::WHITE));
-
-                    frame_ui.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 8.0;
-                            ui.allocate_ui(
-                                egui::vec2(thumbnails::THUMB_SIZE, thumbnails::THUMB_SIZE),
-                                |ui| {
-                                    thumbnails::draw_thumbnail_widget(
-                                        ui,
-                                        assets.textures.get(&frame.lump.to_uppercase()),
-                                        Some("?"),
-                                        false,
-                                    );
-                                },
-                            );
-                            ui.label(
-                                egui::RichText::new(label)
-                                    .strong()
-                                    .color(egui::Color32::WHITE),
-                            );
-                        });
-                    });
-                });
-        }
+        let lump_upper = frame.lump.to_uppercase();
+        shared::draw_drag_ghost(
+            ui.ctx(),
+            |ui| {
+                thumbnails::draw_thumbnail_widget(
+                    ui,
+                    assets.textures.get(&lump_upper),
+                    Some("?"),
+                    false,
+                );
+            },
+            &label,
+        );
     }
     changed
 }

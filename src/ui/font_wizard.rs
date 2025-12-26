@@ -187,26 +187,11 @@ fn analyze_selection(patches: &[String]) -> (String, FontTypeWrapper) {
         }
     }
 
-    let mut stem = common;
+    let mut stem = common.trim_end_matches(|c: char| c.is_ascii_digit()).to_string();
 
     if looks_like_hud {
-        while let Some(c) = stem.chars().last() {
-            if c.is_ascii_digit() {
-                stem.pop();
-            } else {
-                break;
-            }
-        }
         (stem, FontTypeWrapper::Hud)
     } else {
-        while let Some(c) = stem.chars().last() {
-            if c.is_ascii_digit() {
-                stem.pop();
-            } else {
-                break;
-            }
-        }
-
         let suffixes = ["NUM", "PRCNT", "PRCN", "PCNT", "PERCENT", "MINUS"];
         for s in suffixes {
             if stem.ends_with(s) {
