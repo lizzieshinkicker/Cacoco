@@ -133,8 +133,9 @@ jobs:
         path: dist/*
 
   release-nightly:
+    name: Create nightly release
     needs: [ build-windows, build-mac, build-linux, activity-check ]
-    if: ${{ needs.activity-check.outputs.nightly-outdated }}
+    if: needs.activity-check.outputs.nightly-outdated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
@@ -165,7 +166,7 @@ jobs:
       with:
         tag_name: nightly
         target_commitish: ${{ github.sha }}
-        name: "Cacoco nightly builds"
+        name: "Cacoco nightly build"
         prerelease: true
         make_latest: false
         draft: false
