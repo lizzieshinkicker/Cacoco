@@ -40,16 +40,6 @@ impl PropertiesUI for GraphicDef {
 }
 
 impl PropertiesUI for FaceDef {
-    fn draw_specific_fields(
-        &mut self,
-        _: &mut egui::Ui,
-        _: &FontCache,
-        _: &AssetStore,
-        _: &PreviewState,
-    ) -> bool {
-        false
-    }
-
     fn get_preview_content(
         &self,
         ui: &egui::Ui,
@@ -70,7 +60,6 @@ impl PropertiesUI for FaceDef {
         }
 
         let face_center_x = anchor_x + (self.common.x as f32) + 12.0;
-
         let dx = state.virtual_mouse_pos.x - face_center_x;
         let threshold = 30.0;
 
@@ -121,7 +110,6 @@ impl PropertiesUI for AnimationDef {
         let mut changed = false;
         ui.horizontal(|ui| {
             ui.heading("Frames");
-
             ui.add_space(8.0);
             ui.label(
                 egui::RichText::new(format!("{:.0} tics/sec", DOOM_TICS_PER_SEC))
@@ -167,7 +155,6 @@ impl PropertiesUI for AnimationDef {
         let mut pivot: Option<usize> = ui.data(|d| d.get_temp(pivot_id).unwrap_or_default());
 
         let mut actions = Vec::new();
-
         ui.spacing_mut().item_spacing.y = 1.0;
 
         if self.frames.is_empty() {
@@ -175,7 +162,6 @@ impl PropertiesUI for AnimationDef {
         } else {
             for (idx, frame) in self.frames.iter_mut().enumerate() {
                 let is_active = active_idx == Some(idx);
-
                 ui.push_id(idx, |ui| {
                     changed |= draw_frame_row(
                         ui,
@@ -331,7 +317,7 @@ fn draw_frame_row(
                 } else {
                     rect.bottom() + spacing_offset
                 };
-                draw_yellow_line(ui, rect, y);
+                shared::draw_yellow_line(ui, rect, y);
                 if ui.input(|i| i.pointer.any_released()) {
                     actions.push(FrameAction::MoveSelection(
                         selection.iter().cloned().collect(),
@@ -366,7 +352,7 @@ fn draw_frame_row(
                     rect.bottom() + spacing_offset
                 };
                 let mut target_idx = if top_half { idx } else { idx + 1 };
-                draw_yellow_line(ui, rect, y);
+                shared::draw_yellow_line(ui, rect, y);
 
                 if ui.input(|i| i.pointer.any_released()) {
                     for key in asset_keys.iter() {
@@ -470,13 +456,6 @@ fn draw_frame_row(
     changed
 }
 
-fn draw_yellow_line(ui: &egui::Ui, rect: egui::Rect, y: f32) {
-    ui.painter().line_segment(
-        [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
-        egui::Stroke::new(2.0, egui::Color32::YELLOW),
-    );
-}
-
 fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) -> bool {
     let mut changed = false;
     let (rect, _) =
@@ -511,46 +490,8 @@ fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) 
 }
 
 impl PropertiesUI for CanvasDef {
-    fn draw_specific_fields(
-        &mut self,
-        _: &mut egui::Ui,
-        _: &FontCache,
-        _: &AssetStore,
-        _: &PreviewState,
-    ) -> bool {
-        false
-    }
-    fn get_preview_content(
-        &self,
-        _: &egui::Ui,
-        _: &FontCache,
-        _: &PreviewState,
-    ) -> Option<PreviewContent> {
-        None
-    }
-    fn has_specific_fields(&self) -> bool {
-        false
-    }
+    fn has_specific_fields(&self) -> bool { false }
 }
 impl PropertiesUI for CarouselDef {
-    fn draw_specific_fields(
-        &mut self,
-        _: &mut egui::Ui,
-        _: &FontCache,
-        _: &AssetStore,
-        _: &PreviewState,
-    ) -> bool {
-        false
-    }
-    fn get_preview_content(
-        &self,
-        _: &egui::Ui,
-        _: &FontCache,
-        _: &PreviewState,
-    ) -> Option<PreviewContent> {
-        None
-    }
-    fn has_specific_fields(&self) -> bool {
-        false
-    }
+    fn has_specific_fields(&self) -> bool { false }
 }

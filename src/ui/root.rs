@@ -1,6 +1,5 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
-use crate::document;
-use crate::ui;
+use crate::{document, ui};
 use crate::ui::font_wizard;
 use eframe::egui;
 use std::path::Path;
@@ -72,11 +71,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 app.new_project(ctx);
             }
             ui::MenuAction::Open => {
-                if let Some(path) = crate::io::open_project_dialog() {
-                    if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                        app.load_project(ctx, loaded, &path);
-                    }
-                }
+                app.open_project_ui(ctx);
             }
             ui::MenuAction::RequestDiscard(pending) => {
                 app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
@@ -155,16 +150,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 app.dirty = true;
             }
 
-            if let Some(f) = &mut app.current_file {
-                for action in actions {
-                    app.dirty = true;
-                    if matches!(action, document::LayerAction::UndoSnapshot) {
-                        app.history.take_snapshot(f, &app.selection);
-                    } else {
-                        document::execute_layer_action(f, action, &mut app.selection);
-                    }
-                }
-            }
+            app.execute_actions(actions);
         });
 
     egui::TopBottomPanel::bottom("gamestate_panel")
@@ -184,16 +170,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             app.current_statusbar_idx,
         );
 
-        if let Some(f) = &mut app.current_file {
-            for action in actions {
-                app.dirty = true;
-                if matches!(action, document::LayerAction::UndoSnapshot) {
-                    app.history.take_snapshot(f, &app.selection);
-                } else {
-                    document::execute_layer_action(f, action, &mut app.selection);
-                }
-            }
-        }
+        app.execute_actions(actions);
     });
 
     if app.settings_open {
@@ -402,16 +379,10 @@ fn draw_confirmation_modal(
                 match pending {
                     PendingAction::New => app.new_project(ctx),
                     PendingAction::Load(path) => {
-                        let final_path = if path.is_empty() {
-                            crate::io::open_project_dialog()
-                        } else {
-                            Some(path.clone())
-                        };
-
-                        if let Some(p) = final_path {
-                            if let Some(loaded) = crate::io::load_project_from_path(ctx, &p) {
-                                app.load_project(ctx, loaded, &p);
-                            }
+                        if path.is_empty() {
+                            app.open_project_ui(ctx);
+                        } else if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
+                            app.load_project(ctx, loaded, &path);
                         }
                     }
                     PendingAction::Template(t) => app.apply_template(ctx, t),
@@ -450,16 +421,14 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(
                     PendingAction::Load("".to_string()),
                 ));
-            } else if let Some(path) = crate::io::open_project_dialog() {
-                if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                    app.load_project(ctx, loaded, &path);
-                }
+            } else {
+                app.open_project_ui(ctx);
             }
         }
         Action::Save => {
             if let Some(f) = &app.current_file {
                 let needs_dialog = match &app.opened_file_path {
-                    Some(p) => !std::path::Path::new(p).is_absolute(),
+                    Some(p) => !Path::new(p).is_absolute(),
                     None => true,
                 };
 
@@ -532,7 +501,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         app.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
                     }
 
-                    let (parent_path, insert_idx) = crate::document::determine_insertion_point(
+                    let (parent_path, insert_idx) = document::determine_insertion_point(
                         &app.selection,
                         app.current_statusbar_idx,
                     );

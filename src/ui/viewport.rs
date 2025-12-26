@@ -227,25 +227,26 @@ pub fn draw_viewport(
             is_viewport_clicked,
         };
 
-        for (idx, child) in bar.children.iter().enumerate() {
-            let mut path = vec![bar_idx, idx];
-            render::draw_element_wrapper(&ctx, child, egui::pos2(proj.origin_x, root_y), &mut path);
-        }
+        let render_status_bar = |render_ctx: &render::RenderContext| {
+            for (idx, child) in bar.children.iter().enumerate() {
+                let mut path = vec![bar_idx, idx];
+                render::draw_element_wrapper(
+                    render_ctx,
+                    child,
+                    egui::pos2(proj.origin_x, root_y),
+                    &mut path,
+                );
+            }
+        };
+
+        render_status_bar(&ctx);
 
         if !selection.is_empty() && preview_state.strobe_timer > 0.0 {
             let fg_ctx = render::RenderContext {
                 pass: RenderPass::Foreground,
                 ..ctx
             };
-            for (idx, child) in bar.children.iter().enumerate() {
-                let mut path = vec![bar_idx, idx];
-                render::draw_element_wrapper(
-                    &fg_ctx,
-                    child,
-                    egui::pos2(proj.origin_x, root_y),
-                    &mut path,
-                );
-            }
+            render_status_bar(&fg_ctx);
         }
 
         if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {

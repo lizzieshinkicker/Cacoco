@@ -8,7 +8,7 @@
 # Description
 Cacoco is an editor for SBARDEF files, and hopefully soon other ID24 features.
 
-There's a lot of good features, but I'm kinda tired and I'll write a lot more later when this is a bit more public.
+There's a lot of good features, but I'm kinda tired, and I'll write a lot more later when this is a bit more public.
 
 You're going to need to use an SBARDEF compliant sourceport like the dev builds of [Helion](https://github.com/Helion-Engine/Helion) or [Woof](https://github.com/fabiangreffrath/woof).
 
@@ -18,4 +18,4 @@ Build it in the same way you build a rust application in your environment of cho
 
 ---
 
-Thank you to [NightFright's great work on their SBARDEF mod for Woof for inspiration](https://github.com/NightFright2k19/doom_sbardef), and many many others to help crack the spec sheet. I hope this tool makes development easier.
+Thank you to [NightFright's great work on their SBARDEF mod for Woof for inspiration](https://github.com/NightFright2k19/doom_sbardef), and many, many others to help crack the spec sheet. I hope this tool makes development easier.

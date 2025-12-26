@@ -9,6 +9,7 @@ use crate::ui::font_wizard::FontWizardState;
 use crate::ui::properties::common;
 use eframe::egui;
 use std::collections::HashSet;
+use crate::ui::shared;
 
 mod browser;
 pub(crate) mod colors;
@@ -105,10 +106,7 @@ pub fn draw_layers_panel(
                         if let Some(f) = file {
                             changed |= browser::draw_fonts_content(ui, f, assets);
                         } else {
-                            ui.vertical_centered(|ui| {
-                                ui.add_space(10.0);
-                                ui.label(egui::RichText::new("No file loaded").weak());
-                            });
+                            shared::draw_no_file_placeholder(ui);
                         }
                     }
                     BrowserTab::Graphics => {
@@ -470,10 +468,7 @@ pub fn draw_layers_panel(
                 });
         }
     } else {
-        bottom_ui.vertical_centered(|ui| {
-            ui.add_space(10.0);
-            ui.label(egui::RichText::new("No file loaded").weak());
-        });
+        shared::draw_no_file_placeholder(&mut bottom_ui);
     }
 
     (actions, changed)

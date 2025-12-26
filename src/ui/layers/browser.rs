@@ -438,19 +438,12 @@ fn draw_asset_grid(
             }
 
             if let Some(tex) = texture {
-                let scaled_size = tex.size_vec2() * (size - 4.0)
-                    / tex.size_vec2().x.max(tex.size_vec2().y).max(1.0);
                 let tint = if is_selected {
                     egui::Color32::WHITE
                 } else {
                     egui::Color32::from_gray(200)
                 };
-                ui.painter().image(
-                    tex.id(),
-                    egui::Rect::from_center_size(rect.center(), scaled_size),
-                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                    tint,
-                );
+                shared::draw_scaled_image(ui, rect.shrink(2.0), tex, tint, 10.0);
             }
 
             let just_opened = ContextMenu::check(ui, &response);
@@ -462,11 +455,7 @@ fn draw_asset_grid(
                 }
                 ContextMenu::show(ui, menu, just_opened, |ui| {
                     if ContextMenu::button(ui, "Auto-Detect and Create Font", true) {
-                        let list: Vec<String> = keys
-                            .iter()
-                            .filter(|k| selection.contains(**k))
-                            .map(|k| k.to_string())
-                            .collect();
+                        let list = collect_selected_keys(keys, &selection);
                         *wizard_state = Some(FontWizardState::new(list));
                         ContextMenu::close(ui);
                     }
@@ -481,11 +470,7 @@ fn draw_asset_grid(
                         };
 
                         if ContextMenu::button(ui, &label, true) {
-                            let list: Vec<String> = keys
-                                .iter()
-                                .filter(|k| selection.contains(**k))
-                                .map(|k| k.to_string())
-                                .collect();
+                            let list = collect_selected_keys(keys, &selection);
                             *confirmation_modal = Some(ConfirmationRequest::DeleteAssets(list));
                             ContextMenu::close(ui);
                         }
@@ -499,11 +484,7 @@ fn draw_asset_grid(
                     selection.insert(key.to_string());
                     pivot = Some(key.to_string());
                 }
-                let list: Vec<String> = keys
-                    .iter()
-                    .filter(|k| selection.contains(**k))
-                    .map(|k| k.to_string())
-                    .collect();
+                let list = collect_selected_keys(keys, &selection);
                 egui::DragAndDrop::set_payload(ui.ctx(), list);
             }
 
@@ -554,19 +535,12 @@ fn draw_library_item(
     }
 
     if let Some(tex) = texture {
-        let scaled_size =
-            tex.size_vec2() * (size - 4.0) / tex.size_vec2().x.max(tex.size_vec2().y).max(1.0);
         let tint = if is_project {
             egui::Color32::WHITE
         } else {
             egui::Color32::from_gray(160)
         };
-        ui.painter().image(
-            tex.id(),
-            egui::Rect::from_center_size(rect.center(), scaled_size),
-            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-            tint,
-        );
+        shared::draw_scaled_image(ui, rect.shrink(2.0), tex, tint, 10.0);
     }
 
     if response.drag_started() {
@@ -602,7 +576,6 @@ fn draw_library_item(
     changed
 }
 
-/// Helper to render the drag ghost for any asset drag operation (Graphics or Library).
 fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
     if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
         let count = asset_keys.len();
@@ -622,4 +595,12 @@ fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
             &label,
         );
     }
+}
+
+fn collect_selected_keys(all_keys: &[&String], selection: &HashSet<String>) -> Vec<String> {
+    all_keys
+        .iter()
+        .filter(|k| selection.contains(k.as_str()))
+        .map(|k| (**k).clone())
+        .collect()
 }

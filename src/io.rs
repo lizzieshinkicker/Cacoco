@@ -239,7 +239,7 @@ pub fn load_iwad_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> Option<
 }
 
 pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut AssetStore) -> bool {
-    let path = std::path::Path::new(path_str);
+    let path = Path::new(path_str);
     if let Ok(mut file) = fs::File::open(path) {
         if let Err(e) = wad::load_wad_into_store(ctx, &mut file, assets) {
             eprintln!("Failed to auto-load WAD at {:?}: {}", path, e);
@@ -325,7 +325,7 @@ fn load_images_from_paths(
     count
 }
 
-fn visit_dirs_for_images(dir: &std::path::Path, paths: &mut Vec<PathBuf>) {
+fn visit_dirs_for_images(dir: &Path, paths: &mut Vec<PathBuf>) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();

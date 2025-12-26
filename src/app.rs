@@ -11,6 +11,7 @@ use crate::ui;
 use crate::ui::font_wizard::FontWizardState;
 use eframe::egui;
 use std::collections::HashSet;
+use crate::document::{self, LayerAction};
 
 const MAX_RECENT_FILES: usize = 5;
 
@@ -138,7 +139,7 @@ impl CacocoApp {
     }
 
     pub fn new_project(&mut self, ctx: &egui::Context) {
-        self.current_file = Some(crate::model::SBarDefFile {
+        self.current_file = Some(SBarDefFile {
             type_: "statusbar".to_string(),
             version: "1.0.0".to_string(),
             data: crate::model::StatusBarDefinition {
@@ -205,6 +206,29 @@ impl CacocoApp {
             }
             Err(e) => {
                 eprintln!("Failed to parse template JSON: {}", e);
+            }
+        }
+    }
+
+    /// Centralized handler for executing a batch of editor actions.
+    pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
+        let Some(f) = &mut self.current_file else { return };
+
+        for action in actions {
+            self.dirty = true;
+            if matches!(action, LayerAction::UndoSnapshot) {
+                self.history.take_snapshot(f, &self.selection);
+            } else {
+                document::execute_layer_action(f, action, &mut self.selection);
+            }
+        }
+    }
+
+    /// Opens the system dialog to pick a project and loads it if successful.
+    pub fn open_project_ui(&mut self, ctx: &egui::Context) {
+        if let Some(path) = io::open_project_dialog() {
+            if let Some(loaded) = io::load_project_from_path(ctx, &path) {
+                self.load_project(ctx, loaded, &path);
             }
         }
     }

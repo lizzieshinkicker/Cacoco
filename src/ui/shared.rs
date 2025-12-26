@@ -77,3 +77,19 @@ pub fn draw_drag_ghost(ctx: &egui::Context, icon_content: impl FnOnce(&mut egui:
             });
     }
 }
+
+/// Draws a yellow horizontal line across a rect at height 'y' to indicate a drop target.
+pub fn draw_yellow_line(ui: &egui::Ui, rect: egui::Rect, y: f32) {
+    ui.painter().line_segment(
+        [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+        egui::Stroke::new(2.0, egui::Color32::YELLOW),
+    );
+}
+
+/// Draws a centered placeholder text indicating no file is currently active.
+pub fn draw_no_file_placeholder(ui: &mut egui::Ui) {
+    ui.vertical_centered(|ui| {
+        ui.add_space(10.0);
+        ui.label(egui::RichText::new("No file loaded").weak());
+    });
+}
