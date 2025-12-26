@@ -88,7 +88,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("tag_sts.png", AssetCategory::Icon),
     a!("tag_wea.png", AssetCategory::Icon),
     a!("tag_wpn.png", AssetCategory::Icon),
-
     a!("prbmarm1.png", AssetCategory::Icon),
     a!("prbmarm2.png", AssetCategory::Icon),
     a!("prbmarm3.png", AssetCategory::Icon),
@@ -96,7 +95,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("prbmhel2.png", AssetCategory::Icon),
     a!("prbmhel3.png", AssetCategory::Icon),
     a!("prbmhel4.png", AssetCategory::Icon),
-
     a!("dgt2num0.png", AssetCategory::Font),
     a!("dgt2num1.png", AssetCategory::Font),
     a!("dgt2num2.png", AssetCategory::Font),
@@ -108,7 +106,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dgt2num8.png", AssetCategory::Font),
     a!("dgt2num9.png", AssetCategory::Font),
     a!("dgt2prcn.png", AssetCategory::Font),
-
     a!("dgt3num0.png", AssetCategory::Font),
     a!("dgt3num1.png", AssetCategory::Font),
     a!("dgt3num2.png", AssetCategory::Font),
@@ -120,7 +117,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dgt3num8.png", AssetCategory::Font),
     a!("dgt3num9.png", AssetCategory::Font),
     a!("dgt3prcn.png", AssetCategory::Font),
-
     a!("dgt4num0.png", AssetCategory::Font),
     a!("dgt4num1.png", AssetCategory::Font),
     a!("dgt4num2.png", AssetCategory::Font),
@@ -132,7 +128,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dgt4num8.png", AssetCategory::Font),
     a!("dgt4num9.png", AssetCategory::Font),
     a!("dgt4prcn.png", AssetCategory::Font),
-
     a!("dgt5num0.png", AssetCategory::Font),
     a!("dgt5num1.png", AssetCategory::Font),
     a!("dgt5num2.png", AssetCategory::Font),
@@ -144,7 +139,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dgt5num8.png", AssetCategory::Font),
     a!("dgt5num9.png", AssetCategory::Font),
     a!("dgt5prcn.png", AssetCategory::Font),
-
     a!("dgt6coln.png", AssetCategory::Font),
     a!("dgt6num0.png", AssetCategory::Font),
     a!("dgt6num1.png", AssetCategory::Font),
@@ -157,7 +151,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dgt6num8.png", AssetCategory::Font),
     a!("dgt6num9.png", AssetCategory::Font),
     a!("dgt6prcn.png", AssetCategory::Font),
-
     a!("dgt7num0.png", AssetCategory::Font),
     a!("dgt7num1.png", AssetCategory::Font),
     a!("dgt7num2.png", AssetCategory::Font),
@@ -168,7 +161,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dgt7num7.png", AssetCategory::Font),
     a!("dgt7num8.png", AssetCategory::Font),
     a!("dgt7num9.png", AssetCategory::Font),
-
     a!("dig033.png", AssetCategory::Font),
     a!("dig037.png", AssetCategory::Font),
     a!("dig043.png", AssetCategory::Font),
@@ -179,7 +171,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("dig049.png", AssetCategory::Font),
     a!("dig050.png", AssetCategory::Font),
     a!("dig051.png", AssetCategory::Font),
-
     a!("etl1num0.png", AssetCategory::Font),
     a!("etl1num1.png", AssetCategory::Font),
     a!("etl1num2.png", AssetCategory::Font),
@@ -190,7 +181,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("etl1num7.png", AssetCategory::Font),
     a!("etl1num8.png", AssetCategory::Font),
     a!("etl1num9.png", AssetCategory::Font),
-
     a!("etl3num0.png", AssetCategory::Font),
     a!("etl3num1.png", AssetCategory::Font),
     a!("etl3num2.png", AssetCategory::Font),
@@ -201,7 +191,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("etl3num7.png", AssetCategory::Font),
     a!("etl3num8.png", AssetCategory::Font),
     a!("etl3num9.png", AssetCategory::Font),
-
     a!("etl4num0.png", AssetCategory::Font),
     a!("etl4num1.png", AssetCategory::Font),
     a!("etl4num2.png", AssetCategory::Font),
@@ -212,7 +201,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("etl4num7.png", AssetCategory::Font),
     a!("etl4num8.png", AssetCategory::Font),
     a!("etl4num9.png", AssetCategory::Font),
-
     a!("etl5num0.png", AssetCategory::Font),
     a!("etl5num1.png", AssetCategory::Font),
     a!("etl5num2.png", AssetCategory::Font),
@@ -223,7 +211,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("etl5num7.png", AssetCategory::Font),
     a!("etl5num8.png", AssetCategory::Font),
     a!("etl5num9.png", AssetCategory::Font),
-
     a!("etm1prcn.png", AssetCategory::Font),
     a!("etm2prcn.png", AssetCategory::Font),
     a!("etm3num0.png", AssetCategory::Font),
@@ -249,7 +236,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("etm6num9.png", AssetCategory::Font),
     a!("etm6prcn.png", AssetCategory::Font),
     a!("etm7prcn.png", AssetCategory::Font),
-
     a!("etr2slsh.png", AssetCategory::Font),
     a!("etr3slsh.png", AssetCategory::Font),
     a!("etr6slsh.png", AssetCategory::Font),
@@ -257,7 +243,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("etrdivdr.png", AssetCategory::Font),
     a!("etrinf1.png", AssetCategory::Font),
     a!("etrinf3.png", AssetCategory::Font),
-
     a!("ets2num0.png", AssetCategory::Font),
     a!("ets2num1.png", AssetCategory::Font),
     a!("ets2num2.png", AssetCategory::Font),
@@ -289,7 +274,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("ets6num8.png", AssetCategory::Font),
     a!("ets6num9.png", AssetCategory::Font),
     a!("ets7num9.png", AssetCategory::Font),
-
     a!("fragnum0.png", AssetCategory::Font),
     a!("fragnum1.png", AssetCategory::Font),
     a!("fragnum2.png", AssetCategory::Font),
@@ -300,7 +284,6 @@ pub const ASSETS: &[LibraryAsset] = &[
     a!("fragnum7.png", AssetCategory::Font),
     a!("fragnum8.png", AssetCategory::Font),
     a!("fragnum9.png", AssetCategory::Font),
-
     a!("prbm033.png", AssetCategory::Font),
     a!("prbm037.png", AssetCategory::Font),
     a!("prbm043.png", AssetCategory::Font),
@@ -350,8 +333,8 @@ pub const ASSETS: &[LibraryAsset] = &[
 
 pub const CLASSIC_PREFIXES: &[&str] = &[];
 pub const NIGHTKICKER_PREFIXES: &[&str] = &[
-    "ammo_ov", "arm_", "bmty", "boom", "dsda", "progbar", "tag_", "prbm",
-    "dgt", "dig", "etl", "etm", "etr", "ets", "frag",
+    "ammo_ov", "arm_", "bmty", "boom", "dsda", "progbar", "tag_", "prbm", "dgt", "dig", "etl",
+    "etm", "etr", "ets", "frag",
 ];
 
 pub const TEMPLATES: &[Template] = &[

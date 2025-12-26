@@ -1,3 +1,4 @@
+use super::thumbnails::{self, ListRow};
 use crate::app::ConfirmationRequest;
 use crate::assets::AssetStore;
 use crate::library::{self, FontDefinition, FontSource};
@@ -7,7 +8,6 @@ use crate::ui::font_wizard::FontWizardState;
 use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
-use super::thumbnails::{self, ListRow};
 
 const ASSET_SEL_KEY: &str = "cacoco_asset_selection";
 const ASSET_PIVOT_KEY: &str = "cacoco_asset_pivot";
@@ -175,10 +175,16 @@ pub fn draw_filtered_browser(
         .filter(|k| !k.starts_with('_'))
         .filter(|key| {
             if !show_fonts_toggle {
-                if registered_font_stems.iter().any(|stem| key.starts_with(stem)) {
+                if registered_font_stems
+                    .iter()
+                    .any(|stem| key.starts_with(stem))
+                {
                     return false;
                 }
-                if library::FONTS.iter().any(|f| key.starts_with(&f.stem.to_uppercase())) {
+                if library::FONTS
+                    .iter()
+                    .any(|f| key.starts_with(&f.stem.to_uppercase()))
+                {
                     return false;
                 }
             }
@@ -203,6 +209,7 @@ pub fn draw_filtered_browser(
         });
         return false;
     }
+
     draw_asset_grid(
         ui,
         assets,
@@ -212,6 +219,8 @@ pub fn draw_filtered_browser(
         confirmation_modal,
         show_project_assets,
     );
+
+    render_asset_drag_ghost(ui, assets);
 
     changed
 }
@@ -273,6 +282,8 @@ pub fn draw_library_browser(
                 });
             });
     }
+
+    render_asset_drag_ghost(ui, assets);
 
     changed
 }
@@ -366,12 +377,12 @@ fn draw_asset_grid(
     let available_w = ui.available_width() - 12.0;
     let target_size = thumbnails::THUMB_SIZE * zoom;
 
-    let mut selection: HashSet<String> = ui.data(|d| {
-        d.get_temp(egui::Id::new(ASSET_SEL_KEY))
+    let mut selection: HashSet<String> =
+        ui.data(|d| d.get_temp(egui::Id::new(ASSET_SEL_KEY)).unwrap_or_default());
+    let mut pivot: Option<String> = ui.data(|d| {
+        d.get_temp(egui::Id::new(ASSET_PIVOT_KEY))
             .unwrap_or_default()
     });
-    let mut pivot: Option<String> =
-        ui.data(|d| d.get_temp(egui::Id::new(ASSET_PIVOT_KEY)).unwrap_or_default());
 
     let cols = ((available_w + 4.0) / (target_size + 4.0)).floor().max(1.0);
     let size = (available_w - ((cols - 1.0) * 4.0)) / cols;
@@ -427,19 +438,12 @@ fn draw_asset_grid(
             }
 
             if let Some(tex) = texture {
-                let scaled_size = tex.size_vec2() * (size - 4.0)
-                    / tex.size_vec2().x.max(tex.size_vec2().y).max(1.0);
                 let tint = if is_selected {
                     egui::Color32::WHITE
                 } else {
                     egui::Color32::from_gray(200)
                 };
-                ui.painter().image(
-                    tex.id(),
-                    egui::Rect::from_center_size(rect.center(), scaled_size),
-                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                    tint,
-                );
+                shared::draw_scaled_image(ui, rect.shrink(2.0), tex, tint, 10.0);
             }
 
             let just_opened = ContextMenu::check(ui, &response);
@@ -451,11 +455,7 @@ fn draw_asset_grid(
                 }
                 ContextMenu::show(ui, menu, just_opened, |ui| {
                     if ContextMenu::button(ui, "Auto-Detect and Create Font", true) {
-                        let list: Vec<String> = keys
-                            .iter()
-                            .filter(|k| selection.contains(**k))
-                            .map(|k| k.to_string())
-                            .collect();
+                        let list = collect_selected_keys(keys, &selection);
                         *wizard_state = Some(FontWizardState::new(list));
                         ContextMenu::close(ui);
                     }
@@ -470,11 +470,7 @@ fn draw_asset_grid(
                         };
 
                         if ContextMenu::button(ui, &label, true) {
-                            let list: Vec<String> = keys
-                                .iter()
-                                .filter(|k| selection.contains(**k))
-                                .map(|k| k.to_string())
-                                .collect();
+                            let list = collect_selected_keys(keys, &selection);
                             *confirmation_modal = Some(ConfirmationRequest::DeleteAssets(list));
                             ContextMenu::close(ui);
                         }
@@ -488,11 +484,7 @@ fn draw_asset_grid(
                     selection.insert(key.to_string());
                     pivot = Some(key.to_string());
                 }
-                let list: Vec<String> = keys
-                    .iter()
-                    .filter(|k| selection.contains(**k))
-                    .map(|k| k.to_string())
-                    .collect();
+                let list = collect_selected_keys(keys, &selection);
                 egui::DragAndDrop::set_payload(ui.ctx(), list);
             }
 
@@ -514,25 +506,6 @@ fn draw_asset_grid(
             }
         }
     });
-
-    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
-        let count = asset_keys.len();
-        let label = if count > 1 {
-            format!("{} assets", count)
-        } else {
-            asset_keys[0].clone()
-        };
-        let first_key = asset_keys[0].clone();
-        let texture = assets.textures.get(&first_key);
-
-        shared::draw_drag_ghost(
-            ui.ctx(),
-            |ui| {
-                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false);
-            },
-            &label,
-        );
-    }
 
     ui.data_mut(|d| {
         d.insert_temp(egui::Id::new(ASSET_SEL_KEY), selection);
@@ -562,19 +535,12 @@ fn draw_library_item(
     }
 
     if let Some(tex) = texture {
-        let scaled_size = tex.size_vec2() * (size - 4.0)
-            / tex.size_vec2().x.max(tex.size_vec2().y).max(1.0);
         let tint = if is_project {
             egui::Color32::WHITE
         } else {
             egui::Color32::from_gray(160)
         };
-        ui.painter().image(
-            tex.id(),
-            egui::Rect::from_center_size(rect.center(), scaled_size),
-            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-            tint,
-        );
+        shared::draw_scaled_image(ui, rect.shrink(2.0), tex, tint, 10.0);
     }
 
     if response.drag_started() {
@@ -608,4 +574,33 @@ fn draw_library_item(
     }
 
     changed
+}
+
+fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
+    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
+        let count = asset_keys.len();
+        let label = if count > 1 {
+            format!("{} assets", count)
+        } else {
+            asset_keys[0].clone()
+        };
+        let first_key = asset_keys[0].clone();
+        let texture = assets.textures.get(&first_key);
+
+        shared::draw_drag_ghost(
+            ui.ctx(),
+            |ui| {
+                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false);
+            },
+            &label,
+        );
+    }
+}
+
+fn collect_selected_keys(all_keys: &[&String], selection: &HashSet<String>) -> Vec<String> {
+    all_keys
+        .iter()
+        .filter(|k| selection.contains(k.as_str()))
+        .map(|k| (**k).clone())
+        .collect()
 }

@@ -1,6 +1,7 @@
 use crate::assets::AssetStore;
 use crate::model::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
 use crate::state::PreviewState;
+use crate::ui::shared;
 use eframe::egui;
 
 pub const THUMB_SIZE: f32 = 36.0;
@@ -78,24 +79,9 @@ fn draw_static_texture_content(
     } else {
         egui::Color32::WHITE
     };
-    let content_size = THUMB_SIZE - (INNER_MARGIN * 2.0);
 
     if let Some(tex) = texture {
-        let tex_size = tex.size_vec2();
-        if tex_size.x > 0.0 && tex_size.y > 0.0 {
-            let scale = (content_size / tex_size.x)
-                .min(content_size / tex_size.y)
-                .min(4.0);
-            let final_size = tex_size * scale;
-            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
-
-            ui.painter().image(
-                tex.id(),
-                draw_rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                tint,
-            );
-        }
+        shared::draw_scaled_image(ui, rect.shrink(INNER_MARGIN), tex, tint, 4.0);
     } else if let Some(icon) = fallback_icon {
         let color = if is_dimmed {
             egui::Color32::from_gray(100)
@@ -128,25 +114,9 @@ fn draw_live_number_thumbnail(
         egui::Color32::WHITE
     };
 
-    let font_stem = file
-        .data
-        .number_fonts
-        .iter()
-        .find(|f| f.name.eq_ignore_ascii_case(&number_def.font))
-        .map(|f| f.stem.as_str());
-
-    let stem = match font_stem {
-        Some(s) => s,
-        None => {
-            ui.painter().text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "?",
-                egui::FontId::proportional(16.0),
-                egui::Color32::RED,
-            );
-            return;
-        }
+    let Some(stem) = find_number_stem(file, &number_def.font) else {
+        draw_font_error(ui, rect);
+        return;
     };
 
     let val = match number_def.type_ {
@@ -181,24 +151,9 @@ fn draw_live_time_thumbnail(
         egui::Color32::WHITE
     };
 
-    let font_stem = file
-        .data
-        .hud_fonts
-        .iter()
-        .find(|f| f.name.eq_ignore_ascii_case(&component.font))
-        .map(|f| f.stem.as_str());
-    let stem = match font_stem {
-        Some(s) => s,
-        None => {
-            ui.painter().text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "?",
-                egui::FontId::proportional(16.0),
-                egui::Color32::RED,
-            );
-            return;
-        }
+    let Some(stem) = find_hud_stem(file, &component.font) else {
+        draw_font_error(ui, rect);
+        return;
     };
 
     let seconds = (time as u64) % 60;
@@ -221,25 +176,9 @@ fn draw_live_component_thumbnail(
         egui::Color32::WHITE
     };
 
-    let font_stem = file
-        .data
-        .hud_fonts
-        .iter()
-        .find(|f| f.name.eq_ignore_ascii_case(&component.font))
-        .map(|f| f.stem.as_str());
-
-    let stem = match font_stem {
-        Some(s) => s,
-        None => {
-            ui.painter().text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "?",
-                egui::FontId::proportional(16.0),
-                egui::Color32::RED,
-            );
-            return;
-        }
+    let Some(stem) = find_hud_stem(file, &component.font) else {
+        draw_font_error(ui, rect);
+        return;
     };
 
     let text_buf;
@@ -290,7 +229,9 @@ pub fn draw_live_patches(
     }
 
     let content_size = THUMB_SIZE - (INNER_MARGIN * 2.0);
-    let scale = (content_size / total_width).min(content_size / max_height).min(4.0);
+    let scale = (content_size / total_width)
+        .min(content_size / max_height)
+        .min(4.0);
 
     let mut current_x = rect.center().x - (total_width * scale / 2.0);
     let center_y = rect.center().y;
@@ -456,4 +397,30 @@ impl<'a> ListRow<'a> {
 
         response
     }
+}
+
+fn find_hud_stem<'a>(file: &'a SBarDefFile, name: &str) -> Option<&'a str> {
+    file.data
+        .hud_fonts
+        .iter()
+        .find(|f| f.name.eq_ignore_ascii_case(name))
+        .map(|f| f.stem.as_str())
+}
+
+fn find_number_stem<'a>(file: &'a SBarDefFile, name: &str) -> Option<&'a str> {
+    file.data
+        .number_fonts
+        .iter()
+        .find(|f| f.name.eq_ignore_ascii_case(name))
+        .map(|f| f.stem.as_str())
+}
+
+fn draw_font_error(ui: &egui::Ui, rect: egui::Rect) {
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "?",
+        egui::FontId::proportional(16.0),
+        egui::Color32::RED,
+    );
 }

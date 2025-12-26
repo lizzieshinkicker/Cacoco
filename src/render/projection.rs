@@ -1,5 +1,5 @@
+use crate::constants::{DOOM_H, DOOM_W, DOOM_W_WIDE};
 use eframe::egui;
-use crate::constants::{DOOM_W, DOOM_H, DOOM_W_WIDE};
 
 pub struct ViewportProjection {
     pub screen_rect: egui::Rect,
@@ -9,11 +9,7 @@ pub struct ViewportProjection {
 }
 
 impl ViewportProjection {
-    pub fn new(
-        avail_rect: egui::Rect,
-        widescreen: bool,
-        aspect_correct: bool,
-    ) -> Self {
+    pub fn new(avail_rect: egui::Rect, widescreen: bool, aspect_correct: bool) -> Self {
         let correction = if aspect_correct { 1.2 } else { 1.0 };
         let base_h = DOOM_H;
         let base_w = if widescreen { DOOM_W_WIDE } else { DOOM_W };
@@ -38,11 +34,15 @@ impl ViewportProjection {
         Self {
             screen_rect: egui::Rect::from_min_size(
                 egui::pos2(offset_x, offset_y),
-                egui::vec2(virtual_w, virtual_h)
+                egui::vec2(virtual_w, virtual_h),
             ),
             final_scale_x,
             final_scale_y,
-            origin_x: if widescreen { (base_w - DOOM_W) / 2.0 } else { 0.0 },
+            origin_x: if widescreen {
+                (base_w - DOOM_W) / 2.0
+            } else {
+                0.0
+            },
         }
     }
 

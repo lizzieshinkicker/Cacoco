@@ -183,7 +183,11 @@ pub fn save_pk3_dialog(
         if let Some(parent) = p.parent() {
             dialog = dialog.set_directory(parent);
         }
-        let mut final_name = p.file_name().and_then(|s| s.to_str()).unwrap_or("status_bar.pk3").to_string();
+        let mut final_name = p
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("status_bar.pk3")
+            .to_string();
         let lower = final_name.to_lowercase();
         if !lower.ends_with(".pk3") && !lower.ends_with(".zip") {
             final_name.push_str(".pk3");
@@ -208,7 +212,11 @@ pub fn save_pk3_dialog(
     None
 }
 
-pub fn save_pk3_silent(file: &SBarDefFile, assets: &AssetStore, path_str: &str) -> anyhow::Result<()> {
+pub fn save_pk3_silent(
+    file: &SBarDefFile,
+    assets: &AssetStore,
+    path_str: &str,
+) -> anyhow::Result<()> {
     let path = Path::new(path_str);
     let fs_file = fs::File::create(path)?;
     build_pk3(fs_file, file, assets)?;
@@ -231,7 +239,7 @@ pub fn load_iwad_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> Option<
 }
 
 pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut AssetStore) -> bool {
-    let path = std::path::Path::new(path_str);
+    let path = Path::new(path_str);
     if let Ok(mut file) = fs::File::open(path) {
         if let Err(e) = wad::load_wad_into_store(ctx, &mut file, assets) {
             eprintln!("Failed to auto-load WAD at {:?}: {}", path, e);
@@ -317,7 +325,7 @@ fn load_images_from_paths(
     count
 }
 
-fn visit_dirs_for_images(dir: &std::path::Path, paths: &mut Vec<PathBuf>) {
+fn visit_dirs_for_images(dir: &Path, paths: &mut Vec<PathBuf>) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();

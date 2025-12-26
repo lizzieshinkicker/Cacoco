@@ -172,7 +172,10 @@ fn execute_move_selection(
     roots.sort_by_key(|p| p.len());
     let mut filtered_sources = Vec::new();
     for p in roots {
-        if !filtered_sources.iter().any(|f: &Vec<usize>| p.starts_with(f)) {
+        if !filtered_sources
+            .iter()
+            .any(|f: &Vec<usize>| p.starts_with(f))
+        {
             filtered_sources.push(p);
         }
     }
@@ -266,7 +269,10 @@ fn get_child_list_mut<'a>(
 
     let mut current_element = bar.children.get_mut(parent_path[1])?;
     for &child_idx in &parent_path[2..] {
-        current_element = current_element.get_common_mut().children.get_mut(child_idx)?;
+        current_element = current_element
+            .get_common_mut()
+            .children
+            .get_mut(child_idx)?;
     }
     Some(&mut current_element.get_common_mut().children)
 }

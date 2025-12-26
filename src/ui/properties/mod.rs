@@ -1,23 +1,23 @@
-use std::collections::HashSet;
-use eframe::egui;
-use crate::model::SBarDefFile;
 use crate::assets::AssetStore;
+use crate::model::SBarDefFile;
 use crate::state::PreviewState;
 use crate::ui::layers::colors;
+use eframe::egui;
+use std::collections::HashSet;
 
 pub mod common;
-mod graphics;
-mod text;
-pub(crate) mod preview;
-mod lookups;
-pub(crate) mod font_cache;
 mod conditions;
-pub mod editor;
-pub mod text_helper;
 mod descriptions;
+pub mod editor;
+pub(crate) mod font_cache;
+mod graphics;
+mod lookups;
+pub(crate) mod preview;
+mod text;
+pub mod text_helper;
 
-use font_cache::FontCache;
 use editor::PropertiesUI;
+use font_cache::FontCache;
 
 pub fn draw_properties_panel(
     ui: &mut egui::Ui,
@@ -32,13 +32,20 @@ pub fn draw_properties_panel(
 
     let file_ref = match file {
         Some(f) => f,
-        None => { ui.label("No file loaded."); return false; }
+        None => {
+            ui.label("No file loaded.");
+            return false;
+        }
     };
 
     if selection.len() > 1 {
         ui.vertical_centered(|ui| {
             ui.add_space(20.0);
-            ui.label(egui::RichText::new("Multiple Objects Selected").strong().size(16.0));
+            ui.label(
+                egui::RichText::new("Multiple Objects Selected")
+                    .strong()
+                    .size(16.0),
+            );
             ui.label(format!("{} objects", selection.len()));
         });
         return false;
@@ -46,7 +53,10 @@ pub fn draw_properties_panel(
 
     let path = match selection.iter().next() {
         Some(p) => p,
-        None => { ui.label("Select a layer to edit."); return false; }
+        None => {
+            ui.label("Select a layer to edit.");
+            return false;
+        }
     };
 
     let font_cache = FontCache::new(file_ref);
@@ -85,7 +95,8 @@ pub fn draw_properties_panel(
             if has_content {
                 ui.group(|ui| {
                     if element._cacoco_text.is_some() {
-                        changed |= text_helper::draw_text_helper_editor(ui, element, &font_cache, assets);
+                        changed |=
+                            text_helper::draw_text_helper_editor(ui, element, &font_cache, assets);
                     } else {
                         changed |= element.draw_specific_fields(ui, &font_cache, assets, state);
                     }

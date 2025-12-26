@@ -1,6 +1,7 @@
 use crate::assets::AssetStore;
 use crate::cheats::CheatEngine;
 use crate::config::AppConfig;
+use crate::document::{self, LayerAction};
 use crate::history::HistoryManager;
 use crate::hotkeys::HotkeyRegistry;
 use crate::io;
@@ -93,11 +94,8 @@ impl CacocoApp {
             "_BG_MASTER",
             include_bytes!("../assets/background.png"),
         );
-        self.assets.load_reference_image(
-            ctx,
-            "HICACOCO",
-            include_bytes!("../assets/HICACOCO.png"),
-        );
+        self.assets
+            .load_reference_image(ctx, "HICACOCO", include_bytes!("../assets/HICACOCO.png"));
         self.assets.load_system_assets(ctx);
 
         for asset in crate::library::ASSETS {
@@ -141,7 +139,7 @@ impl CacocoApp {
     }
 
     pub fn new_project(&mut self, ctx: &egui::Context) {
-        self.current_file = Some(crate::model::SBarDefFile {
+        self.current_file = Some(SBarDefFile {
             type_: "statusbar".to_string(),
             version: "1.0.0".to_string(),
             data: crate::model::StatusBarDefinition {
@@ -168,7 +166,8 @@ impl CacocoApp {
         self.history.undo_stack.clear();
         self.history.redo_stack.clear();
         self.dirty = false;
-        self.preview_state.push_message("Created new empty project.");
+        self.preview_state
+            .push_message("Created new empty project.");
     }
 
     pub fn apply_template(&mut self, ctx: &egui::Context, template: &Template) {
@@ -207,6 +206,31 @@ impl CacocoApp {
             }
             Err(e) => {
                 eprintln!("Failed to parse template JSON: {}", e);
+            }
+        }
+    }
+
+    /// Centralized handler for executing a batch of editor actions.
+    pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
+        let Some(f) = &mut self.current_file else {
+            return;
+        };
+
+        for action in actions {
+            self.dirty = true;
+            if matches!(action, LayerAction::UndoSnapshot) {
+                self.history.take_snapshot(f, &self.selection);
+            } else {
+                document::execute_layer_action(f, action, &mut self.selection);
+            }
+        }
+    }
+
+    /// Opens the system dialog to pick a project and loads it if successful.
+    pub fn open_project_ui(&mut self, ctx: &egui::Context) {
+        if let Some(path) = io::open_project_dialog() {
+            if let Some(loaded) = io::load_project_from_path(ctx, &path) {
+                self.load_project(ctx, loaded, &path);
             }
         }
     }

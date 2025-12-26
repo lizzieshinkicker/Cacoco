@@ -1,14 +1,9 @@
-use eframe::egui;
-use crate::model::*;
 use super::RenderContext;
 use super::graphic::draw_simple_graphic_patch;
+use crate::model::*;
+use eframe::egui;
 
-pub(super) fn draw_animation(
-    ctx: &RenderContext,
-    def: &AnimationDef,
-    pos: egui::Pos2,
-    alpha: f32
-) {
+pub(super) fn draw_animation(ctx: &RenderContext, def: &AnimationDef, pos: egui::Pos2, alpha: f32) {
     if def.frames.is_empty() {
         return;
     }
@@ -36,6 +31,6 @@ pub(super) fn draw_animation(
         &patch_to_draw.to_uppercase(),
         pos,
         def.common.alignment,
-        alpha
+        alpha,
     );
 }

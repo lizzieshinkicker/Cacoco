@@ -1,4 +1,4 @@
-use crate::model::{ConditionType, ConditionDef};
+use crate::model::{ConditionDef, ConditionType};
 
 #[derive(Clone, Copy)]
 pub struct LookupItem {
@@ -65,15 +65,9 @@ pub const SESSION_TYPES: &[LookupItem] = &[
     item!(2, "Deathmatch", "STFDEAD0"),
 ];
 
-pub const HUD_MODES: &[LookupItem] = &[
-    item!(0, "Standard"),
-    item!(1, "Compact"),
-];
+pub const HUD_MODES: &[LookupItem] = &[item!(0, "Standard"), item!(1, "Compact")];
 
-pub const WIDESCREEN_MODES: &[LookupItem] = &[
-    item!(0, "Disabled"),
-    item!(1, "Enabled"),
-];
+pub const WIDESCREEN_MODES: &[LookupItem] = &[item!(0, "Disabled"), item!(1, "Enabled")];
 
 pub const AUTOMAP_FLAGS: &[LookupItem] = &[
     item!(1, "Enabled"),
@@ -129,10 +123,7 @@ pub const GROUPS: &[ConditionGroup] = &[
         icon: Some("PSTRA0"),
         style: GroupStyle::Natural,
         default_param: 1,
-        variants: &[
-            v!("is owned", ItemOwned),
-            v!("NOT owned", ItemNotOwned),
-        ],
+        variants: &[v!("is owned", ItemOwned), v!("NOT owned", ItemNotOwned)],
     },
     ConditionGroup {
         name: "Weapon Slot",
@@ -272,9 +263,17 @@ pub fn resolve_condition_icon(
 
     match cond.condition {
         ArmorGe | ArmorLt | ArmorPercentGe | ArmorPercentLt => {
-            return Some(if state.player.armor_max >= 200 { "ARM2A0" } else { "ARM1A0" });
+            return Some(if state.player.armor_max >= 200 {
+                "ARM2A0"
+            } else {
+                "ARM1A0"
+            });
         }
-        SelectedAmmoGe | SelectedAmmoLt | SelectedAmmoPercentGe | SelectedAmmoPercentLt | SelectedWeaponHasAmmo => {
+        SelectedAmmoGe
+        | SelectedAmmoLt
+        | SelectedAmmoPercentGe
+        | SelectedAmmoPercentLt
+        | SelectedWeaponHasAmmo => {
             return match state.get_selected_ammo_type() {
                 0 => Some("AMMOA0"),
                 1 => Some("SHELA0"),

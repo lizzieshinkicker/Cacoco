@@ -1,5 +1,6 @@
 use crate::assets::AssetStore;
 use crate::state::PreviewState;
+use crate::ui::shared;
 use eframe::egui;
 
 const BTN_SIZE: f32 = 52.0;
@@ -47,22 +48,118 @@ pub fn draw_gamestate_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets:
                     egui::Grid::new("items_top_grid")
                         .spacing(egui::vec2(GRID_SPACING, GRID_SPACING))
                         .show(ui, |ui| {
-                            item_btn(ui, assets, state, "BKEYA0", None, ItemId::BlueCard, "B. Card");
-                            item_btn(ui, assets, state, "BSKUB0", None, ItemId::BlueSkull, "B. Skull");
-                            item_btn(ui, assets, state, "PSTRA0", Some("_BADGE_BERSERK"), ItemId::Berserk, "Berserk");
-                            item_btn(ui, assets, state, "PINSA0", Some("_BADGE_BLURSPHERE"), ItemId::Invisibility, "Invis.");
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "BKEYA0",
+                                None,
+                                ItemId::BlueCard,
+                                "B. Card",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "BSKUB0",
+                                None,
+                                ItemId::BlueSkull,
+                                "B. Skull",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "PSTRA0",
+                                Some("_BADGE_BERSERK"),
+                                ItemId::Berserk,
+                                "Berserk",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "PINSA0",
+                                Some("_BADGE_BLURSPHERE"),
+                                ItemId::Invisibility,
+                                "Invis.",
+                            );
                             ui.end_row();
 
-                            item_btn(ui, assets, state, "YKEYA0", None, ItemId::YellowCard, "Y. Card");
-                            item_btn(ui, assets, state, "YSKUB0", None, ItemId::YellowSkull, "Y. Skull");
-                            item_btn(ui, assets, state, "PMAPA0", Some("_BADGE_ALLMAP"), ItemId::Map, "Map");
-                            item_btn(ui, assets, state, "SUITA0", Some("_BADGE_RADSUIT"), ItemId::Radsuit, "Radsuit");
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "YKEYA0",
+                                None,
+                                ItemId::YellowCard,
+                                "Y. Card",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "YSKUB0",
+                                None,
+                                ItemId::YellowSkull,
+                                "Y. Skull",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "PMAPA0",
+                                Some("_BADGE_ALLMAP"),
+                                ItemId::Map,
+                                "Map",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "SUITA0",
+                                Some("_BADGE_RADSUIT"),
+                                ItemId::Radsuit,
+                                "Radsuit",
+                            );
                             ui.end_row();
 
-                            item_btn(ui, assets, state, "RKEYA0", None, ItemId::RedCard, "R. Card");
-                            item_btn(ui, assets, state, "RSKUB0", None, ItemId::RedSkull, "R. Skull");
-                            item_btn(ui, assets, state, "PVISA0", Some("_BADGE_LITEAMP"), ItemId::Liteamp, "Liteamp");
-                            item_btn(ui, assets, state, "PINVA0", Some("_BADGE_INVULN"), ItemId::Invuln, "Invuln.");
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "RKEYA0",
+                                None,
+                                ItemId::RedCard,
+                                "R. Card",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "RSKUB0",
+                                None,
+                                ItemId::RedSkull,
+                                "R. Skull",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "PVISA0",
+                                Some("_BADGE_LITEAMP"),
+                                ItemId::Liteamp,
+                                "Liteamp",
+                            );
+                            item_btn(
+                                ui,
+                                assets,
+                                state,
+                                "PINVA0",
+                                Some("_BADGE_INVULN"),
+                                ItemId::Invuln,
+                                "Invuln.",
+                            );
                             ui.end_row();
                         });
                 });
@@ -77,16 +174,80 @@ pub fn draw_gamestate_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets:
                     egui::Grid::new("weapons_bottom_grid")
                         .spacing(egui::vec2(GRID_SPACING, GRID_SPACING))
                         .show(ui, |ui| {
-                            weapon_complex_btn(ui, assets, state, "SAWGA0", 1, ItemId::Chainsaw, "Chainsaw");
-                            weapon_complex_btn(ui, assets, state, "STGNUM2", 2, ItemId::Pistol, "Pistol");
-                            weapon_complex_btn(ui, assets, state, "STGNUM3", 3, ItemId::Shotgun, "Shotgun");
-                            weapon_complex_btn(ui, assets, state, "STGNUM4", 4, ItemId::Chaingun, "Chaingun");
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "SAWGA0",
+                                1,
+                                ItemId::Chainsaw,
+                                "Chainsaw",
+                            );
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "STGNUM2",
+                                2,
+                                ItemId::Pistol,
+                                "Pistol",
+                            );
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "STGNUM3",
+                                3,
+                                ItemId::Shotgun,
+                                "Shotgun",
+                            );
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "STGNUM4",
+                                4,
+                                ItemId::Chaingun,
+                                "Chaingun",
+                            );
                             ui.end_row();
 
-                            weapon_complex_btn(ui, assets, state, "SHT2A0", 3, ItemId::SuperShotgun, "S.Shotgun");
-                            weapon_complex_btn(ui, assets, state, "STGNUM5", 5, ItemId::RocketLauncher, "Rocket");
-                            weapon_complex_btn(ui, assets, state, "STGNUM6", 6, ItemId::PlasmaGun, "Plasma");
-                            weapon_complex_btn(ui, assets, state, "STGNUM7", 7, ItemId::BFG, "BFG9000");
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "SHT2A0",
+                                3,
+                                ItemId::SuperShotgun,
+                                "S.Shotgun",
+                            );
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "STGNUM5",
+                                5,
+                                ItemId::RocketLauncher,
+                                "Rocket",
+                            );
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "STGNUM6",
+                                6,
+                                ItemId::PlasmaGun,
+                                "Plasma",
+                            );
+                            weapon_complex_btn(
+                                ui,
+                                assets,
+                                state,
+                                "STGNUM7",
+                                7,
+                                ItemId::BFG,
+                                "BFG9000",
+                            );
                             ui.end_row();
                         });
                 });
@@ -349,23 +510,9 @@ fn draw_asset_button(
     } else {
         egui::Color32::from_gray(100)
     };
-    let content_size = BTN_SIZE - (INNER_MARGIN * 2.0);
 
-    if let Some(key) = patch_key.and_then(|k| assets.textures.get(k)) {
-        let tex_size = key.size_vec2();
-        if tex_size.x > 0.0 && tex_size.y > 0.0 {
-            let scale = (content_size / tex_size.x)
-                .min(content_size / tex_size.y)
-                .min(4.0);
-            let final_size = tex_size * scale;
-            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
-            ui.painter().image(
-                key.id(),
-                draw_rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                tint,
-            );
-        }
+    if let Some(tex) = patch_key.and_then(|k| assets.textures.get(k)) {
+        shared::draw_scaled_image(ui, rect.shrink(INNER_MARGIN), tex, tint, 4.0);
     } else {
         ui.painter().text(
             rect.center(),

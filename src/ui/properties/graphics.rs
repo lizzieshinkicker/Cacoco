@@ -5,7 +5,7 @@ use crate::model::{
 };
 use crate::state::PreviewState;
 use crate::ui::layers::thumbnails;
-use crate::ui::shared::VIEWPORT_RECT_ID;
+use crate::ui::shared::{self, VIEWPORT_RECT_ID};
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -40,25 +40,17 @@ impl PropertiesUI for GraphicDef {
 }
 
 impl PropertiesUI for FaceDef {
-    fn has_specific_fields(&self) -> bool {
-        false
-    }
-
-    fn draw_specific_fields(
-        &mut self,
-        _: &mut egui::Ui,
-        _: &FontCache,
-        _: &AssetStore,
-        _: &PreviewState,
-    ) -> bool { false }
-
     fn get_preview_content(
         &self,
         ui: &egui::Ui,
         _: &FontCache,
         state: &PreviewState,
     ) -> Option<PreviewContent> {
-        let screen_w = if state.engine.widescreen_mode { DOOM_W_WIDE } else { DOOM_W };
+        let screen_w = if state.engine.widescreen_mode {
+            DOOM_W_WIDE
+        } else {
+            DOOM_W
+        };
 
         let mut anchor_x = 0.0;
         if self.common.alignment.contains(Alignment::RIGHT) {
@@ -68,7 +60,6 @@ impl PropertiesUI for FaceDef {
         }
 
         let face_center_x = anchor_x + (self.common.x as f32) + 12.0;
-
         let dx = state.virtual_mouse_pos.x - face_center_x;
         let threshold = 30.0;
 
@@ -81,7 +72,9 @@ impl PropertiesUI for FaceDef {
         };
 
         let is_button_down = ui.input(|i| i.pointer.button_down(egui::PointerButton::Primary));
-        let viewport_rect: Option<egui::Rect> = ui.ctx().data(|d| d.get_temp(egui::Id::new(VIEWPORT_RECT_ID)));
+        let viewport_rect: Option<egui::Rect> = ui
+            .ctx()
+            .data(|d| d.get_temp(egui::Id::new(VIEWPORT_RECT_ID)));
         let pointer_pos = ui.input(|i| i.pointer.latest_pos());
 
         let is_ouched = if let (Some(rect), Some(pos)) = (viewport_rect, pointer_pos) {
@@ -90,7 +83,13 @@ impl PropertiesUI for FaceDef {
             false
         };
 
-        Some(PreviewContent::Image(state.get_face_sprite(is_ouched, look_dir)))
+        Some(PreviewContent::Image(
+            state.get_face_sprite(is_ouched, look_dir),
+        ))
+    }
+
+    fn has_specific_fields(&self) -> bool {
+        false
     }
 }
 
@@ -111,7 +110,6 @@ impl PropertiesUI for AnimationDef {
         let mut changed = false;
         ui.horizontal(|ui| {
             ui.heading("Frames");
-
             ui.add_space(8.0);
             ui.label(
                 egui::RichText::new(format!("{:.0} tics/sec", DOOM_TICS_PER_SEC))
@@ -157,7 +155,6 @@ impl PropertiesUI for AnimationDef {
         let mut pivot: Option<usize> = ui.data(|d| d.get_temp(pivot_id).unwrap_or_default());
 
         let mut actions = Vec::new();
-
         ui.spacing_mut().item_spacing.y = 1.0;
 
         if self.frames.is_empty() {
@@ -165,7 +162,6 @@ impl PropertiesUI for AnimationDef {
         } else {
             for (idx, frame) in self.frames.iter_mut().enumerate() {
                 let is_active = active_idx == Some(idx);
-
                 ui.push_id(idx, |ui| {
                     changed |= draw_frame_row(
                         ui,
@@ -321,7 +317,7 @@ fn draw_frame_row(
                 } else {
                     rect.bottom() + spacing_offset
                 };
-                draw_yellow_line(ui, rect, y);
+                shared::draw_yellow_line(ui, rect, y);
                 if ui.input(|i| i.pointer.any_released()) {
                     actions.push(FrameAction::MoveSelection(
                         selection.iter().cloned().collect(),
@@ -356,7 +352,7 @@ fn draw_frame_row(
                     rect.bottom() + spacing_offset
                 };
                 let mut target_idx = if top_half { idx } else { idx + 1 };
-                draw_yellow_line(ui, rect, y);
+                shared::draw_yellow_line(ui, rect, y);
 
                 if ui.input(|i| i.pointer.any_released()) {
                     for key in asset_keys.iter() {
@@ -436,64 +432,34 @@ fn draw_frame_row(
 
     if response.dragged() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-        if let Some(pointer_pos) = ui.ctx().input(|i| i.pointer.latest_pos()) {
-            let count = selection.len();
-            let label = if count > 1 {
-                format!("{} frames", count)
-            } else {
-                frame.lump.clone()
-            };
+        let count = selection.len();
+        let label = if count > 1 {
+            format!("{} frames", count)
+        } else {
+            frame.lump.clone()
+        };
 
-            egui::Area::new(egui::Id::new("frame_drag_ghost"))
-                .interactable(false)
-                .pivot(egui::Align2::CENTER_CENTER)
-                .fixed_pos(pointer_pos)
-                .order(egui::Order::Tooltip)
-                .show(ui.ctx(), |ui| {
-                    let frame_ui = egui::Frame::default()
-                        .inner_margin(6.0)
-                        .corner_radius(4.0)
-                        .fill(egui::Color32::from_black_alpha(200))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::WHITE));
-
-                    frame_ui.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 8.0;
-                            ui.allocate_ui(
-                                egui::vec2(thumbnails::THUMB_SIZE, thumbnails::THUMB_SIZE),
-                                |ui| {
-                                    thumbnails::draw_thumbnail_widget(
-                                        ui,
-                                        assets.textures.get(&frame.lump.to_uppercase()),
-                                        Some("?"),
-                                        false,
-                                    );
-                                },
-                            );
-                            ui.label(
-                                egui::RichText::new(label).strong().color(egui::Color32::WHITE),
-                            );
-                        });
-                    });
-                });
-        }
+        let lump_upper = frame.lump.to_uppercase();
+        shared::draw_drag_ghost(
+            ui.ctx(),
+            |ui| {
+                thumbnails::draw_thumbnail_widget(
+                    ui,
+                    assets.textures.get(&lump_upper),
+                    Some("?"),
+                    false,
+                );
+            },
+            &label,
+        );
     }
     changed
 }
 
-fn draw_yellow_line(ui: &egui::Ui, rect: egui::Rect, y: f32) {
-    ui.painter().line_segment(
-        [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
-        egui::Stroke::new(2.0, egui::Color32::YELLOW),
-    );
-}
-
 fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) -> bool {
     let mut changed = false;
-    let (rect, _) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), 60.0),
-        egui::Sense::hover(),
-    );
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
     ui.painter().rect_stroke(
         rect,
         4.0,
@@ -524,12 +490,12 @@ fn draw_empty_frame_dropzone(ui: &mut egui::Ui, actions: &mut Vec<FrameAction>) 
 }
 
 impl PropertiesUI for CanvasDef {
-    fn has_specific_fields(&self) -> bool { false }
-    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) -> bool { false }
-    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> { None }
+    fn has_specific_fields(&self) -> bool {
+        false
+    }
 }
 impl PropertiesUI for CarouselDef {
-    fn has_specific_fields(&self) -> bool { false }
-    fn draw_specific_fields(&mut self, _: &mut egui::Ui, _: &FontCache, _: &AssetStore, _: &PreviewState) -> bool { false }
-    fn get_preview_content(&self, _: &egui::Ui, _: &FontCache, _: &PreviewState) -> Option<PreviewContent> { None }
+    fn has_specific_fields(&self) -> bool {
+        false
+    }
 }

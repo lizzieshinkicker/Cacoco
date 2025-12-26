@@ -1,8 +1,8 @@
-use eframe::egui;
-use crate::model::{ElementWrapper, Alignment};
-use crate::assets::AssetStore;
-use crate::ui::layers::thumbnails;
 use super::lookups;
+use crate::assets::AssetStore;
+use crate::model::{Alignment, ElementWrapper};
+use crate::ui::layers::thumbnails;
+use eframe::egui;
 
 pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) -> bool {
     let mut changed = false;
@@ -21,7 +21,9 @@ pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) ->
     changed |= draw_alignment_selector(ui, &mut common.alignment);
 
     ui.add_space(4.0);
-    changed |= ui.checkbox(&mut common.translucency, "Translucent (Boom Style)").changed();
+    changed |= ui
+        .checkbox(&mut common.translucency, "Translucent (Boom Style)")
+        .changed();
 
     changed
 }
@@ -35,33 +37,47 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
 
     ui.horizontal(|ui| {
         ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 0.0);
-        egui::Grid::new("align_matrix").spacing(egui::vec2(2.0, 2.0)).min_col_width(0.0).show(ui, |ui| {
-            let mut toggle = |ui: &mut egui::Ui, target: Alignment| {
-                let (rect, response) = ui.allocate_exact_size(btn_size, egui::Sense::click());
-                if response.clicked() {
-                    *align = extras | target;
-                    changed = true;
-                }
-                let active = current_pos == target;
-                let bg_color = if active { ui.visuals().selection.bg_fill }
-                else if response.hovered() { ui.visuals().widgets.hovered.bg_fill }
-                else { egui::Color32::from_gray(30) };
-                let stroke = if active { ui.visuals().selection.stroke }
-                else { egui::Stroke::new(1.0, egui::Color32::from_gray(50)) };
-                ui.painter().rect(rect, 2.0, bg_color, stroke, egui::StrokeKind::Middle);
-            };
-            toggle(ui, Alignment::LEFT | Alignment::TOP);
-            toggle(ui, Alignment::H_CENTER | Alignment::TOP);
-            toggle(ui, Alignment::RIGHT | Alignment::TOP); ui.end_row();
-            
-            toggle(ui, Alignment::LEFT | Alignment::V_CENTER);
-            toggle(ui, Alignment::H_CENTER | Alignment::V_CENTER);
-            toggle(ui, Alignment::RIGHT | Alignment::V_CENTER); ui.end_row();
-            
-            toggle(ui, Alignment::LEFT | Alignment::BOTTOM); 
-            toggle(ui, Alignment::H_CENTER | Alignment::BOTTOM); 
-            toggle(ui, Alignment::RIGHT | Alignment::BOTTOM); ui.end_row();
-        });
+        egui::Grid::new("align_matrix")
+            .spacing(egui::vec2(2.0, 2.0))
+            .min_col_width(0.0)
+            .show(ui, |ui| {
+                let mut toggle = |ui: &mut egui::Ui, target: Alignment| {
+                    let (rect, response) = ui.allocate_exact_size(btn_size, egui::Sense::click());
+                    if response.clicked() {
+                        *align = extras | target;
+                        changed = true;
+                    }
+                    let active = current_pos == target;
+                    let bg_color = if active {
+                        ui.visuals().selection.bg_fill
+                    } else if response.hovered() {
+                        ui.visuals().widgets.hovered.bg_fill
+                    } else {
+                        egui::Color32::from_gray(30)
+                    };
+                    let stroke = if active {
+                        ui.visuals().selection.stroke
+                    } else {
+                        egui::Stroke::new(1.0, egui::Color32::from_gray(50))
+                    };
+                    ui.painter()
+                        .rect(rect, 2.0, bg_color, stroke, egui::StrokeKind::Middle);
+                };
+                toggle(ui, Alignment::LEFT | Alignment::TOP);
+                toggle(ui, Alignment::H_CENTER | Alignment::TOP);
+                toggle(ui, Alignment::RIGHT | Alignment::TOP);
+                ui.end_row();
+
+                toggle(ui, Alignment::LEFT | Alignment::V_CENTER);
+                toggle(ui, Alignment::H_CENTER | Alignment::V_CENTER);
+                toggle(ui, Alignment::RIGHT | Alignment::V_CENTER);
+                ui.end_row();
+
+                toggle(ui, Alignment::LEFT | Alignment::BOTTOM);
+                toggle(ui, Alignment::H_CENTER | Alignment::BOTTOM);
+                toggle(ui, Alignment::RIGHT | Alignment::BOTTOM);
+                ui.end_row();
+            });
         ui.add_space(8.0);
         ui.vertical(|ui| {
             let mut dyn_left = align.contains(Alignment::DYNAMIC_LEFT);
@@ -79,7 +95,12 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
     changed
 }
 
-pub(super) fn paint_thumb_content(ui: &mut egui::Ui, rect: egui::Rect, tex: Option<&egui::TextureHandle>, fallback_text: Option<&str>) {
+pub(super) fn paint_thumb_content(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    tex: Option<&egui::TextureHandle>,
+    fallback_text: Option<&str>,
+) {
     let content_size = rect.width().min(rect.height()) - 4.0;
     if let Some(t) = tex {
         let sz = t.size_vec2();
@@ -87,27 +108,49 @@ pub(super) fn paint_thumb_content(ui: &mut egui::Ui, rect: egui::Rect, tex: Opti
             let scale = (content_size / sz.x).min(content_size / sz.y).min(4.0);
             let final_size = sz * if scale >= 1.0 { scale.floor() } else { scale };
             let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
-            ui.painter().image(t.id(), draw_rect, egui::Rect::from_min_max(egui::pos2(0.0,0.0), egui::pos2(1.0,1.0)), egui::Color32::WHITE);
+            ui.painter().image(
+                t.id(),
+                draw_rect,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                egui::Color32::WHITE,
+            );
         }
     } else if let Some(text) = fallback_text {
-        ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, egui::FontId::proportional(14.0), egui::Color32::from_gray(160));
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            text,
+            egui::FontId::proportional(14.0),
+            egui::Color32::from_gray(160),
+        );
     }
 }
 
-pub fn draw_root_statusbar_fields(ui: &mut egui::Ui, bar: &mut crate::model::StatusBarLayout) -> bool {
+pub fn draw_root_statusbar_fields(
+    ui: &mut egui::Ui,
+    bar: &mut crate::model::StatusBarLayout,
+) -> bool {
     let mut changed = false;
     ui.label(egui::RichText::new("Main Settings").strong());
 
     ui.horizontal(|ui| {
         ui.add_space(2.0);
         ui.label("Bar Height:");
-        changed |= ui.add(egui::DragValue::new(&mut bar.height).range(0..=200).speed(1)).changed();
+        changed |= ui
+            .add(
+                egui::DragValue::new(&mut bar.height)
+                    .range(0..=200)
+                    .speed(1),
+            )
+            .changed();
         ui.add_space(2.0);
     });
 
     ui.horizontal(|ui| {
         ui.add_space(2.0);
-        changed |= ui.checkbox(&mut bar.fullscreen_render, "Fullscreen Render").changed();
+        changed |= ui
+            .checkbox(&mut bar.fullscreen_render, "Fullscreen Render")
+            .changed();
         ui.add_space(2.0);
     });
 
@@ -122,7 +165,7 @@ pub fn draw_root_statusbar_fields(ui: &mut egui::Ui, bar: &mut crate::model::Sta
         let mut flat_name = bar.fill_flat.clone().unwrap_or_default();
         let edit_res = ui.add_sized(
             [ui.available_width() - 4.0, 20.0],
-            egui::TextEdit::singleline(&mut flat_name)
+            egui::TextEdit::singleline(&mut flat_name),
         );
 
         if edit_res.changed() {
@@ -176,10 +219,14 @@ pub fn draw_lookup_param_dd(
     salt: &str,
     param: &mut i32,
     items: &[lookups::LookupItem],
-    _assets: &AssetStore
+    _assets: &AssetStore,
 ) -> bool {
     let mut changed = false;
-    let current_name = items.iter().find(|i| i.id == *param).map(|i| i.name).unwrap_or("Unknown");
+    let current_name = items
+        .iter()
+        .find(|i| i.id == *param)
+        .map(|i| i.name)
+        .unwrap_or("Unknown");
 
     egui::ComboBox::from_id_salt(salt)
         .selected_text(current_name)

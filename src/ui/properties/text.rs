@@ -1,12 +1,12 @@
-use crate::assets::AssetStore;
-use crate::model::{ComponentDef, ComponentType, ElementWrapper, NumberDef, NumberType, Element};
-use crate::state::PreviewState;
-use eframe::egui;
-use super::editor::PropertiesUI;
-use super::preview::PreviewContent;
 use super::FontCache;
 use super::common;
+use super::editor::PropertiesUI;
 use super::lookups;
+use super::preview::PreviewContent;
+use crate::assets::AssetStore;
+use crate::model::{ComponentDef, ComponentType, Element, ElementWrapper, NumberDef, NumberType};
+use crate::state::PreviewState;
+use eframe::egui;
 
 const HEADER_MENU_KEY: &str = "cacoco_prop_header_menu_id";
 
@@ -46,13 +46,25 @@ impl PropertiesUI for NumberDef {
             NumberType::Ammo | NumberType::MaxAmmo => {
                 ui.horizontal(|ui| {
                     ui.label("Ammo Type:");
-                    changed |= common::draw_lookup_param_dd(ui, "num_param_ammo", &mut self.param, lookups::AMMO_TYPES, assets);
+                    changed |= common::draw_lookup_param_dd(
+                        ui,
+                        "num_param_ammo",
+                        &mut self.param,
+                        lookups::AMMO_TYPES,
+                        assets,
+                    );
                 });
             }
             NumberType::AmmoWeapon | NumberType::MaxAmmoWeapon => {
                 ui.horizontal(|ui| {
                     ui.label("Weapon Source:");
-                    changed |= common::draw_lookup_param_dd(ui, "num_param_weapon", &mut self.param, lookups::WEAPONS, assets);
+                    changed |= common::draw_lookup_param_dd(
+                        ui,
+                        "num_param_weapon",
+                        &mut self.param,
+                        lookups::WEAPONS,
+                        assets,
+                    );
                 });
             }
             _ => {}
@@ -60,7 +72,9 @@ impl PropertiesUI for NumberDef {
 
         ui.horizontal(|ui| {
             ui.label("Max Length:");
-            changed |= ui.add(egui::DragValue::new(&mut self.maxlength).range(0..=9)).changed();
+            changed |= ui
+                .add(egui::DragValue::new(&mut self.maxlength).range(0..=9))
+                .changed();
         });
 
         changed
@@ -199,7 +213,10 @@ pub fn draw_interactive_header(
         })
         .response;
 
-    let is_interactive = matches!(element.data, Element::Number(_) | Element::Percent(_) | Element::Component(_));
+    let is_interactive = matches!(
+        element.data,
+        Element::Number(_) | Element::Percent(_) | Element::Component(_)
+    );
 
     if is_interactive {
         let interact = ui.interact(response.rect, response.id, egui::Sense::click());
@@ -231,9 +248,24 @@ pub fn draw_interactive_header(
                         ui.set_max_width(200.0);
                         let mut close = false;
                         match &mut element.data {
-                            Element::Number(n) => if draw_number_options(ui, &mut n.type_, &mut n.param) { close = true; changed = true; },
-                            Element::Percent(p) => if draw_number_options(ui, &mut p.type_, &mut p.param) { close = true; changed = true; },
-                            Element::Component(c) => if draw_component_options(ui, &mut c.type_) { close = true; changed = true; },
+                            Element::Number(n) => {
+                                if draw_number_options(ui, &mut n.type_, &mut n.param) {
+                                    close = true;
+                                    changed = true;
+                                }
+                            }
+                            Element::Percent(p) => {
+                                if draw_number_options(ui, &mut p.type_, &mut p.param) {
+                                    close = true;
+                                    changed = true;
+                                }
+                            }
+                            Element::Component(c) => {
+                                if draw_component_options(ui, &mut c.type_) {
+                                    close = true;
+                                    changed = true;
+                                }
+                            }
                             _ => {}
                         }
                         if close {
@@ -242,7 +274,9 @@ pub fn draw_interactive_header(
                     });
                 })
                 .response;
-            if ui.input(|i| i.pointer.any_click()) && !area_response.hovered() && !response.hovered()
+            if ui.input(|i| i.pointer.any_click())
+                && !area_response.hovered()
+                && !response.hovered()
             {
                 ui.data_mut(|d| d.remove::<egui::Id>(egui::Id::new(HEADER_MENU_KEY)));
             }
@@ -299,8 +333,10 @@ fn component_type_name(t: ComponentType) -> String {
 }
 
 fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(ui.available_width().max(100.0), 24.0), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width().max(100.0), 24.0),
+        egui::Sense::click(),
+    );
     if response.hovered() || selected {
         ui.painter().rect_filled(
             rect,
@@ -345,7 +381,9 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
     ui.add_space(4.0);
     if custom_menu_item(ui, "Ammo (by Type)", *type_ == NumberType::Ammo) {
         *type_ = NumberType::Ammo;
-        if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) { *param = 0; }
+        if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) {
+            *param = 0;
+        }
         changed = true;
     }
     if custom_menu_item(ui, "Selected Ammo", *type_ == NumberType::AmmoSelected) {
@@ -354,7 +392,9 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
     }
     if custom_menu_item(ui, "Max Ammo (by Type)", *type_ == NumberType::MaxAmmo) {
         *type_ = NumberType::MaxAmmo;
-        if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) { *param = 0; }
+        if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) {
+            *param = 0;
+        }
         changed = true;
     }
     ui.add_space(4.0);
@@ -362,12 +402,20 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
     ui.add_space(4.0);
     if custom_menu_item(ui, "Ammo (by Weapon)", *type_ == NumberType::AmmoWeapon) {
         *type_ = NumberType::AmmoWeapon;
-        if !lookups::WEAPONS.iter().any(|i| i.id == *param) { *param = 101; }
+        if !lookups::WEAPONS.iter().any(|i| i.id == *param) {
+            *param = 101;
+        }
         changed = true;
     }
-    if custom_menu_item(ui, "Max Ammo (by Weapon)", *type_ == NumberType::MaxAmmoWeapon) {
+    if custom_menu_item(
+        ui,
+        "Max Ammo (by Weapon)",
+        *type_ == NumberType::MaxAmmoWeapon,
+    ) {
         *type_ = NumberType::MaxAmmoWeapon;
-        if !lookups::WEAPONS.iter().any(|i| i.id == *param) { *param = 101; }
+        if !lookups::WEAPONS.iter().any(|i| i.id == *param) {
+            *param = 101;
+        }
         changed = true;
     }
     changed

@@ -1,7 +1,6 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
-use crate::document;
-use crate::ui;
 use crate::ui::font_wizard;
+use crate::{document, ui};
 use eframe::egui;
 use std::path::Path;
 
@@ -72,11 +71,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 app.new_project(ctx);
             }
             ui::MenuAction::Open => {
-                if let Some(path) = crate::io::open_project_dialog() {
-                    if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                        app.load_project(ctx, loaded, &path);
-                    }
-                }
+                app.open_project_ui(ctx);
             }
             ui::MenuAction::RequestDiscard(pending) => {
                 app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
@@ -93,7 +88,8 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             }
             ui::MenuAction::ExportDone(path) => {
                 app.add_to_recent(&path);
-                app.preview_state.push_message(format!("Exported: {}", path));
+                app.preview_state
+                    .push_message(format!("Exported: {}", path));
             }
             ui::MenuAction::PickPortAndRun => {
                 handle_pick_port_and_run(app);
@@ -154,16 +150,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 app.dirty = true;
             }
 
-            if let Some(f) = &mut app.current_file {
-                for action in actions {
-                    app.dirty = true;
-                    if matches!(action, document::LayerAction::UndoSnapshot) {
-                        app.history.take_snapshot(f, &app.selection);
-                    } else {
-                        document::execute_layer_action(f, action, &mut app.selection);
-                    }
-                }
-            }
+            app.execute_actions(actions);
         });
 
     egui::TopBottomPanel::bottom("gamestate_panel")
@@ -183,20 +170,16 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             app.current_statusbar_idx,
         );
 
-        if let Some(f) = &mut app.current_file {
-            for action in actions {
-                app.dirty = true;
-                if matches!(action, document::LayerAction::UndoSnapshot) {
-                    app.history.take_snapshot(f, &app.selection);
-                } else {
-                    document::execute_layer_action(f, action, &mut app.selection);
-                }
-            }
-        }
+        app.execute_actions(actions);
     });
 
     if app.settings_open {
-        ui::draw_settings_window(ctx, &mut app.settings_open, &mut app.config, &mut app.assets);
+        ui::draw_settings_window(
+            ctx,
+            &mut app.settings_open,
+            &mut app.config,
+            &mut app.assets,
+        );
     }
 
     if let Some(f) = &mut app.current_file {
@@ -290,7 +273,11 @@ fn handle_pick_port_and_run(app: &mut CacocoApp) {
     }
 }
 
-fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &ConfirmationRequest) {
+fn draw_confirmation_modal(
+    ctx: &egui::Context,
+    app: &mut CacocoApp,
+    request: &ConfirmationRequest,
+) {
     let mut close_modal = false;
     let mut confirmed = false;
 
@@ -384,23 +371,18 @@ fn draw_confirmation_modal(ctx: &egui::Context, app: &mut CacocoApp, request: &C
                     app.assets.offsets.remove(key);
                 }
                 app.dirty = true;
-                app.preview_state.push_message("Deleted assets from project.");
+                app.preview_state
+                    .push_message("Deleted assets from project.");
             }
             ConfirmationRequest::DiscardChanges(pending) => {
                 app.dirty = false;
                 match pending {
                     PendingAction::New => app.new_project(ctx),
                     PendingAction::Load(path) => {
-                        let final_path = if path.is_empty() {
-                            crate::io::open_project_dialog()
-                        } else {
-                            Some(path.clone())
-                        };
-
-                        if let Some(p) = final_path {
-                            if let Some(loaded) = crate::io::load_project_from_path(ctx, &p) {
-                                app.load_project(ctx, loaded, &p);
-                            }
+                        if path.is_empty() {
+                            app.open_project_ui(ctx);
+                        } else if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
+                            app.load_project(ctx, loaded, &path);
                         }
                     }
                     PendingAction::Template(t) => app.apply_template(ctx, t),
@@ -436,22 +418,24 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Open => {
             if app.dirty {
-                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(PendingAction::Load("".to_string())));
-            } else if let Some(path) = crate::io::open_project_dialog() {
-                if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                    app.load_project(ctx, loaded, &path);
-                }
+                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(
+                    PendingAction::Load("".to_string()),
+                ));
+            } else {
+                app.open_project_ui(ctx);
             }
         }
         Action::Save => {
             if let Some(f) = &app.current_file {
                 let needs_dialog = match &app.opened_file_path {
-                    Some(p) => !std::path::Path::new(p).is_absolute(),
+                    Some(p) => !Path::new(p).is_absolute(),
                     None => true,
                 };
 
                 if needs_dialog {
-                    if let Some(path) = crate::io::save_pk3_dialog(f, &app.assets, app.opened_file_path.clone()) {
+                    if let Some(path) =
+                        crate::io::save_pk3_dialog(f, &app.assets, app.opened_file_path.clone())
+                    {
                         app.opened_file_path = Some(path.clone());
                         app.add_to_recent(&path);
                         app.dirty = false;
@@ -460,7 +444,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 } else {
                     let path = app.opened_file_path.as_ref().unwrap();
                     if let Err(e) = crate::io::save_pk3_silent(f, &app.assets, path) {
-                        app.preview_state.push_message(format!("Save Failed: {}", e));
+                        app.preview_state
+                            .push_message(format!("Save Failed: {}", e));
                     } else {
                         app.dirty = false;
                         app.preview_state.push_message(format!("Saved: {}", path));
@@ -473,7 +458,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 let name = app.opened_file_path.clone();
                 if let Some(path) = crate::io::save_json_dialog(f, name) {
                     app.add_to_recent(&path);
-                    app.preview_state.push_message(format!("Exported: {}", path));
+                    app.preview_state
+                        .push_message(format!("Exported: {}", path));
                 }
             }
         }
@@ -515,7 +501,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         app.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
                     }
 
-                    let (parent_path, insert_idx) = crate::document::determine_insertion_point(
+                    let (parent_path, insert_idx) = document::determine_insertion_point(
                         &app.selection,
                         app.current_statusbar_idx,
                     );

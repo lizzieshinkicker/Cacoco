@@ -4,6 +4,7 @@ use crate::document::LayerAction;
 use crate::model::{Element, ElementWrapper, GraphicDef, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
+use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -187,7 +188,15 @@ fn draw_layer_row(
     );
 
     if response.dragged() {
-        render_drag_ghost(ui, element, assets, file, state, is_visible, selection.len());
+        render_drag_ghost(
+            ui,
+            element,
+            assets,
+            file,
+            state,
+            is_visible,
+            selection.len(),
+        );
     }
 
     response
@@ -251,7 +260,7 @@ fn handle_drop_logic(
             if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container) {
                 match target {
                     DropTarget::Sibling(insert_idx, line_y) => {
-                        draw_yellow_line(ui, rect, line_y);
+                        shared::draw_yellow_line(ui, rect, line_y);
                         if ui.input(|i| i.pointer.any_released()) {
                             actions.push(LayerAction::UndoSnapshot);
                             actions.push(LayerAction::MoveSelection {
@@ -289,7 +298,7 @@ fn handle_drop_logic(
             if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container) {
                 match target {
                     DropTarget::Sibling(mut insert_idx, line_y) => {
-                        draw_yellow_line(ui, rect, line_y);
+                        shared::draw_yellow_line(ui, rect, line_y);
                         if ui.input(|i| i.pointer.any_released()) {
                             actions.push(LayerAction::UndoSnapshot);
                             for key in asset_keys.iter() {
@@ -390,7 +399,11 @@ fn render_row_contents(
     let res = if element._cacoco_text.is_some() {
         thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some("T"), !is_visible)
     } else if matches!(element.data, Element::Canvas(_)) {
-        let icon = if folder_state.is_open() { "📂" } else { "📁" };
+        let icon = if folder_state.is_open() {
+            "📂"
+        } else {
+            "📁"
+        };
         thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some(icon), !is_visible)
     } else {
         thumbnails::draw_thumbnail(
@@ -492,7 +505,7 @@ fn render_drag_ghost(
         element.display_name()
     };
 
-    crate::ui::shared::draw_drag_ghost(
+    shared::draw_drag_ghost(
         ui.ctx(),
         |ui| {
             if element._cacoco_text.is_some() {
@@ -580,11 +593,4 @@ fn calculate_drop_target(
             Some(DropTarget::Child)
         }
     }
-}
-
-fn draw_yellow_line(ui: &mut egui::Ui, rect: egui::Rect, y: f32) {
-    ui.painter().line_segment(
-        [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
-        egui::Stroke::new(2.0, egui::Color32::YELLOW),
-    );
 }
