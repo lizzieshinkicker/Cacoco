@@ -21,8 +21,6 @@ pub struct HotkeyRegistry {
     pub save: KeyboardShortcut,
     pub open: KeyboardShortcut,
     pub export_json: KeyboardShortcut,
-    pub copy: KeyboardShortcut,
-    pub paste: KeyboardShortcut,
     pub duplicate: KeyboardShortcut,
     pub delete: KeyboardShortcut,
 }
@@ -34,12 +32,10 @@ impl Default for HotkeyRegistry {
         Self {
             undo: KeyboardShortcut::new(cmd, Key::Z),
             redo: KeyboardShortcut::new(cmd | Modifiers::SHIFT, Key::Z),
-            redo_alt: KeyboardShortcut::new(cmd, Key::Y), // Standard alternative for Redo
+            redo_alt: KeyboardShortcut::new(cmd, Key::Y),
             save: KeyboardShortcut::new(cmd, Key::S),
             open: KeyboardShortcut::new(cmd, Key::O),
             export_json: KeyboardShortcut::new(cmd, Key::E),
-            copy: KeyboardShortcut::new(cmd, Key::C),
-            paste: KeyboardShortcut::new(cmd, Key::V),
             duplicate: KeyboardShortcut::new(cmd, Key::J),
             delete: KeyboardShortcut::new(Modifiers::NONE, Key::Delete),
         }
@@ -69,14 +65,15 @@ impl HotkeyRegistry {
             return Some(Action::Undo);
         }
 
-        let has_paste_event =
-            ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_))));
-        if has_paste_event || ctx.input_mut(|i| i.consume_shortcut(&self.paste)) {
+        let is_paste = ctx.input(|i| i.key_pressed(Key::V) && i.modifiers.command);
+        if is_paste {
+            ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::V));
             return Some(Action::Paste);
         }
 
-        let has_copy_event = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
-        if has_copy_event || ctx.input_mut(|i| i.consume_shortcut(&self.copy)) {
+        let is_copy = ctx.input(|i| i.key_pressed(Key::C) && i.modifiers.command);
+        if is_copy {
+            ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::C));
             return Some(Action::Copy);
         }
 

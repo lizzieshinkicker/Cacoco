@@ -37,6 +37,7 @@ pub enum LayerAction {
     },
     DeleteStatusBar(usize),
     PasteStatusBars(Vec<StatusBarLayout>),
+    GroupSelection(Vec<Vec<usize>>),
 }
 
 pub fn execute_layer_action(
@@ -131,14 +132,7 @@ pub fn execute_layer_action(
             insert_idx,
             element,
         } => {
-            if let Some(list) = get_child_list_mut(file, &parent_path) {
-                let actual_idx = insert_idx.min(list.len());
-                list.insert(actual_idx, element);
-                selection.clear();
-                let mut new_sel_path = parent_path;
-                new_sel_path.push(actual_idx);
-                selection.insert(new_sel_path);
-            }
+            insert_element_and_select(file, parent_path, insert_idx, element, selection);
         }
         LayerAction::Paste {
             parent_path,
@@ -208,6 +202,51 @@ pub fn execute_layer_action(
                 selection.insert(vec![file.data.status_bars.len() - 1]);
             }
         }
+        LayerAction::GroupSelection(paths) => {
+            let filtered_sources = filter_to_roots(paths);
+            if filtered_sources.is_empty() {
+                return;
+            }
+
+            let mut sorted_for_pos = filtered_sources.clone();
+            sorted_for_pos.sort();
+
+            let first_path = &sorted_for_pos[0];
+            if first_path.len() < 2 {
+                return;
+            }
+
+            let target_parent = first_path[..first_path.len() - 1].to_vec();
+            let mut insert_idx = first_path[first_path.len() - 1];
+
+            let mut to_remove = filtered_sources.clone();
+            sort_paths_for_removal(&mut to_remove);
+
+            let mut moved_elements = Vec::new();
+            for src in to_remove {
+                let src_parent = &src[0..src.len() - 1];
+                let src_idx = *src.last().unwrap();
+                if src_parent == target_parent && src_idx < insert_idx {
+                    insert_idx -= 1;
+                }
+                if let Some((list, idx)) = get_parent_list_and_idx(file, &src) {
+                    moved_elements.push(list.remove(idx));
+                }
+            }
+
+            moved_elements.reverse();
+            let new_canvas = ElementWrapper {
+                data: crate::model::Element::Canvas(crate::model::CanvasDef {
+                    common: crate::model::CommonAttrs {
+                        children: moved_elements,
+                        ..Default::default()
+                    },
+                }),
+                ..Default::default()
+            };
+
+            insert_element_and_select(file, target_parent, insert_idx, new_canvas, selection);
+        }
     }
 }
 
@@ -218,17 +257,7 @@ fn execute_move_selection(
     mut insert_idx: usize,
     selection: &mut HashSet<Vec<usize>>,
 ) {
-    let mut roots = sources.clone();
-    roots.sort_by_key(|p| p.len());
-    let mut filtered_sources = Vec::new();
-    for p in roots {
-        if !filtered_sources
-            .iter()
-            .any(|f: &Vec<usize>| p.starts_with(f))
-        {
-            filtered_sources.push(p);
-        }
-    }
+    let filtered_sources = filter_to_roots(sources);
 
     for src in &filtered_sources {
         if target_parent.starts_with(src) {
@@ -337,4 +366,36 @@ fn get_parent_list_and_idx<'a>(
     let parent_path = &path[0..path.len() - 1];
     let target_idx = *path.last().unwrap();
     get_child_list_mut(file, parent_path).map(|list| (list, target_idx))
+}
+
+/// Filters a list of paths to only include the "roots", effectively ignoring children
+/// if their parent is already in the list.
+fn filter_to_roots(paths: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
+    let mut roots = paths;
+    roots.sort_by_key(|p| p.len());
+    let mut filtered = Vec::new();
+    for p in roots {
+        if !filtered.iter().any(|f: &Vec<usize>| p.starts_with(f)) {
+            filtered.push(p);
+        }
+    }
+    filtered
+}
+
+/// Helper to insert a single element into the document and update the selection to point to it.
+fn insert_element_and_select(
+    file: &mut SBarDefFile,
+    parent_path: Vec<usize>,
+    insert_idx: usize,
+    element: ElementWrapper,
+    selection: &mut HashSet<Vec<usize>>,
+) {
+    if let Some(list) = get_child_list_mut(file, &parent_path) {
+        let actual_idx = insert_idx.min(list.len());
+        list.insert(actual_idx, element);
+        selection.clear();
+        let mut new_path = parent_path;
+        new_path.push(actual_idx);
+        selection.insert(new_path);
+    }
 }

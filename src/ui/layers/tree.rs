@@ -469,6 +469,16 @@ fn handle_context_menu(
             selection.insert(my_path.to_vec());
         }
         ContextMenu::show(ui, menu, just_opened, |ui| {
+            let can_group = !selection.is_empty() && selection.iter().all(|p| p.len() >= 2);
+            if ContextMenu::button(ui, "Group in New Canvas", can_group) {
+                actions.push(LayerAction::UndoSnapshot);
+                actions.push(LayerAction::GroupSelection(
+                    selection.iter().cloned().collect(),
+                ));
+                ContextMenu::close(ui);
+            }
+            ui.separator();
+
             if ContextMenu::button(ui, "Duplicate", true) {
                 actions.push(LayerAction::UndoSnapshot);
                 actions.push(LayerAction::DuplicateSelection(
@@ -617,7 +627,6 @@ pub fn deletion_needs_confirmation(file: &SBarDefFile, selection: &HashSet<Vec<u
         if path.len() < 2 {
             continue;
         }
-
         if let Some(el) = file.get_element(path) {
             if !el.children().is_empty() {
                 return true;
