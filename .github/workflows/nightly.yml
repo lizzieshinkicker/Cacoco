@@ -114,6 +114,7 @@ jobs:
         LD_BIN: ${{ steps.install-linuxdeploy.outputs.linuxdeploy }}
         LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|${{ env.ARTIFACT_NAME }}.zsync"
         LDAI_VERSION: "${{ steps.version.outputs.version }}"
+        LDAI_OUTPUT: ${{ env.ARTIFACT_NAME }}
       run: |
         "$LD_BIN" --output appimage \
                   --executable target/x86_64-unknown-linux-gnu/release/cacoco \
@@ -124,8 +125,8 @@ jobs:
     - name: Rename binary
       run: |
         mkdir -p dist
-        mv Cacoco-*-x86_64.AppImage "dist/${ARTIFACT_NAME}"
-        mv Cacoco-*-x86_64.AppImage.zsync "dist/${ARTIFACT_NAME}.zsync"
+        mv "${ARTIFACT_NAME}" "dist/${ARTIFACT_NAME}"
+        mv "${ARTIFACT_NAME}.zsync" "dist/${ARTIFACT_NAME}.zsync"
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
