@@ -1,8 +1,6 @@
 use crate::assets::AssetStore;
 use crate::constants::{DOOM_TICS_PER_SEC, DOOM_W, DOOM_W_WIDE};
-use crate::model::{
-    Alignment, AnimationDef, CanvasDef, CarouselDef, FaceDef, FrameDef, GraphicDef,
-};
+use crate::model::{AnimationDef, CanvasDef, CarouselDef, FaceDef, FrameDef, GraphicDef};
 use crate::state::PreviewState;
 use crate::ui::layers::thumbnails;
 use crate::ui::shared::{self, VIEWPORT_RECT_ID};
@@ -52,12 +50,8 @@ impl PropertiesUI for FaceDef {
             DOOM_W
         };
 
-        let mut anchor_x = 0.0;
-        if self.common.alignment.contains(Alignment::RIGHT) {
-            anchor_x = screen_w;
-        } else if self.common.alignment.contains(Alignment::H_CENTER) {
-            anchor_x = screen_w / 2.0;
-        }
+        let anchor_x =
+            -crate::render::get_alignment_anchor_offset(self.common.alignment, screen_w, 0.0).x;
 
         let face_center_x = anchor_x + (self.common.x as f32) + 12.0;
         let dx = state.virtual_mouse_pos.x - face_center_x;
