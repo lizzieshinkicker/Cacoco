@@ -7,6 +7,8 @@ permissions:
 on:
   schedule:
     - cron: '0 3 * * *'
+  release:
+    types: [published]
   workflow_dispatch:
 
 env:
@@ -15,6 +17,7 @@ env:
 jobs:
   activity-check:
     name: Check for repo activity
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     outputs:
       nightly-outdated: ${{ steps.check.outputs.nightly-outdated }}
@@ -37,10 +40,35 @@ jobs:
             echo "nightly-outdated=true" >> "$GITHUB_OUTPUT"
           fi
 
+  version:
+    name: Get version name
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      appimage-version: ${{ steps.version.outputs.appimage-version }}
+      appimage-release-tag: ${{ steps.version.outputs.release-tag }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Read version name from git
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" != "release" ]]; then
+          SHORT_HASH=$(git rev-parse --short ${{ github.sha }})
+          echo "version=nightly" >> "$GITHUB_OUTPUT"
+          echo "appimage-version=nightly-$SHORT_HASH" >> "$GITHUB_OUTPUT"
+          echo "release-tag=nightly" >> "$GITHUB_OUTPUT"
+        else
+          echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          echo "appimage-version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          echo "release-tag=latest" >> "$GITHUB_OUTPUT"
+        fi
 
   build-windows:
     name: Build (Windows)
+    needs: version
     runs-on: windows-latest
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
     steps:
     - uses: actions/checkout@v6
     - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
@@ -51,15 +79,17 @@ jobs:
     - name: Rename binary
       run: |
         mkdir -p dist
-        mv target/x86_64-pc-windows-msvc/release/cacoco.exe dist/cacoco-nightly-windows.exe
+        mv target/x86_64-pc-windows-msvc/release/cacoco.exe dist/cacoco-${{ env.version}}-windows.exe
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
-        name: windows-nightly
+        name: windows-${{ env.RELEASE_VERSION }}
         path: dist/*
 
   build-mac:
     name: Build (macOS)
+    # macOS binaries aren't really ready for real releases yet
+    if: github.event_name != 'release'
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v6
@@ -87,9 +117,13 @@ jobs:
 
   build-linux:
     name: Build (Linux)
+    needs: version
     runs-on: ubuntu-latest
     env:
-      ARTIFACT_NAME: cacoco-nightly-linux-x86_64.AppImage
+      APPIMAGE_VERSION: ${{ needs.version.outputs.appimage-version }}
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      ARTIFACT_NAME: cacoco-${{ needs.version.outputs.version }}-linux-x86_64.AppImage
+      UPDATE_TAG: ${{ needs.version.outputs.appimage-release-tag }}
     steps:
     - uses: actions/checkout@v6
     - name: Build release binary (Debian Bullseye)
@@ -104,16 +138,11 @@ jobs:
       uses: miurahr/install-linuxdeploy-action@v1.8.0
       with:
         plugins: appimage
-    - name: Create version name file
-      id: version
-      run: |
-        SHORT_HASH=$(git rev-parse --short ${{ github.sha }})
-        echo "version=nightly-$SHORT_HASH" >> "$GITHUB_OUTPUT"
     - name: Create AppImage
       env:
         LD_BIN: ${{ steps.install-linuxdeploy.outputs.linuxdeploy }}
-        LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|nightly|${{ env.ARTIFACT_NAME }}.zsync"
-        LDAI_VERSION: "${{ steps.version.outputs.version }}"
+        LDAI_UPDATE_INFORMATION: "gh-releases-zsync|${{ github.repository_owner }}|Cacoco|${{ env.UPDATE_TAG }}|${{ env.ARTIFACT_NAME }}.zsync"
+        LDAI_VERSION: ${{ env.APPIMAGE_VERSION }}
         LDAI_OUTPUT: ${{ env.ARTIFACT_NAME }}
       run: |
         "$LD_BIN" --output appimage \
@@ -130,13 +159,13 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
-        name: linux-nightly
+        name: linux-${{ env.RELEASE_VERSION }}
         path: dist/*
 
   release-nightly:
     name: Create nightly release
     needs: [ build-windows, build-mac, build-linux, activity-check ]
-    if: needs.activity-check.outputs.nightly-outdated == 'true' || github.event_name != 'schedule'
+    if: github.event_name != 'release' && (needs.activity-check.outputs.nightly-outdated == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
@@ -174,5 +203,20 @@ jobs:
         overwrite_files: true
         generate_release_notes: true
         body: ""
+        files: |
+          artifacts/**/*
+
+  release:
+    name: Upload assets to release
+    needs: [ build-windows, build-linux ]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v7
+      with:
+        path: artifacts
+    - name: Upload artifacts to release
+      uses: softprops/action-gh-release@v2.5.0
+      with:
         files: |
           artifacts/**/*
