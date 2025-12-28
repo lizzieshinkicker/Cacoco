@@ -90,7 +90,10 @@ jobs:
     name: Build (macOS)
     # macOS binaries aren't really ready for real releases yet
     if: github.event_name != 'release'
+    needs: version
     runs-on: macos-latest
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
     steps:
     - uses: actions/checkout@v6
     - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
@@ -108,11 +111,11 @@ jobs:
         lipo -create \
           target/aarch64-apple-darwin/release/cacoco \
           target/x86_64-apple-darwin/release/cacoco \
-          -output dist/cacoco-nightly-mac
+          -output dist/cacoco-${{ env.RELEASE_VERSION }}-mac
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
-        name: nightly-macos
+        name: macos-${{ env.RELEASE_VERSION }}
         path: dist/*
 
   build-linux:
@@ -165,7 +168,7 @@ jobs:
   release-nightly:
     name: Create nightly release
     needs: [ build-windows, build-mac, build-linux, activity-check ]
-    if: github.event_name != 'release' && (needs.activity-check.outputs.nightly-outdated == 'true' || github.event_name == 'workflow_dispatch')
+    if: github.event_name != 'release' && (github.event_name == 'workflow_dispatch' || needs.activity-check.outputs.nightly-outdated == 'true')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
