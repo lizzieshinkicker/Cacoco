@@ -16,6 +16,15 @@ fn default_version() -> String {
     "1.0.0".to_string()
 }
 
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
     pub struct Alignment: u32 {
@@ -191,7 +200,7 @@ pub struct StatusBarLayout {
     pub fullscreen_render: bool,
     #[serde(rename = "fillflat")]
     pub fill_flat: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub children: Vec<ElementWrapper>,
 }
 
@@ -282,9 +291,9 @@ pub struct CommonAttrs {
     pub translation: Option<String>,
     #[serde(default)]
     pub translucency: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "deserialize_null_default")]
     pub conditions: Vec<ConditionDef>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "deserialize_null_default")]
     pub children: Vec<ElementWrapper>,
 }
 
