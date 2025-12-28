@@ -1,7 +1,7 @@
 use super::common::{self, paint_thumb_content};
 use super::lookups;
 use crate::assets::AssetStore;
-use crate::model::{ConditionDef, ConditionType, ElementWrapper};
+use crate::model::{ConditionDef, ConditionType, Element, ElementWrapper, NumberType};
 use eframe::egui;
 
 pub fn draw_conditions_editor(
@@ -11,14 +11,37 @@ pub fn draw_conditions_editor(
     state: &crate::state::PreviewState,
 ) -> bool {
     let mut changed = false;
+    let is_ammo_selected = is_ammo_selected_type(element);
+
     let common = element.get_common_mut();
     ui.add_space(12.0);
+
+    if is_ammo_selected {
+        let has_safety = common
+            .conditions
+            .iter()
+            .any(|c| c.condition == ConditionType::SelectedWeaponHasAmmo);
+        if !has_safety {
+            common.conditions.insert(
+                0,
+                ConditionDef {
+                    condition: ConditionType::SelectedWeaponHasAmmo,
+                    param: 0,
+                    param2: 0,
+                },
+            );
+            changed = true;
+        }
+    }
 
     ui.horizontal(|ui| {
         ui.heading(format!("Conditions ({})", common.conditions.len()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if !common.conditions.is_empty() {
-                if ui.button("Clear").clicked() {
+                if ui
+                    .add_enabled(!is_ammo_selected, egui::Button::new("Clear"))
+                    .clicked()
+                {
                     common.conditions.clear();
                     changed = true;
                 }
@@ -39,7 +62,9 @@ pub fn draw_conditions_editor(
     for (i, cond) in common.conditions.iter_mut().enumerate() {
         let id = ui.make_persistent_id(format!("cond_card_{}", i));
         ui.push_id(id, |ui| {
-            changed |= draw_condition_card(ui, cond, assets, &mut remove_idx, i, state);
+            let can_remove =
+                !(is_ammo_selected && cond.condition == ConditionType::SelectedWeaponHasAmmo);
+            changed |= draw_condition_card(ui, cond, assets, &mut remove_idx, i, state, can_remove);
         });
         ui.add_space(4.0);
     }
@@ -52,6 +77,13 @@ pub fn draw_conditions_editor(
     changed
 }
 
+fn is_ammo_selected_type(el: &ElementWrapper) -> bool {
+    match &el.data {
+        Element::Number(n) | Element::Percent(n) => n.type_ == NumberType::AmmoSelected,
+        _ => false,
+    }
+}
+
 fn draw_condition_card(
     ui: &mut egui::Ui,
     cond: &mut ConditionDef,
@@ -59,6 +91,7 @@ fn draw_condition_card(
     remove_idx: &mut Option<usize>,
     my_idx: usize,
     state: &crate::state::PreviewState,
+    can_remove: bool,
 ) -> bool {
     let mut changed = false;
     let is_true = crate::conditions::resolve(&[cond.clone()], state);
@@ -79,7 +112,9 @@ fn draw_condition_card(
                     ui.allocate_exact_size(egui::vec2(box_size, box_size), egui::Sense::hover());
                 ui.painter()
                     .rect_filled(rect, 4.0, egui::Color32::from_gray(45));
-                let tex = master_icon_name.and_then(|n| assets.textures.get(n));
+                let tex = master_icon_name
+                    .as_ref()
+                    .and_then(|n| assets.textures.get(n));
                 paint_thumb_content(ui, rect, tex, None);
                 if tex.is_none() {
                     ui.painter().text(
@@ -100,7 +135,7 @@ fn draw_condition_card(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
-                            .small_button("X")
+                            .add_enabled(can_remove, egui::Button::new("X").small())
                             .on_hover_text("Remove Condition")
                             .clicked()
                         {
@@ -108,13 +143,14 @@ fn draw_condition_card(
                         }
 
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                            egui::ComboBox::from_id_salt("group_dd")
+                            egui::ComboBox::from_id_salt(format!("group_dd_{}_{}", g_idx, my_idx))
                                 .selected_text(group.name)
                                 .width(ui.available_width())
-                                .height(600.0)
+                                .height(1000.0)
                                 .show_ui(ui, |ui| {
+                                    ui.set_min_width(120.0);
                                     for (idx, g) in lookups::GROUPS.iter().enumerate() {
-                                        if ui.selectable_label(g_idx == idx, g.name).clicked() {
+                                        if common::custom_menu_item(ui, g.name, g_idx == idx) {
                                             if idx != g_idx {
                                                 let new_group = &lookups::GROUPS[idx];
                                                 cond.condition = new_group.variants[0].condition;
@@ -145,7 +181,7 @@ fn draw_condition_card(
                 ui.horizontal(|ui| {
                     let (g_idx, _) = lookups::find_group_for_type(cond.condition);
                     let group = &lookups::GROUPS[g_idx];
-                    changed |= draw_condition_predicate(ui, group, cond, assets);
+                    changed |= draw_condition_predicate(ui, group, cond, assets, my_idx);
                 });
             });
         });
@@ -168,19 +204,20 @@ fn draw_condition_predicate(
     group: &lookups::ConditionGroup,
     cond: &mut ConditionDef,
     assets: &AssetStore,
+    my_idx: usize,
 ) -> bool {
     let mut changed = false;
     match group.style {
         lookups::GroupStyle::Standard => {
-            changed |= draw_operator_selector(ui, group, cond, assets);
-            changed |= draw_params_for_type(ui, cond, assets);
+            changed |= draw_operator_selector(ui, group, cond, assets, my_idx);
+            changed |= draw_params_for_type(ui, cond, assets, my_idx);
         }
         lookups::GroupStyle::Natural => {
-            changed |= draw_params_for_type(ui, cond, assets);
-            changed |= draw_operator_selector(ui, group, cond, assets);
+            changed |= draw_params_for_type(ui, cond, assets, my_idx);
+            changed |= draw_operator_selector(ui, group, cond, assets, my_idx);
         }
         lookups::GroupStyle::AmmoComplex => {
-            changed |= draw_operator_selector(ui, group, cond, assets);
+            changed |= draw_operator_selector(ui, group, cond, assets, my_idx);
             changed |= ui
                 .add(
                     egui::DragValue::new(&mut cond.param)
@@ -190,7 +227,7 @@ fn draw_condition_predicate(
                 .changed();
             changed |= common::draw_lookup_param_dd(
                 ui,
-                "param2",
+                &format!("param2_{}", my_idx),
                 &mut cond.param2,
                 lookups::AMMO_TYPES,
                 assets,
@@ -205,6 +242,7 @@ fn draw_operator_selector(
     group: &lookups::ConditionGroup,
     cond: &mut ConditionDef,
     _assets: &AssetStore,
+    my_idx: usize,
 ) -> bool {
     let mut changed = false;
     let current_variant = group
@@ -218,50 +256,93 @@ fn draw_operator_selector(
         lookups::GroupStyle::Natural => 50.0,
     };
 
-    egui::ComboBox::from_id_salt("op_dd")
+    egui::ComboBox::from_id_salt(format!("op_dd_{:?}_{}", cond.condition, my_idx))
         .selected_text(current_variant.label)
         .width(width)
-        .height(600.0)
+        .height(1000.0)
         .show_ui(ui, |ui| {
+            ui.set_min_width(100.0);
             for v in group.variants {
-                changed |= ui
-                    .selectable_value(&mut cond.condition, v.condition, v.label)
-                    .changed();
+                if common::custom_menu_item(ui, v.label, cond.condition == v.condition) {
+                    cond.condition = v.condition;
+                    changed = true;
+                }
             }
         });
     changed
 }
 
-fn draw_params_for_type(ui: &mut egui::Ui, cond: &mut ConditionDef, assets: &AssetStore) -> bool {
+fn draw_params_for_type(
+    ui: &mut egui::Ui,
+    cond: &mut ConditionDef,
+    assets: &AssetStore,
+    my_idx: usize,
+) -> bool {
     use crate::model::ConditionType::*;
     use lookups::*;
 
     let mut changed = false;
     match cond.condition {
         WeaponOwned | WeaponNotOwned | WeaponSelected | WeaponNotSelected | WeaponHasAmmo => {
-            changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, WEAPONS, assets);
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                &format!("p1_wpn_{:?}_{}", cond.condition, my_idx),
+                &mut cond.param,
+                WEAPONS,
+                assets,
+            );
         }
         ItemOwned | ItemNotOwned => {
-            changed |= common::draw_lookup_param_dd(ui, "param1", &mut cond.param, ITEMS, assets);
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                &format!("p1_item_{:?}_{}", cond.condition, my_idx),
+                &mut cond.param,
+                ITEMS,
+                assets,
+            );
         }
         AmmoMatch => {
-            changed |=
-                common::draw_lookup_param_dd(ui, "param1", &mut cond.param, AMMO_TYPES, assets);
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                &format!("p1_ammo_{:?}_{}", cond.condition, my_idx),
+                &mut cond.param,
+                AMMO_TYPES,
+                assets,
+            );
         }
         SessionTypeEq | SessionTypeNeq => {
-            changed |=
-                common::draw_lookup_param_dd(ui, "param1", &mut cond.param, SESSION_TYPES, assets);
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                &format!("p1_sess_{:?}_{}", cond.condition, my_idx),
+                &mut cond.param,
+                SESSION_TYPES,
+                assets,
+            );
         }
         HudModeEq => {
-            changed |=
-                common::draw_lookup_param_dd(ui, "param1", &mut cond.param, HUD_MODES, assets);
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                &format!("p1_hud_{:?}_{}", cond.condition, my_idx),
+                &mut cond.param,
+                HUD_MODES,
+                assets,
+            );
         }
         WidescreenModeEq => {
             changed |= common::draw_lookup_param_dd(
                 ui,
-                "param1",
+                &format!("p1_wide_{:?}_{}", cond.condition, my_idx),
                 &mut cond.param,
                 WIDESCREEN_MODES,
+                assets,
+            );
+        }
+        GameVersionGe | GameVersionLt => {
+            changed |= common::draw_lookup_param_dd(
+                ui,
+                &format!("p1_ver_{:?}_{}", cond.condition, my_idx),
+                &mut cond.param,
+                FEATURE_LEVELS,
                 assets,
             );
         }

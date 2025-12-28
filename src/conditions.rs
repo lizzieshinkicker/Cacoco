@@ -239,8 +239,8 @@ fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) ->
     use crate::model::ConditionType::*;
     let param = condition.param;
     match condition.condition {
-        GameVersionGe => state.world.game_version >= param,
-        GameVersionLt => state.world.game_version < param,
+        GameVersionGe => (state.world.game_version as i32) >= param,
+        GameVersionLt => (state.world.game_version as i32) < param,
         SessionTypeEq => state.world.session_type == param,
         SessionTypeNeq => state.world.session_type != param,
         GameModeEq => true,

@@ -1,4 +1,5 @@
 use crate::assets::AssetStore;
+use crate::model::FeatureLevel;
 use crate::state::PreviewState;
 use eframe::egui;
 
@@ -77,7 +78,51 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                             ui.end_row();
 
                             ui.label("Version:");
-                            ui.add(egui::DragValue::new(&mut state.world.game_version));
+                            egui::ComboBox::from_id_salt("version_dd")
+                                .selected_text(match state.world.game_version {
+                                    FeatureLevel::Doom19 => "Doom 1.9",
+                                    FeatureLevel::LimitRemoving => "Limit Removing",
+                                    FeatureLevel::Boom => "Boom 2.02",
+                                    FeatureLevel::Complevel9 => "Complevel 9",
+                                    FeatureLevel::MBF => "MBF",
+                                    FeatureLevel::MBF21 => "MBF21",
+                                    FeatureLevel::ID24 => "ID24",
+                                })
+                                .width(110.0)
+                                .show_ui(ui, |ui| {
+                                    use crate::model::FeatureLevel::*;
+                                    ui.selectable_value(
+                                        &mut state.world.game_version,
+                                        Doom19,
+                                        "Doom 1.9",
+                                    );
+                                    ui.selectable_value(
+                                        &mut state.world.game_version,
+                                        LimitRemoving,
+                                        "Limit Removing",
+                                    );
+                                    ui.selectable_value(
+                                        &mut state.world.game_version,
+                                        Boom,
+                                        "Boom 2.02",
+                                    );
+                                    ui.selectable_value(
+                                        &mut state.world.game_version,
+                                        Complevel9,
+                                        "Complevel 9",
+                                    );
+                                    ui.selectable_value(&mut state.world.game_version, MBF, "MBF");
+                                    ui.selectable_value(
+                                        &mut state.world.game_version,
+                                        MBF21,
+                                        "MBF21",
+                                    );
+                                    ui.selectable_value(
+                                        &mut state.world.game_version,
+                                        ID24,
+                                        "ID24",
+                                    );
+                                });
                             ui.end_row();
                         });
                 });
