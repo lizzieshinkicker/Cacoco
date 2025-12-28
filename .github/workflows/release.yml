@@ -79,7 +79,7 @@ jobs:
     - name: Rename binary
       run: |
         mkdir -p dist
-        mv target/x86_64-pc-windows-msvc/release/cacoco.exe dist/cacoco-${{ env.version}}-windows.exe
+        mv target/x86_64-pc-windows-msvc/release/cacoco.exe dist/cacoco-${{ env.RELEASE_VERSION }}-windows.exe
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
