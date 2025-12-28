@@ -1,5 +1,5 @@
 use eframe::egui;
-use egui::{Key, KeyboardShortcut, Modifiers};
+use egui::{Event, Key, KeyboardShortcut, Modifiers};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
@@ -23,6 +23,8 @@ pub struct HotkeyRegistry {
     pub export_json: KeyboardShortcut,
     pub duplicate: KeyboardShortcut,
     pub delete: KeyboardShortcut,
+    pub copy: KeyboardShortcut,
+    pub paste: KeyboardShortcut,
 }
 
 impl Default for HotkeyRegistry {
@@ -38,6 +40,8 @@ impl Default for HotkeyRegistry {
             export_json: KeyboardShortcut::new(cmd, Key::E),
             duplicate: KeyboardShortcut::new(cmd, Key::J),
             delete: KeyboardShortcut::new(Modifiers::NONE, Key::Delete),
+            copy: KeyboardShortcut::new(cmd, Key::C),
+            paste: KeyboardShortcut::new(cmd, Key::V),
         }
     }
 }
@@ -58,6 +62,22 @@ impl HotkeyRegistry {
             return None;
         }
 
+        let mut event_action = None;
+        ctx.input(|i| {
+            for event in &i.events {
+                match event {
+                    Event::Copy => event_action = Some(Action::Copy),
+                    Event::Cut => event_action = Some(Action::Copy),
+                    Event::Paste(_) => event_action = Some(Action::Paste),
+                    _ => {}
+                }
+            }
+        });
+
+        if let Some(action) = event_action {
+            return Some(action);
+        }
+
         if ctx.input_mut(|i| i.consume_shortcut(&self.redo) || i.consume_shortcut(&self.redo_alt)) {
             return Some(Action::Redo);
         }
@@ -65,16 +85,11 @@ impl HotkeyRegistry {
             return Some(Action::Undo);
         }
 
-        let is_paste = ctx.input(|i| i.key_pressed(Key::V) && i.modifiers.command);
-        if is_paste {
-            ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::V));
-            return Some(Action::Paste);
-        }
-
-        let is_copy = ctx.input(|i| i.key_pressed(Key::C) && i.modifiers.command);
-        if is_copy {
-            ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::C));
+        if ctx.input_mut(|i| i.consume_shortcut(&self.copy)) {
             return Some(Action::Copy);
+        }
+        if ctx.input_mut(|i| i.consume_shortcut(&self.paste)) {
+            return Some(Action::Paste);
         }
 
         if ctx.input_mut(|i| i.consume_shortcut(&self.duplicate)) {
@@ -85,5 +100,95 @@ impl HotkeyRegistry {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui::{Context, Event, Key, Modifiers, RawInput};
+
+    /// Simulates the OS triggering a "Copy" event (which egui intercepts).
+    /// This tests that we are reading `ctx.input().events`.
+    #[test]
+    fn test_hotkey_copy_event() {
+        let registry = HotkeyRegistry::default();
+        let ctx = Context::default();
+        let mut input = RawInput::default();
+
+        input.events.push(Event::Copy);
+
+        let mut action = None;
+        let _ = ctx.run(input, |ctx| {
+            action = registry.check(ctx);
+        });
+
+        assert_eq!(action, Some(Action::Copy));
+    }
+
+    /// Simulates the OS triggering a "Paste" event.
+    #[test]
+    fn test_hotkey_paste_event() {
+        let registry = HotkeyRegistry::default();
+        let ctx = Context::default();
+        let mut input = RawInput::default();
+
+        input.events.push(Event::Paste("some content".to_owned()));
+
+        let mut action = None;
+        let _ = ctx.run(input, |ctx| {
+            action = registry.check(ctx);
+        });
+
+        assert_eq!(action, Some(Action::Paste));
+    }
+
+    /// Simulates a raw key press (Ctrl+J) that the OS does NOT treat as a standard command.
+    /// This tests that `consume_shortcut` is still working for custom hotkeys.
+    #[test]
+    fn test_hotkey_duplicate_shortcut() {
+        let registry = HotkeyRegistry::default();
+        let ctx = Context::default();
+        let mut input = RawInput::default();
+
+        input.modifiers = Modifiers::COMMAND;
+        input.events.push(Event::Key {
+            key: Key::J,
+            physical_key: Some(Key::J),
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        });
+
+        let mut action = None;
+        let _ = ctx.run(input, |ctx| {
+            action = registry.check(ctx);
+        });
+
+        assert_eq!(action, Some(Action::Duplicate));
+    }
+
+    /// Tests that the fallback raw key check for Copy still works if no Event::Copy is present.
+    #[test]
+    fn test_hotkey_copy_fallback_raw() {
+        let registry = HotkeyRegistry::default();
+        let ctx = Context::default();
+        let mut input = RawInput::default();
+
+        input.modifiers = Modifiers::COMMAND;
+        input.events.push(Event::Key {
+            key: Key::C,
+            physical_key: Some(Key::C),
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        });
+
+        let mut action = None;
+        let _ = ctx.run(input, |ctx| {
+            action = registry.check(ctx);
+        });
+
+        assert_eq!(action, Some(Action::Copy));
     }
 }

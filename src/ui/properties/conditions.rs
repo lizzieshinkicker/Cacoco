@@ -1,7 +1,7 @@
 use super::common::{self, paint_thumb_content};
 use super::lookups;
 use crate::assets::AssetStore;
-use crate::model::{ConditionDef, ConditionType, ElementWrapper};
+use crate::model::{ConditionDef, ConditionType, Element, ElementWrapper, NumberType};
 use eframe::egui;
 
 pub fn draw_conditions_editor(
@@ -11,14 +11,37 @@ pub fn draw_conditions_editor(
     state: &crate::state::PreviewState,
 ) -> bool {
     let mut changed = false;
+    let is_ammo_selected = is_ammo_selected_type(element);
+
     let common = element.get_common_mut();
     ui.add_space(12.0);
+
+    if is_ammo_selected {
+        let has_safety = common
+            .conditions
+            .iter()
+            .any(|c| c.condition == ConditionType::SelectedWeaponHasAmmo);
+        if !has_safety {
+            common.conditions.insert(
+                0,
+                ConditionDef {
+                    condition: ConditionType::SelectedWeaponHasAmmo,
+                    param: 0,
+                    param2: 0,
+                },
+            );
+            changed = true;
+        }
+    }
 
     ui.horizontal(|ui| {
         ui.heading(format!("Conditions ({})", common.conditions.len()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if !common.conditions.is_empty() {
-                if ui.button("Clear").clicked() {
+                if ui
+                    .add_enabled(!is_ammo_selected, egui::Button::new("Clear"))
+                    .clicked()
+                {
                     common.conditions.clear();
                     changed = true;
                 }
@@ -39,7 +62,9 @@ pub fn draw_conditions_editor(
     for (i, cond) in common.conditions.iter_mut().enumerate() {
         let id = ui.make_persistent_id(format!("cond_card_{}", i));
         ui.push_id(id, |ui| {
-            changed |= draw_condition_card(ui, cond, assets, &mut remove_idx, i, state);
+            let can_remove =
+                !(is_ammo_selected && cond.condition == ConditionType::SelectedWeaponHasAmmo);
+            changed |= draw_condition_card(ui, cond, assets, &mut remove_idx, i, state, can_remove);
         });
         ui.add_space(4.0);
     }
@@ -52,6 +77,13 @@ pub fn draw_conditions_editor(
     changed
 }
 
+fn is_ammo_selected_type(el: &ElementWrapper) -> bool {
+    match &el.data {
+        Element::Number(n) | Element::Percent(n) => n.type_ == NumberType::AmmoSelected,
+        _ => false,
+    }
+}
+
 fn draw_condition_card(
     ui: &mut egui::Ui,
     cond: &mut ConditionDef,
@@ -59,6 +91,7 @@ fn draw_condition_card(
     remove_idx: &mut Option<usize>,
     my_idx: usize,
     state: &crate::state::PreviewState,
+    can_remove: bool,
 ) -> bool {
     let mut changed = false;
     let is_true = crate::conditions::resolve(&[cond.clone()], state);
@@ -102,7 +135,7 @@ fn draw_condition_card(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
-                            .small_button("X")
+                            .add_enabled(can_remove, egui::Button::new("X").small())
                             .on_hover_text("Remove Condition")
                             .clicked()
                         {

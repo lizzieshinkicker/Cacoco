@@ -46,6 +46,8 @@ pub fn draw_layer_tree_root(
             actions,
             confirmation_modal,
         );
+
+        draw_terminal_drop_zone(ui, vec![bar_idx], bar.children.len(), selection, actions);
     }
 }
 
@@ -102,7 +104,7 @@ pub fn draw_layer_tree_recursive(
                 draw_layer_tree_recursive(
                     ui,
                     element.children(),
-                    my_path,
+                    my_path.clone(),
                     selection,
                     selection_pivot,
                     assets,
@@ -111,6 +113,8 @@ pub fn draw_layer_tree_recursive(
                     actions,
                     confirmation_modal,
                 );
+
+                draw_terminal_drop_zone(ui, my_path, element.children().len(), selection, actions);
             });
         }
     }
@@ -162,6 +166,7 @@ fn draw_layer_row(
         parent_path,
         my_idx,
         is_container,
+        is_last,
         selection,
         element,
         actions,
@@ -256,6 +261,7 @@ fn handle_drop_logic(
     parent_path: &[usize],
     my_idx: usize,
     is_container: bool,
+    is_last: bool,
     selection: &HashSet<Vec<usize>>,
     element: &ElementWrapper,
     actions: &mut Vec<LayerAction>,
@@ -265,18 +271,27 @@ fn handle_drop_logic(
         let is_parent = my_path.starts_with(&*dragged) && my_path.len() > dragged.len();
 
         if !is_self && !is_parent && ui.rect_contains_pointer(rect) {
-            if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container) {
+            if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container, is_last) {
                 match target {
                     DropTarget::Sibling(insert_idx, line_y) => {
-                        shared::draw_yellow_line(ui, rect, line_y);
-                        if ui.input(|i| i.pointer.any_released()) {
-                            actions.push(LayerAction::UndoSnapshot);
-                            actions.push(LayerAction::MoveSelection {
-                                sources: selection.iter().cloned().collect(),
-                                target_parent: parent_path.to_vec(),
-                                insert_idx,
-                            });
-                            egui::DragAndDrop::clear_payload(ui.ctx());
+                        let is_noop = if parent_path == &dragged[0..dragged.len() - 1] {
+                            let dragged_idx = *dragged.last().unwrap();
+                            insert_idx == dragged_idx || insert_idx == dragged_idx + 1
+                        } else {
+                            false
+                        };
+
+                        if !is_noop {
+                            shared::draw_yellow_line(ui, rect, line_y);
+                            if ui.input(|i| i.pointer.any_released()) {
+                                actions.push(LayerAction::UndoSnapshot);
+                                actions.push(LayerAction::MoveSelection {
+                                    sources: selection.iter().cloned().collect(),
+                                    target_parent: parent_path.to_vec(),
+                                    insert_idx,
+                                });
+                                egui::DragAndDrop::clear_payload(ui.ctx());
+                            }
                         }
                     }
                     DropTarget::Child => {
@@ -303,7 +318,7 @@ fn handle_drop_logic(
 
     if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
         if ui.rect_contains_pointer(rect) {
-            if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container) {
+            if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container, is_last) {
                 match target {
                     DropTarget::Sibling(mut insert_idx, line_y) => {
                         shared::draw_yellow_line(ui, rect, line_y);
@@ -598,6 +613,7 @@ fn calculate_drop_target(
     rect: egui::Rect,
     my_idx: usize,
     is_container: bool,
+    is_last: bool,
 ) -> Option<DropTarget> {
     let pos = ui.ctx().input(|i| i.pointer.latest_pos())?;
     let off = ui.spacing().item_spacing.y * 0.5;
@@ -606,7 +622,11 @@ fn calculate_drop_target(
         if pos.y < rect.center().y {
             Some(DropTarget::Sibling(my_idx, rect.top() - off))
         } else {
-            Some(DropTarget::Sibling(my_idx + 1, rect.bottom() + off))
+            if is_last {
+                None
+            } else {
+                Some(DropTarget::Sibling(my_idx + 1, rect.bottom() + off))
+            }
         }
     } else {
         let h = rect.height();
@@ -614,7 +634,11 @@ fn calculate_drop_target(
         if rel_y < h * 0.25 {
             Some(DropTarget::Sibling(my_idx, rect.top() - off))
         } else if rel_y > h * 0.75 {
-            Some(DropTarget::Sibling(my_idx + 1, rect.bottom() + off))
+            if is_last {
+                None
+            } else {
+                Some(DropTarget::Sibling(my_idx + 1, rect.bottom() + off))
+            }
         } else {
             Some(DropTarget::Child)
         }
@@ -634,4 +658,61 @@ pub fn deletion_needs_confirmation(file: &SBarDefFile, selection: &HashSet<Vec<u
         }
     }
     false
+}
+
+/// Draws an invisible drop zone at the end of a list to make it easier to drop items
+/// outside of open containers (siblings after).
+fn draw_terminal_drop_zone(
+    ui: &mut egui::Ui,
+    parent_path: Vec<usize>,
+    insert_idx: usize,
+    selection: &HashSet<Vec<usize>>,
+    actions: &mut Vec<LayerAction>,
+) {
+    let height = 12.0;
+    let (rect, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), height),
+        egui::Sense::hover(),
+    );
+
+    if let Some(dragged) = egui::DragAndDrop::payload::<Vec<usize>>(ui.ctx()) {
+        let is_noop = if parent_path == dragged[0..dragged.len() - 1] {
+            let dragged_idx = *dragged.last().unwrap();
+            insert_idx == dragged_idx + 1
+        } else {
+            false
+        };
+
+        if !is_noop && !parent_path.starts_with(&*dragged) && ui.rect_contains_pointer(rect) {
+            shared::draw_yellow_line(ui, rect, rect.center().y);
+            if ui.input(|i| i.pointer.any_released()) {
+                actions.push(LayerAction::UndoSnapshot);
+                actions.push(LayerAction::MoveSelection {
+                    sources: selection.iter().cloned().collect(),
+                    target_parent: parent_path.clone(),
+                    insert_idx,
+                });
+                egui::DragAndDrop::clear_payload(ui.ctx());
+            }
+        }
+    }
+
+    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
+        if ui.rect_contains_pointer(rect) {
+            shared::draw_yellow_line(ui, rect, rect.center().y);
+            if ui.input(|i| i.pointer.any_released()) {
+                actions.push(LayerAction::UndoSnapshot);
+                let mut current_insert = insert_idx;
+                for key in asset_keys.iter() {
+                    actions.push(LayerAction::Add {
+                        parent_path: parent_path.clone(),
+                        insert_idx: current_insert,
+                        element: wrap_graphic(key),
+                    });
+                    current_insert += 1;
+                }
+                egui::DragAndDrop::clear_payload(ui.ctx());
+            }
+        }
+    }
 }

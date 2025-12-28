@@ -359,10 +359,6 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
         }
         changed = true;
     }
-    if common::custom_menu_item(ui, "Selected Ammo", *type_ == NumberType::AmmoSelected) {
-        *type_ = NumberType::AmmoSelected;
-        changed = true;
-    }
     if common::custom_menu_item(ui, "Max Ammo (by Type)", *type_ == NumberType::MaxAmmo) {
         *type_ = NumberType::MaxAmmo;
         if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) {
