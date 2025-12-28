@@ -240,10 +240,45 @@ pub fn draw_lookup_param_dd(
 
     egui::ComboBox::from_id_salt(salt)
         .selected_text(current_name)
+        .height(1000.0)
         .show_ui(ui, |ui| {
+            ui.set_min_width(120.0);
             for item in items {
-                changed |= ui.selectable_value(param, item.id, item.name).changed();
+                if custom_menu_item(ui, item.name, *param == item.id) {
+                    *param = item.id;
+                    changed = true;
+                }
             }
         });
     changed
+}
+
+pub fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width().max(100.0), 20.0),
+        egui::Sense::click(),
+    );
+    if response.hovered() || selected {
+        ui.painter().rect_filled(
+            rect,
+            4.0,
+            if selected {
+                ui.visuals().selection.bg_fill
+            } else {
+                egui::Color32::from_gray(60)
+            },
+        );
+    }
+    ui.painter().text(
+        rect.left_center() + egui::vec2(8.0, 0.0),
+        egui::Align2::LEFT_CENTER,
+        text,
+        egui::FontId::proportional(14.0),
+        if selected {
+            ui.visuals().selection.stroke.color
+        } else {
+            egui::Color32::from_gray(240)
+        },
+    );
+    response.clicked()
 }

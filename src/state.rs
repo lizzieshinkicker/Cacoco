@@ -1,4 +1,5 @@
 use crate::constants::DOOM_TICS_PER_SEC;
+use crate::model::FeatureLevel;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -48,7 +49,7 @@ pub struct WorldContext {
     pub session_type: i32,
     pub episode: i32,
     pub level: i32,
-    pub game_version: i32,
+    pub game_version: FeatureLevel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,7 +128,7 @@ impl Default for PreviewState {
             world: WorldContext {
                 episode: 1,
                 level: 1,
-                game_version: 200,
+                game_version: FeatureLevel::ID24,
                 session_type: 0,
             },
             engine: EngineContext::default(),

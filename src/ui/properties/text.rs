@@ -24,8 +24,9 @@ impl PropertiesUI for NumberDef {
             egui::ComboBox::from_id_salt("num_font_selector")
                 .selected_text(self.font.clone())
                 .width(ui.available_width())
+                .height(1000.0)
                 .show_ui(ui, |ui| {
-                    let h = (fonts.number_font_names.len() as f32 * 42.0).min(250.0);
+                    let h = (fonts.number_font_names.len() as f32 * 42.0).min(1000.0);
                     ui.set_min_height(h);
                     for (i, name) in fonts.number_font_names.iter().enumerate() {
                         let stem = fonts.get_number_stem(name);
@@ -125,6 +126,8 @@ impl PropertiesUI for ComponentDef {
                 .width(ui.available_width())
                 .height(600.0)
                 .show_ui(ui, |ui| {
+                    let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
+                    ui.set_min_height(h);
                     for (i, name) in fonts.hud_font_names.iter().enumerate() {
                         let stem = fonts.get_hud_stem(name);
                         changed |= common::draw_font_selection_row(
@@ -332,65 +335,35 @@ fn component_type_name(t: ComponentType) -> String {
     format!("{:?}", t)
 }
 
-fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width().max(100.0), 24.0),
-        egui::Sense::click(),
-    );
-    if response.hovered() || selected {
-        ui.painter().rect_filled(
-            rect,
-            4.0,
-            if selected {
-                ui.visuals().selection.bg_fill
-            } else {
-                egui::Color32::from_gray(60)
-            },
-        );
-    }
-    ui.painter().text(
-        rect.left_center() + egui::vec2(8.0, 0.0),
-        egui::Align2::LEFT_CENTER,
-        text,
-        egui::FontId::proportional(14.0),
-        if selected {
-            ui.visuals().selection.stroke.color
-        } else {
-            egui::Color32::from_gray(240)
-        },
-    );
-    response.clicked()
-}
-
 fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i32) -> bool {
     let mut changed = false;
-    if custom_menu_item(ui, "Health", *type_ == NumberType::Health) {
+    if common::custom_menu_item(ui, "Health", *type_ == NumberType::Health) {
         *type_ = NumberType::Health;
         changed = true;
     }
-    if custom_menu_item(ui, "Armor", *type_ == NumberType::Armor) {
+    if common::custom_menu_item(ui, "Armor", *type_ == NumberType::Armor) {
         *type_ = NumberType::Armor;
         changed = true;
     }
-    if custom_menu_item(ui, "Frags", *type_ == NumberType::Frags) {
+    if common::custom_menu_item(ui, "Frags", *type_ == NumberType::Frags) {
         *type_ = NumberType::Frags;
         changed = true;
     }
     ui.add_space(4.0);
     ui.separator();
     ui.add_space(4.0);
-    if custom_menu_item(ui, "Ammo (by Type)", *type_ == NumberType::Ammo) {
+    if common::custom_menu_item(ui, "Ammo (by Type)", *type_ == NumberType::Ammo) {
         *type_ = NumberType::Ammo;
         if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) {
             *param = 0;
         }
         changed = true;
     }
-    if custom_menu_item(ui, "Selected Ammo", *type_ == NumberType::AmmoSelected) {
+    if common::custom_menu_item(ui, "Selected Ammo", *type_ == NumberType::AmmoSelected) {
         *type_ = NumberType::AmmoSelected;
         changed = true;
     }
-    if custom_menu_item(ui, "Max Ammo (by Type)", *type_ == NumberType::MaxAmmo) {
+    if common::custom_menu_item(ui, "Max Ammo (by Type)", *type_ == NumberType::MaxAmmo) {
         *type_ = NumberType::MaxAmmo;
         if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) {
             *param = 0;
@@ -400,14 +373,14 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
     ui.add_space(4.0);
     ui.separator();
     ui.add_space(4.0);
-    if custom_menu_item(ui, "Ammo (by Weapon)", *type_ == NumberType::AmmoWeapon) {
+    if common::custom_menu_item(ui, "Ammo (by Weapon)", *type_ == NumberType::AmmoWeapon) {
         *type_ = NumberType::AmmoWeapon;
         if !lookups::WEAPONS.iter().any(|i| i.id == *param) {
             *param = 101;
         }
         changed = true;
     }
-    if custom_menu_item(
+    if common::custom_menu_item(
         ui,
         "Max Ammo (by Weapon)",
         *type_ == NumberType::MaxAmmoWeapon,
@@ -424,34 +397,34 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
 fn draw_component_options(ui: &mut egui::Ui, type_: &mut ComponentType) -> bool {
     use crate::model::ComponentType::*;
     let mut changed = false;
-    if custom_menu_item(ui, "Time", *type_ == Time) {
+    if common::custom_menu_item(ui, "Time", *type_ == Time) {
         *type_ = Time;
         changed = true;
     }
-    if custom_menu_item(ui, "Level Title", *type_ == LevelTitle) {
+    if common::custom_menu_item(ui, "Level Title", *type_ == LevelTitle) {
         *type_ = LevelTitle;
         changed = true;
     }
-    if custom_menu_item(ui, "Announce Level Title", *type_ == AnnounceLevelTitle) {
+    if common::custom_menu_item(ui, "Announce Level Title", *type_ == AnnounceLevelTitle) {
         *type_ = AnnounceLevelTitle;
         changed = true;
     }
     ui.add_space(4.0);
     ui.separator();
     ui.add_space(4.0);
-    if custom_menu_item(ui, "Message", *type_ == Message) {
+    if common::custom_menu_item(ui, "Message", *type_ == Message) {
         *type_ = Message;
         changed = true;
     }
-    if custom_menu_item(ui, "Coordinates", *type_ == Coordinates) {
+    if common::custom_menu_item(ui, "Coordinates", *type_ == Coordinates) {
         *type_ = Coordinates;
         changed = true;
     }
-    if custom_menu_item(ui, "FPS Counter", *type_ == FpsCounter) {
+    if common::custom_menu_item(ui, "FPS Counter", *type_ == FpsCounter) {
         *type_ = FpsCounter;
         changed = true;
     }
-    if custom_menu_item(ui, "Stat Totals", *type_ == StatTotals) {
+    if common::custom_menu_item(ui, "Stat Totals", *type_ == StatTotals) {
         *type_ = StatTotals;
         changed = true;
     }

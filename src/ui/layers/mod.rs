@@ -350,14 +350,56 @@ pub fn draw_layers_panel(
                         });
                     }
 
+                    let sel_ammo_btn = ui.add_enabled(has_num, egui::Button::new("Selected Ammo"));
+                    if sel_ammo_btn.clicked() {
+                        new_element = Some(ElementWrapper {
+                            data: Element::Number(NumberDef {
+                                font: default_num_font.clone().unwrap(),
+                                type_: NumberType::AmmoSelected,
+                                common: crate::model::CommonAttrs {
+                                    conditions: vec![crate::model::ConditionDef {
+                                        condition:
+                                            crate::model::ConditionType::SelectedWeaponHasAmmo,
+                                        param: 0,
+                                        param2: 0,
+                                    }],
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        });
+                    }
+
                     let pct_btn = ui.add_enabled(has_num, egui::Button::new("Percent"));
                     if !has_num {
                         pct_btn.on_hover_text("Add a Number Font in the 'Fonts' tab first!");
                     } else if pct_btn.clicked() {
                         new_element = Some(ElementWrapper {
                             data: Element::Percent(NumberDef {
-                                font: default_num_font.unwrap(),
+                                font: default_num_font.clone().unwrap(),
                                 type_: NumberType::Health,
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        });
+                    }
+
+                    let sel_pct_btn = ui.add_enabled(has_num, egui::Button::new("Selected Ammo %"));
+                    if sel_pct_btn.clicked() {
+                        new_element = Some(ElementWrapper {
+                            data: Element::Percent(NumberDef {
+                                font: default_num_font.unwrap(),
+                                type_: NumberType::AmmoSelected,
+                                common: crate::model::CommonAttrs {
+                                    conditions: vec![crate::model::ConditionDef {
+                                        condition:
+                                            crate::model::ConditionType::SelectedWeaponHasAmmo,
+                                        param: 0,
+                                        param2: 0,
+                                    }],
+                                    ..Default::default()
+                                },
                                 ..Default::default()
                             }),
                             ..Default::default()

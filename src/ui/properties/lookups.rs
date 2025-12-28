@@ -75,6 +75,16 @@ pub const AUTOMAP_FLAGS: &[LookupItem] = &[
     item!(4, "Disabled"),
 ];
 
+pub const FEATURE_LEVELS: &[LookupItem] = &[
+    item!(0, "Doom 1.9"),
+    item!(1, "Limit Removing"),
+    item!(2, "Boom 2.02"),
+    item!(3, "Complevel 9"),
+    item!(4, "MBF"),
+    item!(5, "MBF21"),
+    item!(6, "ID24"),
+];
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GroupStyle {
     Standard,
@@ -172,6 +182,7 @@ pub const GROUPS: &[ConditionGroup] = &[
             v!("% >=", SelectedAmmoPercentGe),
             v!("% <", SelectedAmmoPercentLt),
             v!("matches", AmmoMatch),
+            v!("uses ammo", SelectedWeaponHasAmmo),
         ],
     },
     ConditionGroup {
@@ -217,11 +228,7 @@ pub const GROUPS: &[ConditionGroup] = &[
         icon: Some("M_OPTION"),
         style: GroupStyle::Standard,
         default_param: 0,
-        variants: &[
-            v!("Enabled", WidgetEnabled),
-            v!("Disabled", WidgetDisabled),
-            v!("Selected Weapon Has Ammo", SelectedWeaponHasAmmo),
-        ],
+        variants: &[v!("Enabled", WidgetEnabled), v!("Disabled", WidgetDisabled)],
     },
 ];
 
@@ -258,15 +265,18 @@ fn find_icon(list: &[LookupItem], id: i32) -> Option<&'static str> {
 pub fn resolve_condition_icon(
     cond: &ConditionDef,
     state: &crate::state::PreviewState,
-) -> Option<&'static str> {
+) -> Option<String> {
     use ConditionType::*;
 
     match cond.condition {
+        SlotOwned | SlotNotOwned | SlotSelected | SlotNotSelected => {
+            return Some(format!("STGNUM{}", cond.param));
+        }
         ArmorGe | ArmorLt | ArmorPercentGe | ArmorPercentLt => {
             return Some(if state.player.armor_max >= 200 {
-                "ARM2A0"
+                "ARM2A0".to_string()
             } else {
-                "ARM1A0"
+                "ARM1A0".to_string()
             });
         }
         SelectedAmmoGe
@@ -275,11 +285,11 @@ pub fn resolve_condition_icon(
         | SelectedAmmoPercentLt
         | SelectedWeaponHasAmmo => {
             return match state.get_selected_ammo_type() {
-                0 => Some("AMMOA0"),
-                1 => Some("SHELA0"),
-                2 => Some("CELLA0"),
-                3 => Some("ROCKA0"),
-                _ => Some("BPAK0"),
+                0 => Some("AMMOA0".to_string()),
+                1 => Some("SHELA0".to_string()),
+                2 => Some("CELLA0".to_string()),
+                3 => Some("ROCKA0".to_string()),
+                _ => Some("BPAK0".to_string()),
             };
         }
         _ => {}
@@ -298,13 +308,13 @@ pub fn resolve_condition_icon(
         _ => None,
     };
 
-    if specific_icon.is_some() {
-        return specific_icon;
+    if let Some(icon) = specific_icon {
+        return Some(icon.to_string());
     }
 
     let (g_idx, _) = find_group_for_type(cond.condition);
     if g_idx < GROUPS.len() {
-        return GROUPS[g_idx].icon;
+        return GROUPS[g_idx].icon.map(|s| s.to_string());
     }
 
     None

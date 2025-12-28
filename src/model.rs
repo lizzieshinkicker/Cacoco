@@ -82,6 +82,21 @@ pub enum NumberType {
     MaxAmmoWeapon = 7,
 }
 
+#[derive(
+    Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default,
+)]
+#[repr(i32)]
+pub enum FeatureLevel {
+    Doom19 = 0,
+    LimitRemoving = 1,
+    Boom = 2,
+    Complevel9 = 3,
+    MBF = 4,
+    MBF21 = 5,
+    #[default]
+    ID24 = 6,
+}
+
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ConditionType {
