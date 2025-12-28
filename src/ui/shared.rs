@@ -93,3 +93,65 @@ pub fn draw_no_file_placeholder(ui: &mut egui::Ui) {
         ui.label(egui::RichText::new("No file loaded").weak());
     });
 }
+
+/// A stylized header button used for section switching or expansion.
+pub fn section_header_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
+    section_header_button_impl(ui, label, active, 28.0, 14.0)
+}
+
+/// A smaller version for tight spaces like the browser tabs.
+pub fn compact_header_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
+    section_header_button_impl(ui, label, active, 24.0, 11.0)
+}
+
+fn section_header_button_impl(
+    ui: &mut egui::Ui,
+    label: &str,
+    active: bool,
+    h: f32,
+    font_sz: f32,
+) -> egui::Response {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), h), egui::Sense::click());
+
+    let mut bg_color = ui.visuals().widgets.noninteractive.bg_fill;
+    if active {
+        bg_color = egui::Color32::from_rgba_unmultiplied(60, 130, 255, 15);
+    }
+    if response.hovered() {
+        bg_color = ui.visuals().widgets.hovered.bg_fill;
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
+    ui.painter().rect(
+        rect,
+        4.0,
+        bg_color,
+        egui::Stroke::new(1.0, egui::Color32::from_white_alpha(30)),
+        egui::StrokeKind::Inside,
+    );
+
+    let text_color = if active {
+        ui.visuals().text_color()
+    } else {
+        ui.visuals().weak_text_color()
+    };
+
+    ui.painter().text(
+        rect.center() + egui::vec2(0.0, -1.0),
+        egui::Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(font_sz),
+        text_color,
+    );
+
+    response
+}
+
+pub fn truncate_path(path: &str, max_chars: usize) -> String {
+    if path.len() <= max_chars {
+        return path.to_string();
+    }
+    let half = (max_chars - 3) / 2;
+    format!("{}...{}", &path[..half], &path[path.len() - half..])
+}

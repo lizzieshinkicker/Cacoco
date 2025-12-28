@@ -16,6 +16,7 @@ pub(crate) mod preview;
 mod text;
 pub mod text_helper;
 
+use crate::ui::shared;
 use editor::PropertiesUI;
 use font_cache::FontCache;
 
@@ -126,19 +127,28 @@ pub fn draw_properties_panel(
     ui.add_space(4.0);
 
     if show_tabs {
-        ui.vertical_centered(|ui| {
-            ui.horizontal(|ui| {
-                let cluster_width = 160.0;
-                let centering_space = (ui.available_width() - cluster_width) / 2.0;
-                ui.add_space(centering_space.max(0.0));
-                ui.spacing_mut().item_spacing = egui::vec2(2.0, 0.0);
-
-                ui.selectable_value(&mut current_tab, PropertyTab::Properties, "Properties");
-                ui.add(egui::Separator::default().vertical().spacing(6.0));
-                ui.selectable_value(&mut current_tab, PropertyTab::Conditions, "Conditions");
-            });
+        ui.add_space(2.0);
+        ui.columns(2, |uis| {
+            if shared::section_header_button(
+                &mut uis[0],
+                "Properties",
+                current_tab == PropertyTab::Properties,
+            )
+            .clicked()
+            {
+                current_tab = PropertyTab::Properties;
+            }
+            if shared::section_header_button(
+                &mut uis[1],
+                "Conditions",
+                current_tab == PropertyTab::Conditions,
+            )
+            .clicked()
+            {
+                current_tab = PropertyTab::Conditions;
+            }
         });
-        ui.add_space(1.0);
+        ui.add_space(3.0);
         ui.separator();
     }
 
