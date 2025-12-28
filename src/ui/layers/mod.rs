@@ -20,7 +20,7 @@ const TAB_STATE_KEY: &str = "cacoco_layers_tab_state";
 const THUMB_ZOOM_KEY: &str = "cacoco_layers_thumb_zoom";
 const SHOW_FONTS_KEY: &str = "cacoco_show_fonts_state";
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum BrowserTab {
     Layouts,
     Graphics,
@@ -46,9 +46,24 @@ pub fn draw_layers_panel(
         .ctx()
         .data(|d| d.get_temp::<f32>(split_id).unwrap_or(0.35));
 
+    let mut current_tab: Option<BrowserTab> = ui.data(|d| {
+        d.get_temp(egui::Id::new(TAB_STATE_KEY))
+            .unwrap_or(Some(BrowserTab::Layouts))
+    });
+
+    let mut zoom = ui.data(|d| d.get_temp(egui::Id::new(THUMB_ZOOM_KEY)).unwrap_or(1.0f32));
+    let mut show_fonts = ui.data(|d| d.get_temp(egui::Id::new(SHOW_FONTS_KEY)).unwrap_or(true));
+
     let available_height = ui.available_height();
     let min_h = 100.0;
-    let top_height = (available_height * split_fraction).clamp(min_h, available_height - min_h);
+    let is_collapsed = current_tab.is_none();
+
+    let header_h = 32.0;
+    let top_height = if is_collapsed {
+        header_h
+    } else {
+        (available_height * split_fraction).clamp(min_h, available_height - min_h)
+    };
 
     let top_rect = egui::Rect::from_min_size(
         ui.cursor().min,
@@ -60,199 +75,210 @@ pub fn draw_layers_panel(
     let mut top_ui = ui.new_child(egui::UiBuilder::new().max_rect(top_rect));
     top_ui.set_clip_rect(top_rect);
 
-    let mut current_tab = top_ui.data(|d| {
-        d.get_temp(egui::Id::new(TAB_STATE_KEY))
-            .unwrap_or(BrowserTab::Layouts)
-    });
-    let mut zoom = top_ui.data(|d| d.get_temp(egui::Id::new(THUMB_ZOOM_KEY)).unwrap_or(1.0f32));
-    let mut show_fonts = top_ui.data(|d| d.get_temp(egui::Id::new(SHOW_FONTS_KEY)).unwrap_or(true));
-
     let mut actions = Vec::new();
 
     top_ui.add_space(3.0);
 
     top_ui.horizontal(|ui| {
-        ui.add_space(4.0);
+        let cluster_width = 284.0;
+        let available_w = ui.available_width();
+        let centering_space = (available_w - cluster_width) / 2.0;
+        ui.add_space(centering_space.max(0.0));
+
         ui.spacing_mut().item_spacing = egui::vec2(2.0, 0.0);
 
-        let mut tab_btn =
-            |ui: &mut egui::Ui, value, label| ui.selectable_value(&mut current_tab, value, label);
+        let mut toggle_tab = |ui: &mut egui::Ui, target: BrowserTab, label: &str| {
+            let is_selected = current_tab == Some(target);
+            if ui.selectable_label(is_selected, label).clicked() {
+                current_tab = if is_selected { None } else { Some(target) };
+            }
+        };
 
-        tab_btn(ui, BrowserTab::Layouts, "Layouts");
+        toggle_tab(ui, BrowserTab::Layouts, "Layouts");
         ui.add(egui::Separator::default().vertical().spacing(6.0));
-        tab_btn(ui, BrowserTab::Graphics, "Graphics");
+        toggle_tab(ui, BrowserTab::Graphics, "Graphics");
         ui.add(egui::Separator::default().vertical().spacing(6.0));
-        tab_btn(ui, BrowserTab::Fonts, "Fonts");
+        toggle_tab(ui, BrowserTab::Fonts, "Fonts");
         ui.add(egui::Separator::default().vertical().spacing(6.0));
-        tab_btn(ui, BrowserTab::IWAD, "IWAD");
+        toggle_tab(ui, BrowserTab::IWAD, "IWAD");
         ui.add(egui::Separator::default().vertical().spacing(6.0));
-        tab_btn(ui, BrowserTab::Library, "Library");
+        toggle_tab(ui, BrowserTab::Library, "Library");
     });
 
     top_ui.add_space(1.0);
     top_ui.separator();
 
-    let header_bottom = top_ui.cursor().min.y;
-    let has_footer = !matches!(current_tab, BrowserTab::Fonts | BrowserTab::Layouts);
-    let footer_h = if has_footer { 32.0 } else { 0.0 };
+    if let Some(active_tab) = current_tab {
+        let header_bottom = top_rect.min.y + header_h;
+        let has_footer = !matches!(active_tab, BrowserTab::Fonts | BrowserTab::Layouts);
+        let footer_h = if has_footer { 32.0 } else { 0.0 };
 
-    let scroll_rect = egui::Rect::from_min_max(
-        egui::pos2(top_rect.min.x, header_bottom),
-        egui::pos2(top_rect.max.x, top_rect.max.y - footer_h),
-    );
+        let footer_top = (top_rect.max.y - footer_h).max(header_bottom);
 
-    top_ui.scope_builder(egui::UiBuilder::new().max_rect(scroll_rect), |ui| {
-        egui::ScrollArea::vertical()
-            .id_salt("browser_scroll")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                ui.add_space(4.0);
-                match current_tab {
-                    BrowserTab::Layouts => {
-                        if let Some(f) = file {
-                            ui.vertical(|ui| {
-                                changed |= layouts::draw_layouts_browser(
-                                    ui,
-                                    f,
-                                    selection,
-                                    current_bar_idx,
-                                    &mut actions,
-                                    confirmation_modal,
-                                );
-                            });
-                        } else {
-                            shared::draw_no_file_placeholder(ui);
-                        }
-                    }
-                    BrowserTab::Fonts => {
-                        if let Some(f) = file {
-                            changed |= browser::draw_fonts_content(ui, f, assets);
-                        } else {
-                            shared::draw_no_file_placeholder(ui);
-                        }
-                    }
-                    BrowserTab::Graphics => {
-                        changed |= browser::draw_filtered_browser(
-                            ui,
-                            assets,
-                            file,
-                            zoom,
-                            true,
-                            wizard_state,
-                            confirmation_modal,
-                            show_fonts,
-                        );
-                    }
-                    BrowserTab::IWAD => {
-                        changed |= browser::draw_filtered_browser(
-                            ui,
-                            assets,
-                            file,
-                            zoom,
-                            false,
-                            wizard_state,
-                            confirmation_modal,
-                            show_fonts,
-                        );
-                    }
-                    BrowserTab::Library => {
-                        changed |= browser::draw_library_browser(ui, assets, file, zoom);
-                    }
-                }
-            });
-    });
-
-    if has_footer {
-        let footer_rect = egui::Rect::from_min_max(
-            egui::pos2(top_rect.min.x, top_rect.max.y - footer_h),
-            egui::pos2(top_rect.max.x, top_rect.max.y),
+        let scroll_rect = egui::Rect::from_min_max(
+            egui::pos2(top_rect.min.x, header_bottom),
+            egui::pos2(top_rect.max.x, footer_top),
         );
 
-        top_ui.scope_builder(egui::UiBuilder::new().max_rect(footer_rect), |ui| {
-            ui.separator();
-            ui.horizontal(|ui| {
-                ui.add_space(4.0);
-
-                ui.vertical(|ui| {
-                    ui.add_space(3.0);
-                    ui.label(egui::RichText::new("Zoom").weak().size(12.0));
-                });
-
-                ui.add_sized(
-                    [80.0, 20.0],
-                    egui::Slider::new(&mut zoom, 0.5..=3.0).show_value(false),
-                );
-
-                if current_tab == BrowserTab::Graphics || current_tab == BrowserTab::IWAD {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add_space(4.0);
-
-                        if current_tab == BrowserTab::Graphics {
-                            ui.menu_button("Import...", |ui| {
-                                if ui.button("Files").clicked() {
-                                    let count = crate::io::import_images_dialog(ui.ctx(), assets);
-                                    if count > 0 {
-                                        state.push_message(format!("Imported {} images.", count));
-                                        changed = true;
-                                    }
-                                    ui.close();
-                                }
-                                if ui.button("Folder").clicked() {
-                                    let count = crate::io::import_folder_dialog(ui.ctx(), assets);
-                                    if count > 0 {
-                                        state.push_message(format!(
-                                            "Imported {} images from folder.",
-                                            count
-                                        ));
-                                        changed = true;
-                                    }
-                                    ui.close();
-                                }
-                            });
-                            ui.add_space(4.0);
-                            ui.separator();
-                            ui.add_space(4.0);
-                        } else if current_tab == BrowserTab::IWAD {
-                            ui.add_space(87.0);
+        top_ui.scope_builder(egui::UiBuilder::new().max_rect(scroll_rect), |ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("browser_scroll")
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.add_space(4.0);
+                    match active_tab {
+                        BrowserTab::Layouts => {
+                            if let Some(f) = file {
+                                ui.vertical(|ui| {
+                                    changed |= layouts::draw_layouts_browser(
+                                        ui,
+                                        f,
+                                        selection,
+                                        current_bar_idx,
+                                        &mut actions,
+                                        confirmation_modal,
+                                    );
+                                });
+                            } else {
+                                shared::draw_no_file_placeholder(ui);
+                            }
                         }
-
-                        ui.checkbox(&mut show_fonts, "Fonts");
-                    });
-                }
-            });
+                        BrowserTab::Fonts => {
+                            if let Some(f) = file {
+                                changed |= browser::draw_fonts_content(ui, f, assets);
+                            } else {
+                                shared::draw_no_file_placeholder(ui);
+                            }
+                        }
+                        BrowserTab::Graphics => {
+                            changed |= browser::draw_filtered_browser(
+                                ui,
+                                assets,
+                                file,
+                                zoom,
+                                true,
+                                wizard_state,
+                                confirmation_modal,
+                                show_fonts,
+                            );
+                        }
+                        BrowserTab::IWAD => {
+                            changed |= browser::draw_filtered_browser(
+                                ui,
+                                assets,
+                                file,
+                                zoom,
+                                false,
+                                wizard_state,
+                                confirmation_modal,
+                                show_fonts,
+                            );
+                        }
+                        BrowserTab::Library => {
+                            changed |= browser::draw_library_browser(ui, assets, file, zoom);
+                        }
+                    }
+                });
         });
+
+        if has_footer && footer_top < top_rect.max.y {
+            let footer_rect = egui::Rect::from_min_max(
+                egui::pos2(top_rect.min.x, footer_top),
+                egui::pos2(top_rect.max.x, top_rect.max.y),
+            );
+
+            top_ui.scope_builder(egui::UiBuilder::new().max_rect(footer_rect), |ui| {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.add_space(4.0);
+                    ui.vertical(|ui| {
+                        ui.add_space(3.0);
+                        ui.label(egui::RichText::new("Zoom").weak().size(12.0));
+                    });
+
+                    ui.add_sized(
+                        [80.0, 20.0],
+                        egui::Slider::new(&mut zoom, 0.5..=3.0).show_value(false),
+                    );
+
+                    if active_tab == BrowserTab::Graphics || active_tab == BrowserTab::IWAD {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.add_space(4.0);
+                            if active_tab == BrowserTab::Graphics {
+                                ui.menu_button("Import...", |ui| {
+                                    if ui.button("Files").clicked() {
+                                        let count =
+                                            crate::io::import_images_dialog(ui.ctx(), assets);
+                                        if count > 0 {
+                                            state.push_message(format!(
+                                                "Imported {} images.",
+                                                count
+                                            ));
+                                            changed = true;
+                                        }
+                                        ui.close();
+                                    }
+                                    if ui.button("Folder").clicked() {
+                                        let count =
+                                            crate::io::import_folder_dialog(ui.ctx(), assets);
+                                        if count > 0 {
+                                            state.push_message(format!(
+                                                "Imported {} images from folder.",
+                                                count
+                                            ));
+                                            changed = true;
+                                        }
+                                        ui.close();
+                                    }
+                                });
+                                ui.add_space(4.0);
+                                ui.separator();
+                                ui.add_space(4.0);
+                            } else if active_tab == BrowserTab::IWAD {
+                                ui.add_space(87.0);
+                            }
+                            ui.checkbox(&mut show_fonts, "Fonts");
+                        });
+                    }
+                });
+            });
+        }
     }
 
-    top_ui.data_mut(|d| {
+    ui.data_mut(|d| {
         d.insert_temp(egui::Id::new(TAB_STATE_KEY), current_tab);
         d.insert_temp(egui::Id::new(THUMB_ZOOM_KEY), zoom);
         d.insert_temp(egui::Id::new(SHOW_FONTS_KEY), show_fonts);
     });
 
-    let (response, painter) =
-        ui.allocate_painter(egui::vec2(ui.available_width(), 8.0), egui::Sense::drag());
+    if !is_collapsed {
+        let (response, painter) =
+            ui.allocate_painter(egui::vec2(ui.available_width(), 8.0), egui::Sense::drag());
 
-    let color = if response.hovered() || response.dragged() {
-        ui.visuals().widgets.hovered.bg_fill
+        let color = if response.hovered() || response.dragged() {
+            ui.visuals().widgets.hovered.bg_fill
+        } else {
+            ui.visuals().widgets.noninteractive.bg_stroke.color
+        };
+
+        painter.line_segment(
+            [
+                egui::pos2(response.rect.left(), response.rect.center().y),
+                egui::pos2(response.rect.right(), response.rect.center().y),
+            ],
+            egui::Stroke::new(1.0, color),
+        );
+
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+        }
+        if response.dragged() {
+            split_fraction += response.drag_delta().y / available_height;
+            ui.ctx()
+                .data_mut(|d| d.insert_temp(split_id, split_fraction));
+        }
     } else {
-        ui.visuals().widgets.noninteractive.bg_stroke.color
-    };
-
-    painter.line_segment(
-        [
-            egui::pos2(response.rect.left(), response.rect.center().y),
-            egui::pos2(response.rect.right(), response.rect.center().y),
-        ],
-        egui::Stroke::new(1.0, color),
-    );
-
-    if response.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
-    }
-    if response.dragged() {
-        split_fraction += response.drag_delta().y / available_height;
-        ui.ctx()
-            .data_mut(|d| d.insert_temp(split_id, split_fraction));
+        ui.add_space(1.0);
     }
 
     let remaining_h = ui.available_height();
@@ -269,10 +295,8 @@ pub fn draw_layers_panel(
             ui.heading("Layers");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(4.0);
-
                 ui.menu_button("New Layer...", |ui| {
                     let mut new_element = None;
-
                     let default_hud_font = f.data.hud_fonts.first().map(|font| font.name.clone());
                     let default_num_font =
                         f.data.number_fonts.first().map(|font| font.name.clone());
@@ -305,7 +329,6 @@ pub fn draw_layers_panel(
                     }
 
                     ui.separator();
-
                     if ui.button("Graphic").clicked() {
                         new_element = Some(ElementWrapper {
                             data: Element::Graphic(GraphicDef {
@@ -335,7 +358,6 @@ pub fn draw_layers_panel(
                     }
 
                     ui.separator();
-
                     let num_btn = ui.add_enabled(has_num, egui::Button::new("Number"));
                     if !has_num {
                         num_btn.on_hover_text("Add a Number Font in the 'Fonts' tab first!");
@@ -407,7 +429,6 @@ pub fn draw_layers_panel(
                     }
 
                     ui.separator();
-
                     let comp_btn = ui.add_enabled(has_hud, egui::Button::new("Component"));
                     if !has_hud {
                         comp_btn.on_hover_text("Add a HUD Font in the 'Fonts' tab first!");
@@ -425,7 +446,6 @@ pub fn draw_layers_panel(
                     if let Some(element) = new_element {
                         let (parent_path, insert_idx) =
                             document::determine_insertion_point(selection, *current_bar_idx);
-
                         actions.push(LayerAction::UndoSnapshot);
                         actions.push(LayerAction::Add {
                             parent_path,
@@ -440,12 +460,10 @@ pub fn draw_layers_panel(
 
         bottom_ui.separator();
 
-        if f.data.status_bars.is_empty() {
-        } else {
+        if !f.data.status_bars.is_empty() {
             if *current_bar_idx >= f.data.status_bars.len() {
                 *current_bar_idx = 0;
             }
-
             egui::ScrollArea::vertical()
                 .id_salt("layers_scroll")
                 .auto_shrink([false, false])

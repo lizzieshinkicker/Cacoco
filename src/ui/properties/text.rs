@@ -318,7 +318,7 @@ pub fn draw_interactive_header(
     changed
 }
 
-fn number_type_name(t: NumberType) -> &'static str {
+pub fn number_type_name(t: NumberType) -> &'static str {
     match t {
         NumberType::Health => "Health",
         NumberType::Armor => "Armor",

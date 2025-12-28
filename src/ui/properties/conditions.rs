@@ -14,7 +14,6 @@ pub fn draw_conditions_editor(
     let is_ammo_selected = is_ammo_selected_type(element);
 
     let common = element.get_common_mut();
-    ui.add_space(12.0);
 
     if is_ammo_selected {
         let has_safety = common
@@ -35,18 +34,11 @@ pub fn draw_conditions_editor(
     }
 
     ui.horizontal(|ui| {
-        ui.heading(format!("Conditions ({})", common.conditions.len()));
+        ui.label(egui::RichText::new(format!("Active Rules: {}", common.conditions.len())).weak());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if !common.conditions.is_empty() {
-                if ui
-                    .add_enabled(!is_ammo_selected, egui::Button::new("Clear"))
-                    .clicked()
-                {
-                    common.conditions.clear();
-                    changed = true;
-                }
-            }
-            if ui.button("Add").clicked() {
+            ui.add_space(2.0);
+
+            if ui.button("Add Condition").clicked() {
                 common.conditions.push(ConditionDef {
                     condition: ConditionType::WeaponOwned,
                     param: 101,
@@ -54,9 +46,19 @@ pub fn draw_conditions_editor(
                 });
                 changed = true;
             }
+            if !common.conditions.is_empty() {
+                if ui
+                    .add_enabled(!is_ammo_selected, egui::Button::new("Clear All"))
+                    .clicked()
+                {
+                    common.conditions.clear();
+                    changed = true;
+                }
+            }
         });
     });
     ui.separator();
+    ui.add_space(4.0);
 
     let mut remove_idx = None;
     for (i, cond) in common.conditions.iter_mut().enumerate() {

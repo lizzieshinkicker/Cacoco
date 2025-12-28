@@ -122,6 +122,8 @@ pub fn draw_layouts_browser(
                 });
             }
         }
+
+        ui.add_space(2.0);
     });
 
     if let Some((source, target)) = move_request {

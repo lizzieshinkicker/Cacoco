@@ -102,32 +102,82 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         .resizable(false)
         .exact_width(289.0)
         .show(ctx, |ui| {
-            let available_height = ui.available_height();
+            let held_items_id = ui.make_persistent_id("held_items_expanded");
+            let mut expanded = ui.data(|d| d.get_temp::<bool>(held_items_id).unwrap_or(true));
 
-            ui.vertical(|ui| {
-                ui.set_height(available_height);
+            egui::TopBottomPanel::bottom("left_sidebar_footer")
+                .frame(egui::Frame::NONE)
+                .resizable(false)
+                .show_inside(ui, |ui| {
+                    ui.add_space(5.0);
 
-                let mut props_changed = false;
-                egui::ScrollArea::vertical()
-                    .id_salt("properties_scroll")
-                    .max_height(available_height * 0.60)
-                    .show(ui, |ui| {
-                        props_changed = ui::draw_properties_panel(
-                            ui,
-                            &mut app.current_file,
-                            &app.selection,
-                            &app.assets,
-                            &app.preview_state,
-                        );
-                    });
+                    let (rect, response) = ui.allocate_exact_size(
+                        egui::vec2(ui.available_width(), 28.0),
+                        egui::Sense::click(),
+                    );
 
-                if props_changed {
-                    app.dirty = true;
-                }
+                    let mut bg_color = ui.visuals().widgets.noninteractive.bg_fill;
+                    if expanded {
+                        bg_color = egui::Color32::from_rgba_unmultiplied(60, 130, 255, 15);
+                    }
+                    if response.hovered() {
+                        bg_color = ui.visuals().widgets.hovered.bg_fill;
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
 
-                ui.separator();
-                ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
-            });
+                    ui.painter().rect(
+                        rect,
+                        4.0,
+                        bg_color,
+                        egui::Stroke::new(1.0, egui::Color32::from_white_alpha(30)),
+                        egui::StrokeKind::Inside,
+                    );
+
+                    let text_color = if expanded {
+                        ui.visuals().text_color()
+                    } else {
+                        ui.visuals().weak_text_color()
+                    };
+
+                    ui.painter().text(
+                        rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        "Held Items",
+                        egui::FontId::proportional(14.0),
+                        text_color,
+                    );
+
+                    if response.clicked() {
+                        expanded = !expanded;
+                    }
+
+                    ui.add_space(1.0);
+                    ui.separator();
+
+                    if expanded {
+                        ui.add_space(3.0);
+                        ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
+                        ui.add_space(10.0);
+                    } else {
+                        ui.add_space(3.0);
+                    }
+                });
+
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE)
+                .show_inside(ui, |ui| {
+                    if ui::draw_properties_panel(
+                        ui,
+                        &mut app.current_file,
+                        &app.selection,
+                        &app.assets,
+                        &app.preview_state,
+                    ) {
+                        app.dirty = true;
+                    }
+                });
+
+            ui.data_mut(|d| d.insert_temp(held_items_id, expanded));
         });
 
     egui::SidePanel::right("right_side_panel")
