@@ -669,7 +669,7 @@ fn draw_terminal_drop_zone(
     selection: &HashSet<Vec<usize>>,
     actions: &mut Vec<LayerAction>,
 ) {
-    let height = 12.0;
+    let height = 2.0;
     let (rect, _) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), height),
         egui::Sense::hover(),
