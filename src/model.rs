@@ -291,9 +291,17 @@ pub struct CommonAttrs {
     pub translation: Option<String>,
     #[serde(default)]
     pub translucency: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "deserialize_null_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_null_default"
+    )]
     pub conditions: Vec<ConditionDef>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "deserialize_null_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_null_default"
+    )]
     pub children: Vec<ElementWrapper>,
 }
 

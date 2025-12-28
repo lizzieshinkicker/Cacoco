@@ -157,18 +157,19 @@ pub(super) fn resolve_position(
     pos
 }
 
-pub(super) fn get_alignment_anchor_offset(align: Alignment, w: f32, h: f32) -> egui::Vec2 {
-    let mut dx = 0.0;
-    let mut dy = 0.0;
-    if align.contains(Alignment::RIGHT) {
-        dx = -w;
-    } else if align.contains(Alignment::H_CENTER) {
-        dx = -w / 2.0;
-    }
-    if align.contains(Alignment::BOTTOM) {
-        dy = -h;
-    } else if align.contains(Alignment::V_CENTER) {
-        dy = -h / 2.0;
-    }
-    egui::vec2(dx, dy)
+pub fn get_alignment_anchor_offset(align: Alignment, w: f32, h: f32) -> egui::Vec2 {
+    let calc = |size: f32, max_bit: Alignment, mid_bit: Alignment| {
+        if align.contains(max_bit) {
+            -size
+        } else if align.contains(mid_bit) {
+            -(size / 2.0).floor()
+        } else {
+            0.0
+        }
+    };
+
+    egui::vec2(
+        calc(w, Alignment::RIGHT, Alignment::H_CENTER),
+        calc(h, Alignment::BOTTOM, Alignment::V_CENTER),
+    )
 }
