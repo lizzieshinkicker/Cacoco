@@ -18,11 +18,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     }
 
     let dirty_indicator = if app.dirty { "*" } else { "" };
-
     let file_display = if app.current_file.is_some() {
         if let Some(path_str) = &app.opened_file_path {
             let name = Path::new(path_str)
-                .file_name()
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or(path_str);
             format!("[{}{}] ", dirty_indicator, name)
@@ -36,8 +35,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     let flavor_title = ctx.data(|d| d.get_temp::<String>(egui::Id::new("random_title")));
     if let Some(flavor) = flavor_title {
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
-            "{}Cacoco - {}",
-            file_display, flavor
+            "{file_display}Cacoco - {flavor}"
         )));
     }
 
@@ -48,60 +46,27 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     app.cheat_engine.process_input(ctx, &mut app.preview_state);
     app.preview_state.update(ctx.input(|i| i.stable_dt));
 
-    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-        let action = ui::draw_menu_bar(
-            ui,
-            ctx,
-            &mut app.current_file,
-            app.opened_file_path.clone(),
-            &mut app.config,
-            &mut app.assets,
-            &mut app.settings_open,
-            app.dirty,
-        );
-
-        match action {
-            ui::MenuAction::LoadProject(loaded, path) => {
-                app.load_project(ctx, loaded, &path);
-            }
-            ui::MenuAction::LoadTemplate(template) => {
-                app.apply_template(ctx, template);
-            }
-            ui::MenuAction::NewEmpty => {
-                app.new_project(ctx);
-            }
-            ui::MenuAction::Open => {
-                app.open_project_ui(ctx);
-            }
-            ui::MenuAction::RequestDiscard(pending) => {
-                app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
-            }
-            ui::MenuAction::SaveDone(path) => {
-                if path == "SILENT" {
-                    handle_action(app, crate::hotkeys::Action::Save, ctx);
-                } else {
-                    app.opened_file_path = Some(path.clone());
-                    app.add_to_recent(&path);
-                    app.dirty = false;
-                    app.preview_state.push_message(format!("Saved: {}", path));
-                }
-            }
-            ui::MenuAction::ExportDone(path) => {
-                app.add_to_recent(&path);
-                app.preview_state
-                    .push_message(format!("Exported: {}", path));
-            }
-            ui::MenuAction::PickPortAndRun => {
-                handle_pick_port_and_run(app);
-            }
-            _ => {}
-        }
-    });
-
     egui::SidePanel::left("left_side_panel")
         .resizable(false)
         .exact_width(289.0)
         .show(ctx, |ui| {
+            ui.add_space(5.0);
+
+            let menu_action = ui::draw_menu_bar(
+                ui,
+                ctx,
+                &mut app.current_file,
+                app.opened_file_path.clone(),
+                &mut app.config,
+                &mut app.assets,
+                &mut app.settings_open,
+                app.dirty,
+            );
+            handle_menu_action(app, menu_action, ctx);
+
+            ui.add_space(2.0);
+            ui.separator();
+
             let held_items_id = ui.make_persistent_id("held_items_expanded");
             let mut expanded = ui.data(|d| d.get_temp::<bool>(held_items_id).unwrap_or(true));
 
@@ -109,49 +74,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 .frame(egui::Frame::NONE)
                 .resizable(false)
                 .show_inside(ui, |ui| {
-                    ui.add_space(5.0);
-
-                    let (rect, response) = ui.allocate_exact_size(
-                        egui::vec2(ui.available_width(), 28.0),
-                        egui::Sense::click(),
-                    );
-
-                    let mut bg_color = ui.visuals().widgets.noninteractive.bg_fill;
-                    if expanded {
-                        bg_color = egui::Color32::from_rgba_unmultiplied(60, 130, 255, 15);
-                    }
-                    if response.hovered() {
-                        bg_color = ui.visuals().widgets.hovered.bg_fill;
-                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                    }
-
-                    ui.painter().rect(
-                        rect,
-                        4.0,
-                        bg_color,
-                        egui::Stroke::new(1.0, egui::Color32::from_white_alpha(30)),
-                        egui::StrokeKind::Inside,
-                    );
-
-                    let text_color = if expanded {
-                        ui.visuals().text_color()
-                    } else {
-                        ui.visuals().weak_text_color()
-                    };
-
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "Held Items",
-                        egui::FontId::proportional(14.0),
-                        text_color,
-                    );
-
-                    if response.clicked() {
+                    ui.add_space(7.0);
+                    if ui::shared::section_header_button(ui, "Held Items", expanded).clicked() {
                         expanded = !expanded;
                     }
-
-                    ui.add_space(1.0);
                     ui.separator();
 
                     if expanded {
@@ -650,5 +576,35 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 }
             }
         }
+    }
+}
+
+fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::Context) {
+    match action {
+        ui::MenuAction::LoadProject(loaded, path) => app.load_project(ctx, loaded, &path),
+        ui::MenuAction::LoadTemplate(template) => app.apply_template(ctx, template),
+        ui::MenuAction::NewEmpty => app.new_project(ctx),
+        ui::MenuAction::Open => app.open_project_ui(ctx),
+        ui::MenuAction::RequestDiscard(pending) => {
+            app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending))
+        }
+        ui::MenuAction::SaveDone(path) => {
+            if path == "SILENT" {
+                handle_action(app, crate::hotkeys::Action::Save, ctx);
+            } else {
+                app.opened_file_path = Some(path.clone());
+                app.add_to_recent(&path);
+                app.dirty = false;
+                app.preview_state.push_message(format!("Saved: {path}"));
+            }
+        }
+        ui::MenuAction::ExportDone(path) => {
+            app.add_to_recent(&path);
+            app.preview_state.push_message(format!("Exported: {path}"));
+        }
+        ui::MenuAction::PickPortAndRun => {
+            handle_pick_port_and_run(app);
+        }
+        _ => {}
     }
 }

@@ -4,6 +4,8 @@ use crate::config::AppConfig;
 use crate::io::{self, LoadedProject};
 use crate::library;
 use crate::model::SBarDefFile;
+use crate::ui::context_menu::ContextMenu;
+use crate::ui::shared;
 use eframe::egui;
 use std::path::Path;
 
@@ -34,141 +36,141 @@ pub fn draw_menu_bar(
     let template_modal_id = ui.make_persistent_id("template_selector_open");
     let mut template_open = ui.data(|d| d.get_temp::<bool>(template_modal_id).unwrap_or(false));
 
-    egui::MenuBar::new().ui(ui, |ui| {
-        ui.menu_button("File", |ui| {
-            if ui.button("New...").clicked() {
+    let file_id = ui.make_persistent_id("file_menu_area");
+    let run_id = ui.make_persistent_id("run_menu_area");
+
+    let mut open_file = false;
+    let mut open_run = false;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let btn_w = (ui.available_width() - 4.0) / 2.0;
+
+        let file_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+            shared::section_header_button(ui, "File", ContextMenu::get(ui, file_id).is_some())
+        });
+        if file_res.clicked() {
+            open_file = true;
+            trigger_menu(ui, file_id, file_res.rect.left_bottom());
+        }
+
+        let run_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+            shared::section_header_button(ui, "Run", ContextMenu::get(ui, run_id).is_some())
+        });
+        if run_res.clicked() {
+            open_run = true;
+            trigger_menu(ui, run_id, run_res.rect.left_bottom());
+        }
+    });
+
+    if let Some(menu) = ContextMenu::get(ui, file_id) {
+        ContextMenu::show(ui, menu, open_file, |ui| {
+            if ContextMenu::button(ui, "New Project...", true) {
                 if dirty {
                     action = MenuAction::RequestDiscard(PendingAction::New);
                 } else {
                     template_open = true;
                 }
-                ui.close();
+                ContextMenu::close(ui);
             }
-
-            if ui.button("Open...").on_hover_text("Ctrl+O").clicked() {
+            if ContextMenu::button(ui, "Open Project...", true) {
                 if dirty {
                     action = MenuAction::RequestDiscard(PendingAction::Load("".to_string()));
                 } else {
                     action = MenuAction::Open;
                 }
-                ui.close();
+                ContextMenu::close(ui);
             }
 
             if !config.recent_files.is_empty() {
                 ui.separator();
-                ui.label("Recent Files");
-
+                ui.label(egui::RichText::new("  Recent Files").weak().size(10.0));
                 let mut file_to_load = None;
                 for path in config.recent_files.iter() {
-                    let path_str: &String = path;
-                    let display_path = if path_str.len() > 50 {
-                        format!("...{}", &path_str[path_str.len() - 47..])
-                    } else {
-                        path_str.clone()
-                    };
-
-                    if ui.button(display_path).clicked() {
-                        file_to_load = Some(path_str.clone());
-                        ui.close();
+                    if ContextMenu::button(ui, &shared::truncate_path(path, 30), true) {
+                        file_to_load = Some(path.clone());
                     }
                 }
-
-                if let Some(path_to_load) = file_to_load {
+                if let Some(path) = file_to_load {
                     if dirty {
-                        action = MenuAction::RequestDiscard(PendingAction::Load(path_to_load));
-                    } else if let Some(loaded) = io::load_project_from_path(ctx, &path_to_load) {
-                        action = MenuAction::LoadProject(loaded, path_to_load);
-                    } else {
-                        config.recent_files.retain(|p| p != &path_to_load);
-                        config.save();
+                        action = MenuAction::RequestDiscard(PendingAction::Load(path));
+                    } else if let Some(loaded) = io::load_project_from_path(ctx, &path) {
+                        action = MenuAction::LoadProject(loaded, path);
                     }
+                    ContextMenu::close(ui);
                 }
             }
 
             ui.separator();
-            if ui.button("Save").on_hover_text("Ctrl+S").clicked() {
+            if ContextMenu::button(ui, "Save", true) {
                 action = MenuAction::SaveDone("SILENT".to_string());
-                ui.close();
+                ContextMenu::close(ui);
             }
-            if ui.button("Save As...").clicked() {
+            if ContextMenu::button(ui, "Save As...", true) {
                 if let Some(f) = current_file {
                     if let Some(path) = io::save_pk3_dialog(f, assets, opened_file_path.clone()) {
                         action = MenuAction::SaveDone(path);
                     }
                 }
-                ui.close();
+                ContextMenu::close(ui);
             }
-
-            if ui
-                .button("Export JSON...")
-                .on_hover_text("Ctrl+E")
-                .clicked()
-            {
+            if ContextMenu::button(ui, "Export JSON...", true) {
                 if let Some(f) = current_file {
                     if let Some(path) = io::save_json_dialog(f, opened_file_path.clone()) {
                         action = MenuAction::ExportDone(path);
                     }
                 }
-                ui.close();
+                ContextMenu::close(ui);
             }
+
             ui.separator();
-            if ui.button("Settings...").clicked() {
+            if ContextMenu::button(ui, "Settings...", true) {
                 *settings_open = true;
-                ui.close();
+                ContextMenu::close(ui);
             }
             ui.separator();
-            if ui.button("Quit").clicked() {
+            if ContextMenu::button(ui, "Quit", true) {
                 if dirty {
                     action = MenuAction::RequestDiscard(PendingAction::Quit);
                 } else {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
+                ContextMenu::close(ui);
             }
         });
+    }
 
-        ui.menu_button("Run", |ui| {
+    if let Some(menu) = ContextMenu::get(ui, run_id) {
+        ContextMenu::show(ui, menu, open_run, |ui| {
             let has_file = current_file.is_some();
-
             if config.source_ports.is_empty() {
-                if ui
-                    .add_enabled(has_file, egui::Button::new("Launch (No port set...)"))
-                    .clicked()
-                {
+                if ContextMenu::button(ui, "Add New Port...", has_file) {
                     action = MenuAction::PickPortAndRun;
-                    ui.close();
+                    ContextMenu::close(ui);
                 }
             } else {
                 for path_str in &config.source_ports {
                     let name = get_port_name(path_str);
-                    if ui
-                        .add_enabled(has_file, egui::Button::new(format!("Launch in {}", name)))
-                        .clicked()
-                    {
+                    if ContextMenu::button(ui, &format!("Launch in {name}"), has_file) {
                         if let (Some(f), Some(iwad)) =
                             (current_file.as_ref(), config.base_wad_path.as_ref())
                         {
                             io::launch_game(f, assets, path_str, iwad);
                         }
-                        ui.close();
+                        ContextMenu::close(ui);
                     }
                 }
                 ui.separator();
-                if ui.button("Add New Port...").clicked() {
+                if ContextMenu::button(ui, "Add New Port...", true) {
                     action = MenuAction::PickPortAndRun;
-                    ui.close();
+                    ContextMenu::close(ui);
                 }
             }
-
-            if !has_file {
-                ui.separator();
-                ui.label("⚠ No file loaded");
-            }
         });
-    });
+    }
 
     if template_open {
         let mut close_window = false;
-
         egui::Window::new("Create New Project")
             .open(&mut template_open)
             .collapsible(false)
@@ -228,7 +230,6 @@ pub fn draw_menu_bar(
     }
 
     ui.data_mut(|d| d.insert_temp(template_modal_id, template_open));
-
     action
 }
 
@@ -424,4 +425,12 @@ pub fn get_port_name(path_str: &str) -> String {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
     }
+}
+
+/// Consolidated helper to trigger the custom ContextMenu state.
+fn trigger_menu(ui: &mut egui::Ui, id: egui::Id, pos: egui::Pos2) {
+    ui.data_mut(|d| {
+        d.insert_temp(egui::Id::new("cacoco_context_menu_id"), id);
+        d.insert_temp(egui::Id::new("cacoco_context_menu_pos"), pos);
+    });
 }
