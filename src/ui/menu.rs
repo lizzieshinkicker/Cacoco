@@ -47,7 +47,7 @@ pub fn draw_menu_bar(
         let btn_w = (ui.available_width() - 4.0) / 2.0;
 
         let file_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
-            shared::section_header_button(ui, "File", ContextMenu::get(ui, file_id).is_some())
+            shared::section_header_button(ui, "File", None, ContextMenu::get(ui, file_id).is_some())
         });
         if file_res.clicked() {
             open_file = true;
@@ -55,7 +55,7 @@ pub fn draw_menu_bar(
         }
 
         let run_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
-            shared::section_header_button(ui, "Run", ContextMenu::get(ui, run_id).is_some())
+            shared::section_header_button(ui, "Run", None, ContextMenu::get(ui, run_id).is_some())
         });
         if run_res.clicked() {
             open_run = true;

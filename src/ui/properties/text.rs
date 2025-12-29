@@ -206,7 +206,7 @@ pub fn draw_interactive_header(
 
                 ui.add_sized(
                     [ui.available_width(), 0.0],
-                    egui::Label::new(egui::RichText::new(title).size(16.0).strong()),
+                    egui::Label::new(egui::RichText::new(title).size(16.0)),
                 );
                 ui.add(egui::Separator::default().spacing(8.0));
                 ui.vertical_centered(|ui| {

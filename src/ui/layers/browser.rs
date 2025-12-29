@@ -42,7 +42,7 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
     let mut remove_hud = None;
 
     if !file.data.hud_fonts.is_empty() {
-        ui.label(egui::RichText::new("HUD Fonts").strong());
+        ui.label(egui::RichText::new("HUD Fonts"));
         for (i, font) in file.data.hud_fonts.iter().enumerate() {
             let preview_char = (b'A' + (i % 26) as u8) as char;
             if draw_registered_font_row(ui, &font.name, &font.stem, false, preview_char, assets) {
@@ -57,7 +57,7 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
     }
 
     if !file.data.number_fonts.is_empty() {
-        ui.label(egui::RichText::new("Number Fonts").strong());
+        ui.label(egui::RichText::new("Number Fonts"));
         for (i, font) in file.data.number_fonts.iter().enumerate() {
             let preview_char = std::char::from_digit((i % 10) as u32, 10).unwrap_or('0');
             if draw_registered_font_row(ui, &font.name, &font.stem, true, preview_char, assets) {
@@ -119,11 +119,7 @@ pub fn draw_filtered_browser(
 ) -> bool {
     let mut changed = false;
     if !show_project_assets {
-        ui.heading("Base IWAD Browser");
-        ui.separator();
-        ui.add_space(4.0);
-
-        ui.label(egui::RichText::new("IWAD HUD Fonts").strong());
+        ui.label(egui::RichText::new("IWAD HUD Fonts"));
         ui.add_space(4.0);
         let iwad_hud = library::FONTS
             .iter()
@@ -133,7 +129,7 @@ pub fn draw_filtered_browser(
         }
 
         ui.add_space(8.0);
-        ui.label(egui::RichText::new("IWAD Number Fonts").strong());
+        ui.label(egui::RichText::new("IWAD Number Fonts"));
         ui.add_space(4.0);
         let iwad_num = library::FONTS
             .iter()
@@ -145,7 +141,7 @@ pub fn draw_filtered_browser(
         ui.add_space(12.0);
         ui.separator();
         ui.add_space(8.0);
-        ui.label(egui::RichText::new("Loose IWAD Assets").strong());
+        ui.label(egui::RichText::new("Loose IWAD Assets"));
     }
 
     let mut project_stems = HashSet::new();
@@ -232,11 +228,7 @@ pub fn draw_library_browser(
     zoom: f32,
 ) -> bool {
     let mut changed = false;
-    ui.heading("Library Browser");
-    ui.separator();
-    ui.add_space(4.0);
-
-    ui.label(egui::RichText::new("HUD Font Packages").strong());
+    ui.label(egui::RichText::new("HUD Font Packages"));
     ui.add_space(4.0);
     let lib_hud = library::FONTS
         .iter()
@@ -246,7 +238,7 @@ pub fn draw_library_browser(
     }
 
     ui.add_space(8.0);
-    ui.label(egui::RichText::new("Number Font Packages").strong());
+    ui.label(egui::RichText::new("Number Font Packages"));
     ui.add_space(4.0);
     let lib_num = library::FONTS
         .iter()
@@ -258,7 +250,7 @@ pub fn draw_library_browser(
     ui.add_space(12.0);
     ui.separator();
     ui.add_space(8.0);
-    ui.label(egui::RichText::new("Loose Library Assets").strong());
+    ui.label(egui::RichText::new("Loose Library Assets"));
 
     let available_w = ui.available_width() - 12.0;
     let target_size = thumbnails::THUMB_SIZE * zoom;
@@ -330,9 +322,7 @@ fn draw_unified_font_row(
         ui.put(
             btn_rect,
             egui::Label::new(
-                egui::RichText::new("Added!")
-                    .color(egui::Color32::GREEN)
-                    .strong(),
+                egui::RichText::new("Added!"),
             ),
         );
     } else if ui.put(btn_rect, egui::Button::new("Add").small()).clicked() {

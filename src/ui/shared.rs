@@ -94,22 +94,30 @@ pub fn draw_no_file_placeholder(ui: &mut egui::Ui) {
     });
 }
 
+
 /// A stylized header button used for section switching or expansion.
-pub fn section_header_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
-    section_header_button_impl(ui, label, active, 28.0, 14.0)
+pub fn section_header_button(ui: &mut egui::Ui, label: &str, subheading: Option<&str>, active: bool) -> egui::Response {
+    section_header_button_impl(ui, label, subheading, active, 28.0, 14.0, false)
 }
 
 /// A smaller version for tight spaces like the browser tabs.
-pub fn compact_header_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
-    section_header_button_impl(ui, label, active, 24.0, 11.0)
+pub fn compact_header_button(ui: &mut egui::Ui, label: &str, subheading: Option<&str>, active: bool) -> egui::Response {
+    section_header_button_impl(ui, label, subheading, active, 24.0, 11.0, false)
+}
+
+/// A large header button with heading-style text and optional right-aligned action text.
+pub fn heading_action_button(ui: &mut egui::Ui, label: &str, subheading: Option<&str>, active: bool) -> egui::Response {
+    section_header_button_impl(ui, label, subheading, active, 32.0, 18.0, true)
 }
 
 fn section_header_button_impl(
     ui: &mut egui::Ui,
     label: &str,
+    subheading: Option<&str>,
     active: bool,
     h: f32,
     font_sz: f32,
+    is_heading: bool,
 ) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), h), egui::Sense::click());
@@ -131,19 +139,39 @@ fn section_header_button_impl(
         egui::StrokeKind::Inside,
     );
 
-    let text_color = if active {
+    let text_color = if active || is_heading {
         ui.visuals().text_color()
     } else {
         ui.visuals().weak_text_color()
     };
 
-    ui.painter().text(
-        rect.center() + egui::vec2(0.0, -1.0),
-        egui::Align2::CENTER_CENTER,
-        label,
-        egui::FontId::proportional(font_sz),
-        text_color,
-    );
+    let font_id = egui::FontId::proportional(font_sz);
+
+    if let Some(sub) = subheading {
+        ui.painter().text(
+            rect.left_center() + egui::vec2(8.0, -1.0),
+            egui::Align2::LEFT_CENTER,
+            label,
+            font_id,
+            text_color,
+        );
+
+        ui.painter().text(
+            rect.right_center() + egui::vec2(-8.0, -1.0),
+            egui::Align2::RIGHT_CENTER,
+            sub,
+            egui::FontId::proportional((font_sz * 0.75).max(10.0)),
+            ui.visuals().weak_text_color(),
+        );
+    } else {
+        ui.painter().text(
+            rect.center() + egui::vec2(0.0, -1.0),
+            egui::Align2::CENTER_CENTER,
+            label,
+            font_id,
+            text_color,
+        );
+    }
 
     response
 }

@@ -16,20 +16,11 @@ pub fn draw_layouts_browser(
 ) -> bool {
     let mut changed = false;
 
-    ui.horizontal(|ui| {
-        ui.heading("Layouts");
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(4.0);
-            if ui.button("New Layout").clicked() {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::AddStatusBar);
-                changed = true;
-            }
-        });
-    });
-
-    ui.separator();
-    ui.add_space(4.0);
+    if shared::heading_action_button(ui, "Layouts", Some("New Layout"), false).clicked() {
+        actions.push(LayerAction::UndoSnapshot);
+        actions.push(LayerAction::AddStatusBar);
+        changed = true;
+    }
 
     let mut move_request = None;
     let mut duplicate_request = None;

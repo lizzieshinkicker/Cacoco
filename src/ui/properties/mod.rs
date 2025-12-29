@@ -132,30 +132,30 @@ pub fn draw_properties_panel(
             if shared::section_header_button(
                 &mut uis[0],
                 "Properties",
+                None,
                 current_tab == PropertyTab::Properties,
             )
-            .clicked()
+                .clicked()
             {
                 current_tab = PropertyTab::Properties;
             }
             if shared::section_header_button(
                 &mut uis[1],
                 "Conditions",
+                None,
                 current_tab == PropertyTab::Conditions,
             )
-            .clicked()
+                .clicked()
             {
                 current_tab = PropertyTab::Conditions;
             }
         });
-        ui.add_space(3.0);
-        ui.separator();
     }
 
     egui::ScrollArea::vertical()
         .id_salt("prop_content_scroll")
         .show(ui, |ui| {
-            ui.add_space(0.0);
+            ui.add_space(4.0);
 
             if let Some(f) = file {
                 let font_cache = FontCache::new(f);
@@ -245,7 +245,7 @@ fn draw_static_header(ui: &mut egui::Ui, title: &str, desc: &str, color: egui::C
         ui.vertical(|ui| {
             ui.add_sized(
                 [ui.available_width(), 0.0],
-                egui::Label::new(egui::RichText::new(title).size(16.0).strong()),
+                egui::Label::new(egui::RichText::new(title).size(16.0)),
             );
             ui.add(egui::Separator::default().spacing(8.0));
             ui.vertical_centered(|ui| {

@@ -96,7 +96,7 @@ pub fn draw_font_wizard(
                 }
 
                 ui.add_space(8.0);
-                ui.label(egui::RichText::new("Character Coverage:").strong());
+                ui.label(egui::RichText::new("Character Coverage:"));
 
                 let scroll_height = 200.0;
                 egui::ScrollArea::vertical()
