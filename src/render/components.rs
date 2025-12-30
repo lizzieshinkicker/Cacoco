@@ -14,7 +14,22 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
                     let ts = ctx.time as u64;
                     format!("{:02}:{:02}:{:02}", ts / 3600, (ts % 3600) / 60, ts % 60)
                 }
-                ComponentType::LevelTitle => "MAP01: ENTRYWAY".to_string(),
+                ComponentType::LevelTitle => {
+                    let map_format_id = egui::Id::new("use_doom2_map_format");
+                    let is_doom2 = ctx
+                        .painter
+                        .ctx()
+                        .data(|d| d.get_temp::<bool>(map_format_id).unwrap_or(true));
+
+                    if is_doom2 {
+                        format!("MAP{:02}: ENTRYWAY", ctx.state.world.level)
+                    } else {
+                        format!(
+                            "E{}M{}: ENTRYWAY",
+                            ctx.state.world.episode, ctx.state.world.level
+                        )
+                    }
+                }
                 ComponentType::FpsCounter => format!("{:.0}", ctx.fps),
                 ComponentType::Coordinates => {
                     format!("X: {:.0} Y: {:.0} Z: 0", ctx.mouse_pos.x, ctx.mouse_pos.y)
@@ -36,14 +51,20 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
 }
 
 fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, alpha: f32) {
-    let parts = ["K: 0/19", "I: 0/9", "S: 0/5"];
+    let p = &ctx.state.player;
+    let parts = [
+        format!("K: {}/{}", p.kills, p.max_kills),
+        format!("I: {}/{}", p.items, p.max_items),
+        format!("S: {}/{}", p.secrets, p.max_secrets),
+    ];
+
     let mut cur_pos = pos;
 
     if def.vertical {
-        for p in parts {
+        for part in &parts {
             draw_text_line(
                 ctx,
-                p,
+                part,
                 &def.font,
                 cur_pos,
                 def.common.alignment,
@@ -53,17 +74,17 @@ fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
             cur_pos.y += 8.0;
         }
     } else {
-        for p in parts {
+        for part in &parts {
             draw_text_line(
                 ctx,
-                p,
+                part,
                 &def.font,
                 cur_pos,
                 def.common.alignment,
                 false,
                 alpha,
             );
-            cur_pos.x += measure_text_line(ctx, p, &def.font, false) + 8.0;
+            cur_pos.x += measure_text_line(ctx, part, &def.font, false) + 8.0;
         }
     }
 }

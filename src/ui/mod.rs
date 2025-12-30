@@ -7,7 +7,6 @@ pub(crate) mod properties;
 pub mod root;
 pub mod shared;
 pub mod viewport;
-pub mod vitals;
 
 pub use gamestate::draw_gamestate_panel;
 pub use layers::draw_layers_panel;
@@ -15,4 +14,3 @@ pub use menu::{MenuAction, draw_menu_bar, draw_settings_window};
 pub use properties::draw_properties_panel;
 pub use root::draw_root_ui;
 pub use viewport::draw_viewport;
-pub use vitals::draw_vitals_panel;

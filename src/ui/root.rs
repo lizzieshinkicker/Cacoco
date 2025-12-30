@@ -67,28 +67,68 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             ui.add_space(2.0);
             ui.separator();
 
-            let held_items_id = ui.make_persistent_id("held_items_expanded");
-            let mut expanded = ui.data(|d| d.get_temp::<bool>(held_items_id).unwrap_or(true));
+            let tab_id = ui.make_persistent_id("sidebar_tab_idx");
+            let mut tab_idx: Option<usize> = ui.data(|d| d.get_temp(tab_id).unwrap_or(Some(0)));
 
             egui::TopBottomPanel::bottom("left_sidebar_footer")
                 .frame(egui::Frame::NONE)
                 .resizable(false)
                 .show_inside(ui, |ui| {
                     ui.add_space(7.0);
-                    if ui::shared::section_header_button(ui, "Held Items", None, expanded).clicked()
-                    {
-                        expanded = !expanded;
-                    }
+
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        let btn_w = (ui.available_width() - 4.0) / 2.0;
+
+                        if ui
+                            .add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+                                ui::shared::section_header_button(
+                                    ui,
+                                    "Held Items",
+                                    None,
+                                    tab_idx == Some(0),
+                                )
+                            })
+                            .clicked()
+                        {
+                            tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
+                        }
+
+                        if ui
+                            .add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+                                ui::shared::section_header_button(
+                                    ui,
+                                    "Game Context",
+                                    None,
+                                    tab_idx == Some(1),
+                                )
+                            })
+                            .clicked()
+                        {
+                            tab_idx = if tab_idx == Some(1) { None } else { Some(1) };
+                        }
+                    });
+
                     ui.separator();
 
-                    if expanded {
+                    if let Some(idx) = tab_idx {
                         ui.add_space(3.0);
-                        ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
+                        if idx == 0 {
+                            ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
+                        } else {
+                            ui::gamestate::draw_context_panel(
+                                ui,
+                                &mut app.preview_state,
+                                &app.assets,
+                            );
+                        }
                         ui.add_space(10.0);
                     } else {
                         ui.add_space(3.0);
                     }
                 });
+
+            ui.data_mut(|d| d.insert_temp(tab_id, tab_idx));
 
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE)
@@ -103,8 +143,6 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                         app.dirty = true;
                     }
                 });
-
-            ui.data_mut(|d| d.insert_temp(held_items_id, expanded));
         });
 
     egui::SidePanel::right("right_side_panel")
@@ -128,13 +166,6 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             }
 
             app.execute_actions(actions);
-        });
-
-    egui::TopBottomPanel::bottom("gamestate_panel")
-        .resizable(false)
-        .exact_height(140.0)
-        .show(ctx, |ui| {
-            ui::draw_vitals_panel(ui, &mut app.preview_state, &app.assets);
         });
 
     egui::CentralPanel::default().show(ctx, |ui| {

@@ -1,4 +1,5 @@
 use crate::assets::AssetStore;
+use crate::model::FeatureLevel;
 use crate::state::PreviewState;
 use crate::ui::shared;
 use eframe::egui;
@@ -477,4 +478,332 @@ fn draw_asset_button(
     }
 
     (rect, response)
+}
+
+pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &AssetStore) {
+    ui.vertical_centered(|ui| {
+        ui.style_mut().spacing.item_spacing = egui::vec2(4.0, 6.0);
+
+        let map_format_id = ui.make_persistent_id("use_doom2_map_format");
+        let mut is_doom2 = ui.data(|d| d.get_temp::<bool>(map_format_id).unwrap_or(true));
+
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 170.0).max(0.0) / 2.0);
+            ui.spacing_mut().item_spacing.x = 12.0;
+
+            ui.vertical(|ui| {
+                egui::Grid::new("sb_vit_grid")
+                    .spacing(egui::vec2(4.0, 4.0))
+                    .show(ui, |ui| {
+                        ui.label("Health:");
+                        ui.add(egui::DragValue::new(&mut state.player.health).range(0..=200));
+                        ui.end_row();
+
+                        ui.label("Armor:");
+                        ui.add(egui::DragValue::new(&mut state.player.armor).range(0..=200));
+                        ui.end_row();
+                    });
+            });
+
+            ui.vertical(|ui| {
+                ui.set_width(42.0);
+                let is_blue = state.player.armor_max == 200;
+                let patch = if is_blue { "ARM2A0" } else { "ARM1A0" };
+                let is_active = state.player.armor > 0;
+
+                let icon_res = draw_icon_button(ui, assets, patch, is_active, "Armor");
+                if icon_res.clicked() {
+                    state.player.armor_max = if is_blue { 100 } else { 200 };
+                }
+            });
+        });
+
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 180.0).max(0.0) / 2.0);
+            ui.spacing_mut().item_spacing.x = 12.0;
+
+            ui.vertical(|ui| {
+                let m_bul = state.get_max_ammo(0);
+                let m_shl = state.get_max_ammo(1);
+                let m_rkt = state.get_max_ammo(3);
+                let m_cel = state.get_max_ammo(2);
+
+                egui::Grid::new("sb_amm_grid")
+                    .spacing(egui::vec2(4.0, 1.0))
+                    .show(ui, |ui| {
+                        ui.label("Bullets:");
+                        ui.add(
+                            egui::DragValue::new(&mut state.inventory.ammo_bullets)
+                                .range(0..=m_bul),
+                        );
+                        ui.end_row();
+                        ui.label("Shells:");
+                        ui.add(
+                            egui::DragValue::new(&mut state.inventory.ammo_shells).range(0..=m_shl),
+                        );
+                        ui.end_row();
+                        ui.label("Rockets:");
+                        ui.add(
+                            egui::DragValue::new(&mut state.inventory.ammo_rockets)
+                                .range(0..=m_rkt),
+                        );
+                        ui.end_row();
+                        ui.label("Cells:");
+                        ui.add(
+                            egui::DragValue::new(&mut state.inventory.ammo_cells).range(0..=m_cel),
+                        );
+                        ui.end_row();
+                    });
+            });
+
+            ui.vertical(|ui| {
+                ui.set_width(42.0);
+                let _ =
+                    draw_icon_button(ui, assets, "BPAKA0", state.inventory.has_backpack, "Pack")
+                        .clicked()
+                        .then(|| state.inventory.has_backpack = !state.inventory.has_backpack);
+            });
+        });
+
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 170.0).max(0.0) / 2.0);
+            egui::Grid::new("sb_stats_grid")
+                .num_columns(2)
+                .spacing(egui::vec2(12.0, 6.0))
+                .show(ui, |ui| {
+                    let draw_stat_row =
+                        |ui: &mut egui::Ui, label: &str, cur: &mut i32, max: &mut i32| {
+                            ui.label(label);
+                            ui.horizontal(|ui| {
+                                ui.add(egui::DragValue::new(cur).range(0..=999).speed(0.5));
+                                ui.label("/");
+                                ui.add(egui::DragValue::new(max).range(0..=999).speed(0.5));
+                            });
+                            ui.end_row();
+                        };
+                    draw_stat_row(
+                        ui,
+                        "Kills:",
+                        &mut state.player.kills,
+                        &mut state.player.max_kills,
+                    );
+                    draw_stat_row(
+                        ui,
+                        "Items:",
+                        &mut state.player.items,
+                        &mut state.player.max_items,
+                    );
+                    draw_stat_row(
+                        ui,
+                        "Secrets:",
+                        &mut state.player.secrets,
+                        &mut state.player.max_secrets,
+                    );
+                });
+        });
+
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
+            egui::Grid::new("sb_ctx_grid")
+                .num_columns(2)
+                .spacing(egui::vec2(12.0, 4.0))
+                .show(ui, |ui| {
+                    ui.label("Mode:");
+                    egui::ComboBox::from_id_salt("sb_mode_dd")
+                        .selected_text(match state.world.session_type {
+                            0 => "Single Player",
+                            1 => "Cooperative",
+                            2 => "Deathmatch",
+                            _ => "Unknown",
+                        })
+                        .width(110.0)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut state.world.session_type, 0, "Single Player");
+                            ui.selectable_value(&mut state.world.session_type, 1, "Cooperative");
+                            ui.selectable_value(&mut state.world.session_type, 2, "Deathmatch");
+                        });
+                    ui.end_row();
+
+                    ui.label("CompLevel:");
+                    egui::ComboBox::from_id_salt("sb_ver_dd")
+                        .selected_text(match state.world.game_version {
+                            FeatureLevel::Doom19 => "Doom 1.9",
+                            FeatureLevel::LimitRemoving => "Limit Removing",
+                            FeatureLevel::Boom => "Boom 2.02",
+                            FeatureLevel::Complevel9 => "Comp Lvl 9",
+                            FeatureLevel::MBF => "MBF",
+                            FeatureLevel::MBF21 => "MBF21",
+                            FeatureLevel::ID24 => "ID24",
+                        })
+                        .width(110.0)
+                        .show_ui(ui, |ui| {
+                            use crate::model::FeatureLevel::*;
+                            ui.selectable_value(&mut state.world.game_version, Doom19, "Doom 1.9");
+                            ui.selectable_value(
+                                &mut state.world.game_version,
+                                LimitRemoving,
+                                "Limit Removing",
+                            );
+                            ui.selectable_value(&mut state.world.game_version, Boom, "Boom 2.02");
+                            ui.selectable_value(
+                                &mut state.world.game_version,
+                                Complevel9,
+                                "Comp Lvl 9",
+                            );
+                            ui.selectable_value(&mut state.world.game_version, MBF, "MBF");
+                            ui.selectable_value(&mut state.world.game_version, MBF21, "MBF21");
+                            ui.selectable_value(&mut state.world.game_version, ID24, "ID24");
+                        });
+                    ui.end_row();
+
+                    ui.label("Map:");
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 2.0;
+                        if is_doom2 {
+                            ui.add(
+                                egui::DragValue::new(&mut state.world.level)
+                                    .range(1..=999)
+                                    .custom_formatter(|n, _| format!("{:02}", n as i32))
+                                    .custom_parser(|s| s.parse::<f64>().ok())
+                                    .prefix("MAP"),
+                            );
+                        } else {
+                            ui.add(
+                                egui::DragValue::new(&mut state.world.episode)
+                                    .prefix("E")
+                                    .range(1..=9),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut state.world.level)
+                                    .prefix("M")
+                                    .range(1..=32),
+                            );
+                        }
+                        ui.add_space(2.0);
+                        if ui.button("🔄").on_hover_text("Switch Map Format").clicked() {
+                            is_doom2 = !is_doom2;
+                        }
+                    });
+                    ui.end_row();
+                });
+        });
+
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+
+        ui.checkbox(&mut state.engine.widescreen_mode, "Widescreen Mode");
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 140.0).max(0.0) / 2.0);
+            ui.label("HUD Style:");
+            ui.add_space(8.0);
+            let hud_text = if state.engine.hud_mode == 0 {
+                "Standard"
+            } else {
+                "Compact"
+            };
+            if ui.button(hud_text).clicked() {
+                state.engine.hud_mode = 1 - state.engine.hud_mode;
+            }
+        });
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
+            ui.label("Automap:");
+            ui.add_space(4.0);
+            if ui
+                .toggle_value(&mut state.engine.automap_active, "Active")
+                .changed()
+            {
+                if !state.engine.automap_active {
+                    state.engine.automap_overlay = false;
+                }
+            }
+            ui.add_enabled(state.engine.automap_active, |ui: &mut egui::Ui| {
+                ui.toggle_value(&mut state.engine.automap_overlay, "Overlay")
+            });
+        });
+
+        ui.data_mut(|d| d.insert_temp(map_format_id, is_doom2));
+    });
+}
+
+fn draw_icon_button(
+    ui: &mut egui::Ui,
+    assets: &AssetStore,
+    patch: &str,
+    is_active: bool,
+    fallback_text: &str,
+) -> egui::Response {
+    let size = 40.0;
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+
+    let (bg_color, stroke) = if is_active {
+        (
+            egui::Color32::from_gray(60),
+            ui.visuals().widgets.hovered.bg_stroke,
+        )
+    } else {
+        (
+            egui::Color32::from_gray(30),
+            egui::Stroke::new(1.0, egui::Color32::from_gray(50)),
+        )
+    };
+
+    if response.hovered() {
+        ui.painter()
+            .rect_filled(rect, 4.0, ui.visuals().widgets.hovered.bg_fill);
+    } else {
+        ui.painter().rect_filled(rect, 4.0, bg_color);
+    }
+    ui.painter()
+        .rect_stroke(rect, 4.0, stroke, egui::StrokeKind::Middle);
+
+    let tint = if is_active {
+        egui::Color32::WHITE
+    } else {
+        egui::Color32::from_gray(100)
+    };
+
+    if let Some(tex) = assets.textures.get(patch) {
+        let content_size = size - 8.0;
+        let tex_size = tex.size_vec2();
+        if tex_size.x > 0.0 && tex_size.y > 0.0 {
+            let scale = (content_size / tex_size.x)
+                .min(content_size / tex_size.y)
+                .min(2.0);
+            let final_size = tex_size * scale;
+            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
+            ui.painter().image(
+                tex.id(),
+                draw_rect,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                tint,
+            );
+        }
+    } else {
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            fallback_text,
+            egui::FontId::proportional(12.0),
+            tint,
+        );
+    }
+    response
 }

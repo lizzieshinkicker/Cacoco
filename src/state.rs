@@ -32,9 +32,9 @@ impl Default for PlayerStats {
             kills: 0,
             items: 0,
             secrets: 0,
-            max_kills: 100,
-            max_items: 50,
-            max_secrets: 10,
+            max_kills: 27,
+            max_items: 9,
+            max_secrets: 5,
             powerup_durations: durations,
         }
     }
