@@ -75,7 +75,8 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 .resizable(false)
                 .show_inside(ui, |ui| {
                     ui.add_space(7.0);
-                    if ui::shared::section_header_button(ui, "Held Items", None, expanded).clicked() {
+                    if ui::shared::section_header_button(ui, "Held Items", None, expanded).clicked()
+                    {
                         expanded = !expanded;
                     }
                     ui.separator();

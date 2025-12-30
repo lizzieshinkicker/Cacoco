@@ -94,19 +94,33 @@ pub fn draw_no_file_placeholder(ui: &mut egui::Ui) {
     });
 }
 
-
 /// A stylized header button used for section switching or expansion.
-pub fn section_header_button(ui: &mut egui::Ui, label: &str, subheading: Option<&str>, active: bool) -> egui::Response {
+pub fn section_header_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    subheading: Option<&str>,
+    active: bool,
+) -> egui::Response {
     section_header_button_impl(ui, label, subheading, active, 28.0, 14.0, false)
 }
 
 /// A smaller version for tight spaces like the browser tabs.
-pub fn compact_header_button(ui: &mut egui::Ui, label: &str, subheading: Option<&str>, active: bool) -> egui::Response {
+pub fn compact_header_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    subheading: Option<&str>,
+    active: bool,
+) -> egui::Response {
     section_header_button_impl(ui, label, subheading, active, 24.0, 11.0, false)
 }
 
 /// A large header button with heading-style text and optional right-aligned action text.
-pub fn heading_action_button(ui: &mut egui::Ui, label: &str, subheading: Option<&str>, active: bool) -> egui::Response {
+pub fn heading_action_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    subheading: Option<&str>,
+    active: bool,
+) -> egui::Response {
     section_header_button_impl(ui, label, subheading, active, 32.0, 18.0, true)
 }
 
