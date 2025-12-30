@@ -10,6 +10,7 @@ pub mod canvas;
 pub mod components;
 pub mod face;
 pub mod graphic;
+pub mod list;
 pub mod palette;
 pub mod patch;
 pub mod projection;
@@ -81,7 +82,7 @@ pub fn draw_element_wrapper(
         }
     }
 
-    let conditions_met = conditions::resolve(&common.conditions, ctx.state);
+    let conditions_met = conditions::resolve(&common.conditions, ctx.state, ctx.assets);
     if !is_selected_branch && !conditions_met {
         return;
     }
@@ -102,6 +103,7 @@ pub fn draw_element_wrapper(
 
     match &element.data {
         Element::Canvas(c) => canvas::draw_canvas(ctx, c, pos, alpha),
+        Element::List(l) => list::draw_list(ctx, l, pos, alpha, current_path),
         Element::Graphic(g) => graphic::draw_graphic(ctx, g, pos, alpha),
         Element::Animation(a) => animation::draw_animation(ctx, a, pos, alpha),
         Element::Face(f) => face::draw_face(
@@ -114,11 +116,14 @@ pub fn draw_element_wrapper(
         Element::FaceBackground(fb) => face::draw_face_background(ctx, fb, pos, alpha),
         Element::Number(n) => text::draw_number(ctx, n, pos, false, alpha),
         Element::Percent(p) => text::draw_number(ctx, p, pos, true, alpha),
+        Element::String(s) => text::draw_string(ctx, s, pos, alpha),
         Element::Component(c) => components::draw_component(ctx, c, pos, alpha),
         Element::Carousel(_) => {}
     }
 
-    recurse_children(ctx, &common.children, pos, current_path);
+    if !matches!(element.data, Element::List(_)) {
+        recurse_children(ctx, &common.children, pos, current_path);
+    }
 }
 
 fn recurse_children(
@@ -145,12 +150,12 @@ pub(super) fn resolve_position(
     );
 
     if ctx.proj.origin_x > 0.0 {
-        let dl = common.alignment.contains(Alignment::DYNAMIC_LEFT);
-        let dr = common.alignment.contains(Alignment::DYNAMIC_RIGHT);
+        let wl = common.alignment.contains(Alignment::WIDESCREEN_LEFT);
+        let wr = common.alignment.contains(Alignment::WIDESCREEN_RIGHT);
 
-        if dl && !dr {
+        if wl && !wr {
             pos.x -= ctx.proj.origin_x;
-        } else if dr && !dl {
+        } else if wr && !wl {
             pos.x += ctx.proj.origin_x;
         }
     }

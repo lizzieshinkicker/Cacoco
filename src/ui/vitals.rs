@@ -125,6 +125,26 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                                 });
                             ui.end_row();
                         });
+
+                    ui.add_space(2.0);
+                    ui.horizontal(|ui| {
+                        ui.label("K/I/S:");
+                        ui.add(
+                            egui::DragValue::new(&mut state.player.kills)
+                                .range(0..=999)
+                                .speed(0.5),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut state.player.items)
+                                .range(0..=999)
+                                .speed(0.5),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut state.player.secrets)
+                                .range(0..=999)
+                                .speed(0.5),
+                        );
+                    });
                 });
 
                 draw_sep(ui, sep_width);
@@ -155,8 +175,10 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                             ui.vertical_centered(|ui| {
                                 let is_blue = state.player.armor_max == 200;
                                 let patch = if is_blue { "ARM2A0" } else { "ARM1A0" };
+                                let is_active = state.player.armor > 0;
 
-                                if draw_icon_button(ui, assets, patch, true, "Armor").clicked() {
+                                if draw_icon_button(ui, assets, patch, is_active, "Armor").clicked()
+                                {
                                     if is_blue {
                                         state.player.armor_max = 100;
                                         state.push_message("Picked up the armor.");
@@ -338,16 +360,16 @@ fn draw_icon_button(
     let size = 42.0;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
 
-    let bg_color = if is_active {
-        egui::Color32::from_gray(60)
+    let (bg_color, stroke) = if is_active {
+        (
+            egui::Color32::from_gray(60),
+            ui.visuals().widgets.hovered.bg_stroke,
+        )
     } else {
-        egui::Color32::from_gray(30)
-    };
-
-    let stroke = if is_active {
-        ui.visuals().widgets.hovered.bg_stroke
-    } else {
-        egui::Stroke::new(1.0, egui::Color32::from_gray(50))
+        (
+            egui::Color32::from_gray(30),
+            egui::Stroke::new(1.0, egui::Color32::from_gray(50)),
+        )
     };
 
     if response.hovered() {

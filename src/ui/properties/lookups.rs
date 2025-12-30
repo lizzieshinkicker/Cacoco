@@ -45,9 +45,9 @@ pub const ITEMS: &[LookupItem] = &[
 pub const WEAPONS: &[LookupItem] = &[
     item!(100, "Chainsaw", "SAWGA0"),
     item!(101, "Shotgun", "SHTGA0"),
-    item!(102, "S. Shotgun", "SHT2A0"),
+    item!(102, "Super Shotgun", "SHT2A0"),
     item!(103, "Chaingun", "CHGGA0"),
-    item!(104, "Rckt. Launch", "MISGA0"),
+    item!(104, "Rocket Launcher", "MISGA0"),
     item!(105, "Plasma Rifle", "PLSGA0"),
     item!(106, "BFG 9000", "BFGGA0"),
 ];
@@ -57,6 +57,22 @@ pub const AMMO_TYPES: &[LookupItem] = &[
     item!(1, "Shells", "SHELA0"),
     item!(2, "Cells", "CELLA0"),
     item!(3, "Rockets", "ROCKA0"),
+];
+
+pub const POWERUPS: &[LookupItem] = &[
+    item!(0, "Invulnerability", "PINVA0"),
+    item!(1, "Berserk", "PSTRA0"),
+    item!(2, "Invisibility", "PINSA0"),
+    item!(3, "Rad Suit", "SUITA0"),
+    item!(4, "Area Map", "PMAPA0"),
+    item!(5, "Lite-Amp", "PVISA0"),
+];
+
+pub const STRING_TYPES: &[LookupItem] = &[
+    item!(0, "Custom String"),
+    item!(1, "Level Title"),
+    item!(2, "Level Label"),
+    item!(3, "Level Author"),
 ];
 
 pub const SESSION_TYPES: &[LookupItem] = &[
@@ -172,6 +188,38 @@ pub const GROUPS: &[ConditionGroup] = &[
         ],
     },
     ConditionGroup {
+        name: "Level Stats",
+        icon: Some("STKILLS"),
+        style: GroupStyle::Standard,
+        default_param: 10,
+        variants: &[
+            v!("Kills >=", KillsGe),
+            v!("Kills <", KillsLt),
+            v!("Items >=", ItemsGe),
+            v!("Items <", ItemsLt),
+            v!("Secrets >=", SecretsGe),
+            v!("Secrets <", SecretsLt),
+            v!("Kills % >=", KillsPercentGe),
+            v!("Kills % <", KillsPercentLt),
+            v!("Items % >=", ItemsPercentGe),
+            v!("Items % <", ItemsPercentLt),
+            v!("Secrets % >=", SecretsPercentGe),
+            v!("Secrets % <", SecretsPercentLt),
+        ],
+    },
+    ConditionGroup {
+        name: "Powerups",
+        icon: Some("PINVA0"),
+        style: GroupStyle::AmmoComplex,
+        default_param: 10,
+        variants: &[
+            v!("Time >=", PowerupTimeGe),
+            v!("Time <", PowerupTimeLt),
+            v!("Time % >=", PowerupTimePercentGe),
+            v!("Time % <", PowerupTimePercentLt),
+        ],
+    },
+    ConditionGroup {
         name: "Selected Ammo",
         icon: Some("SHELA0"),
         style: GroupStyle::Standard,
@@ -208,8 +256,8 @@ pub const GROUPS: &[ConditionGroup] = &[
             v!("HUD Mode", HudModeEq),
             v!("Widescreen", WidescreenModeEq),
             v!("Automap", AutomapModeEq),
-            v!("Ver >=", GameVersionGe),
-            v!("Ver <", GameVersionLt),
+            v!("Version >=", GameVersionGe),
+            v!("Version <", GameVersionLt),
         ],
     },
     ConditionGroup {
@@ -221,6 +269,16 @@ pub const GROUPS: &[ConditionGroup] = &[
             v!("Episode", EpisodeEq),
             v!("Level >=", LevelGe),
             v!("Level <", LevelLt),
+        ],
+    },
+    ConditionGroup {
+        name: "Patch Check",
+        icon: Some("HICACOCO"),
+        style: GroupStyle::Standard,
+        default_param: 0,
+        variants: &[
+            v!("is empty", PatchEmpty),
+            v!("is NOT empty", PatchNotEmpty),
         ],
     },
     ConditionGroup {
@@ -247,6 +305,7 @@ pub enum ParamUsage {
     None,
     Param1,
     Both,
+    String,
 }
 
 pub fn get_param_usage(condition: ConditionType) -> ParamUsage {
@@ -254,6 +313,10 @@ pub fn get_param_usage(condition: ConditionType) -> ParamUsage {
     match condition {
         SelectedWeaponHasAmmo | GameModeEq | GameModeNeq => ParamUsage::None,
         AmmoGe | AmmoLt | AmmoPercentGe | AmmoPercentLt => ParamUsage::Both,
+        PowerupTimeGe | PowerupTimeLt | PowerupTimePercentGe | PowerupTimePercentLt => {
+            ParamUsage::Both
+        }
+        PatchEmpty | PatchNotEmpty | WidgetEnabled | WidgetDisabled => ParamUsage::String,
         _ => ParamUsage::Param1,
     }
 }
@@ -278,6 +341,9 @@ pub fn resolve_condition_icon(
             } else {
                 "ARM1A0".to_string()
             });
+        }
+        PowerupTimeGe | PowerupTimeLt | PowerupTimePercentGe | PowerupTimePercentLt => {
+            return find_icon(POWERUPS, cond.param2).map(|s| s.to_string());
         }
         SelectedAmmoGe
         | SelectedAmmoLt

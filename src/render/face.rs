@@ -25,7 +25,7 @@ pub(super) fn draw_face(
     }
 
     let patch = ctx.state.get_face_sprite(ouch, look_dir);
-    draw_simple_graphic_patch(ctx, &patch, pos, def.common.alignment, alpha);
+    draw_simple_graphic_patch(ctx, &patch, pos, def.common.alignment, alpha, &def.crop);
 }
 
 pub(super) fn draw_face_background(
@@ -34,5 +34,5 @@ pub(super) fn draw_face_background(
     pos: egui::Pos2,
     alpha: f32,
 ) {
-    draw_simple_graphic_patch(ctx, "STFB0", pos, def.common.alignment, alpha);
+    draw_simple_graphic_patch(ctx, "STFB0", pos, def.common.alignment, alpha, &def.crop);
 }

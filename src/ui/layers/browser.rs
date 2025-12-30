@@ -319,12 +319,7 @@ fn draw_unified_font_row(
     );
 
     if is_installed {
-        ui.put(
-            btn_rect,
-            egui::Label::new(
-                egui::RichText::new("Added!"),
-            ),
-        );
+        ui.put(btn_rect, egui::Label::new(egui::RichText::new("Added!")));
     } else if ui.put(btn_rect, egui::Button::new("Add").small()).clicked() {
         if let Some(f) = file {
             if font.source == FontSource::Package {

@@ -1,7 +1,7 @@
 use eframe::egui;
 
-const MENU_ID_KEY: &str = "cacoco_context_menu_id";
-const MENU_POS_KEY: &str = "cacoco_context_menu_pos";
+pub const MENU_ID_KEY: &str = "cacoco_context_menu_id";
+pub const MENU_POS_KEY: &str = "cacoco_context_menu_pos";
 
 pub struct ContextMenu {
     pub id: egui::Id,
@@ -12,13 +12,18 @@ impl ContextMenu {
     pub fn check(ui: &egui::Ui, response: &egui::Response) -> bool {
         if response.secondary_clicked() {
             let pos = ui.input(|i| i.pointer.interact_pos().unwrap_or(response.rect.center()));
-            ui.data_mut(|d| {
-                d.insert_temp(egui::Id::new(MENU_ID_KEY), response.id);
-                d.insert_temp(egui::Id::new(MENU_POS_KEY), pos);
-            });
+            Self::open(ui, response.id, pos);
             return true;
         }
         false
+    }
+
+    /// Centralized helper to open a context menu at a specific position.
+    pub fn open(ui: &egui::Ui, id: egui::Id, pos: egui::Pos2) {
+        ui.data_mut(|d| {
+            d.insert_temp(egui::Id::new(MENU_ID_KEY), id);
+            d.insert_temp(egui::Id::new(MENU_POS_KEY), pos);
+        });
     }
 
     pub fn get(ui: &egui::Ui, response_id: egui::Id) -> Option<Self> {

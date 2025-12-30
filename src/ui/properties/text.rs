@@ -4,8 +4,11 @@ use super::editor::PropertiesUI;
 use super::lookups;
 use super::preview::PreviewContent;
 use crate::assets::AssetStore;
-use crate::model::{ComponentDef, ComponentType, Element, ElementWrapper, NumberDef, NumberType};
+use crate::model::{
+    ComponentDef, ComponentType, Element, ElementWrapper, NumberDef, NumberType, StringDef,
+};
 use crate::state::PreviewState;
+use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
 
 const HEADER_MENU_KEY: &str = "cacoco_prop_header_menu_id";
@@ -19,63 +22,83 @@ impl PropertiesUI for NumberDef {
         _state: &PreviewState,
     ) -> bool {
         let mut changed = false;
-        ui.horizontal(|ui| {
-            ui.label("Font:");
-            egui::ComboBox::from_id_salt("num_font_selector")
-                .selected_text(self.font.clone())
-                .width(ui.available_width())
-                .height(1000.0)
-                .show_ui(ui, |ui| {
-                    let h = (fonts.number_font_names.len() as f32 * 42.0).min(1000.0);
-                    ui.set_min_height(h);
-                    for (i, name) in fonts.number_font_names.iter().enumerate() {
-                        let stem = fonts.get_number_stem(name);
-                        changed |= common::draw_font_selection_row(
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
+                ui.label("Font:");
+
+                let id = ui.make_persistent_id("num_font_selector");
+                let button_res =
+                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
+
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        let h = (fonts.number_font_names.len() as f32 * 42.0).min(400.0);
+                        ui.set_min_height(h);
+                        ui.set_width(200.0);
+                        changed |=
+                            common::draw_number_font_selectors(ui, &mut self.font, fonts, assets);
+                    });
+                }
+            });
+
+            match self.type_ {
+                NumberType::Ammo | NumberType::MaxAmmo => {
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
+                        ui.label("Ammo Type:");
+                        changed |= common::draw_lookup_param_dd(
                             ui,
-                            &mut self.font,
-                            name,
-                            stem.as_ref(),
+                            "num_param_ammo",
+                            &mut self.param,
+                            lookups::AMMO_TYPES,
                             assets,
-                            true,
-                            i,
                         );
-                    }
-                });
-        });
-
-        match self.type_ {
-            NumberType::Ammo | NumberType::MaxAmmo => {
-                ui.horizontal(|ui| {
-                    ui.label("Ammo Type:");
-                    changed |= common::draw_lookup_param_dd(
-                        ui,
-                        "num_param_ammo",
-                        &mut self.param,
-                        lookups::AMMO_TYPES,
-                        assets,
-                    );
-                });
+                    });
+                }
+                NumberType::AmmoWeapon | NumberType::MaxAmmoWeapon => {
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 220.0).max(0.0) / 2.0);
+                        ui.label("Weapon Source:");
+                        changed |= common::draw_lookup_param_dd(
+                            ui,
+                            "num_param_weapon",
+                            &mut self.param,
+                            lookups::WEAPONS,
+                            assets,
+                        );
+                    });
+                }
+                NumberType::PowerupDuration => {
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
+                        ui.label("Powerup:");
+                        changed |= common::draw_lookup_param_dd(
+                            ui,
+                            "num_param_powerup",
+                            &mut self.param,
+                            lookups::POWERUPS,
+                            assets,
+                        );
+                    });
+                }
+                _ => {}
             }
-            NumberType::AmmoWeapon | NumberType::MaxAmmoWeapon => {
-                ui.horizontal(|ui| {
-                    ui.label("Weapon Source:");
-                    changed |= common::draw_lookup_param_dd(
-                        ui,
-                        "num_param_weapon",
-                        &mut self.param,
-                        lookups::WEAPONS,
-                        assets,
-                    );
-                });
-            }
-            _ => {}
-        }
 
-        ui.horizontal(|ui| {
-            ui.label("Max Length:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut self.maxlength).range(0..=9))
-                .changed();
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 130.0).max(0.0) / 2.0);
+                ui.label("Max Length:");
+                changed |= ui
+                    .add_sized(
+                        [40.0, 18.0],
+                        egui::DragValue::new(&mut self.maxlength).range(0..=9),
+                    )
+                    .changed();
+            });
         });
 
         changed
@@ -101,11 +124,125 @@ impl PropertiesUI for NumberDef {
             NumberType::MaxAmmoWeapon => state
                 .get_weapon_ammo_type(self.param)
                 .map_or(0, |idx| state.get_max_ammo(idx)),
+            NumberType::Kills => state.player.kills,
+            NumberType::Items => state.player.items,
+            NumberType::Secrets => state.player.secrets,
+            NumberType::MaxKills => state.player.max_kills,
+            NumberType::MaxItems => state.player.max_items,
+            NumberType::MaxSecrets => state.player.max_secrets,
+            NumberType::KillsPercent => {
+                state.get_stat_percent(state.player.kills, state.player.max_kills)
+            }
+            NumberType::ItemsPercent => {
+                state.get_stat_percent(state.player.items, state.player.max_items)
+            }
+            NumberType::SecretsPercent => {
+                state.get_stat_percent(state.player.secrets, state.player.max_secrets)
+            }
+            NumberType::PowerupDuration => state
+                .player
+                .powerup_durations
+                .get(&self.param)
+                .cloned()
+                .unwrap_or(0.0) as i32,
         };
         Some(PreviewContent::Text {
             text: format!("{}", val),
             stem,
             is_number_font: true,
+        })
+    }
+}
+
+impl PropertiesUI for StringDef {
+    fn draw_specific_fields(
+        &mut self,
+        ui: &mut egui::Ui,
+        fonts: &FontCache,
+        assets: &AssetStore,
+        _state: &PreviewState,
+    ) -> bool {
+        let mut changed = false;
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 210.0).max(0.0) / 2.0);
+                ui.label("String Type:");
+                let mut current_type = self.type_ as i32;
+                if common::draw_lookup_param_dd(
+                    ui,
+                    "string_type_selector",
+                    &mut current_type,
+                    lookups::STRING_TYPES,
+                    assets,
+                ) {
+                    self.type_ = current_type as u8;
+                    changed = true;
+                }
+            });
+
+            if self.type_ == 0 {
+                ui.horizontal(|ui| {
+                    ui.add_space((ui.available_width() - 220.0).max(0.0) / 2.0);
+                    ui.label("Data:");
+                    let mut buf = self.data.clone().unwrap_or_default();
+                    if ui
+                        .add_sized([140.0, 18.0], egui::TextEdit::singleline(&mut buf))
+                        .changed()
+                    {
+                        self.data = Some(buf);
+                        changed = true;
+                    }
+                });
+            }
+
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
+                ui.label("Font:");
+
+                let id = ui.make_persistent_id("string_font_selector");
+                let button_res =
+                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
+
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        let h = (fonts.hud_font_names.len() as f32 * 42.0).min(400.0);
+                        ui.set_min_height(h);
+                        ui.set_width(200.0);
+                        changed |=
+                            common::draw_hud_font_selectors(ui, &mut self.font, fonts, assets);
+                    });
+                }
+            });
+        });
+        changed
+    }
+
+    fn get_preview_content(
+        &self,
+        _ui: &egui::Ui,
+        fonts: &FontCache,
+        _state: &PreviewState,
+    ) -> Option<PreviewContent> {
+        let stem = fonts.get_hud_stem(&self.font);
+        let text = match self.type_ {
+            0 => self
+                .data
+                .as_deref()
+                .unwrap_or("Having Fun with Cacoco!")
+                .to_string(),
+            1 => "Entryway".to_string(),
+            2 => "MAP01".to_string(),
+            3 => "Sandy Petersen".to_string(),
+            _ => String::new(),
+        };
+        Some(PreviewContent::Text {
+            text,
+            stem,
+            is_number_font: false,
         })
     }
 }
@@ -119,28 +256,29 @@ impl PropertiesUI for ComponentDef {
         _state: &PreviewState,
     ) -> bool {
         let mut changed = false;
-        ui.horizontal(|ui| {
-            ui.label("Font:");
-            egui::ComboBox::from_id_salt("hud_font_selector")
-                .selected_text(self.font.clone())
-                .width(ui.available_width())
-                .height(600.0)
-                .show_ui(ui, |ui| {
-                    let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
-                    ui.set_min_height(h);
-                    for (i, name) in fonts.hud_font_names.iter().enumerate() {
-                        let stem = fonts.get_hud_stem(name);
-                        changed |= common::draw_font_selection_row(
-                            ui,
-                            &mut self.font,
-                            name,
-                            stem.as_ref(),
-                            assets,
-                            false,
-                            i,
-                        );
-                    }
-                });
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
+                ui.label("Font:");
+
+                let id = ui.make_persistent_id("hud_font_selector");
+                let button_res =
+                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
+
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
+                        ui.set_min_height(h);
+                        ui.set_width(200.0);
+                        changed |=
+                            common::draw_hud_font_selectors(ui, &mut self.font, fonts, assets);
+                    });
+                }
+            });
         });
         changed
     }
@@ -195,18 +333,22 @@ pub fn draw_interactive_header(
                         Element::Number(n) => number_type_name(n.type_).to_string(),
                         Element::Percent(p) => number_type_name(p.type_).to_string(),
                         Element::Component(c) => component_type_name(c.type_),
+                        Element::String(s) => {
+                            format!("String: {}", lookups::STRING_TYPES[s.type_ as usize].name)
+                        }
                         Element::Graphic(_) => "Graphic".to_string(),
                         Element::Face(_) => "Doomguy".to_string(),
                         Element::FaceBackground(_) => "Face Background".to_string(),
                         Element::Animation(_) => "Animation".to_string(),
                         Element::Canvas(_) => "Canvas Group".to_string(),
+                        Element::List(_) => "List Container".to_string(),
                         Element::Carousel(_) => "Carousel".to_string(),
                     }
                 };
 
                 ui.add_sized(
                     [ui.available_width(), 0.0],
-                    egui::Label::new(egui::RichText::new(title).size(16.0)),
+                    egui::Label::new(egui::RichText::new(title).size(16.0).strong()),
                 );
                 ui.add(egui::Separator::default().spacing(8.0));
                 ui.vertical_centered(|ui| {
@@ -218,7 +360,7 @@ pub fn draw_interactive_header(
 
     let is_interactive = matches!(
         element.data,
-        Element::Number(_) | Element::Percent(_) | Element::Component(_)
+        Element::Number(_) | Element::Percent(_) | Element::Component(_) | Element::String(_)
     );
 
     if is_interactive {
@@ -245,7 +387,9 @@ pub fn draw_interactive_header(
                 .order(egui::Order::Foreground)
                 .fixed_pos(response.rect.left_bottom())
                 .show(ui.ctx(), |ui| {
-                    let frame = egui::Frame::popup(ui.style());
+                    let frame = egui::Frame::popup(ui.style())
+                        .inner_margin(4.0)
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(60)));
                     frame.show(ui, |ui| {
                         ui.set_min_width(response.rect.width().max(100.0));
                         ui.set_max_width(200.0);
@@ -267,6 +411,19 @@ pub fn draw_interactive_header(
                                 if draw_component_options(ui, &mut c.type_) {
                                     close = true;
                                     changed = true;
+                                }
+                            }
+                            Element::String(s) => {
+                                for item in lookups::STRING_TYPES {
+                                    if common::custom_menu_item(
+                                        ui,
+                                        item.name,
+                                        s.type_ == item.id as u8,
+                                    ) {
+                                        s.type_ = item.id as u8;
+                                        close = true;
+                                        changed = true;
+                                    }
                                 }
                             }
                             _ => {}
@@ -328,6 +485,16 @@ pub fn number_type_name(t: NumberType) -> &'static str {
         NumberType::MaxAmmo => "Max Ammo (by Type)",
         NumberType::AmmoWeapon => "Ammo (by Weapon)",
         NumberType::MaxAmmoWeapon => "Max Ammo (by Weapon)",
+        NumberType::Kills => "Kills",
+        NumberType::Items => "Items",
+        NumberType::Secrets => "Secrets",
+        NumberType::KillsPercent => "Kills %",
+        NumberType::ItemsPercent => "Items %",
+        NumberType::SecretsPercent => "Secrets %",
+        NumberType::MaxKills => "Max Kills",
+        NumberType::MaxItems => "Max Items",
+        NumberType::MaxSecrets => "Max Secrets",
+        NumberType::PowerupDuration => "Powerup Time",
     }
 }
 
@@ -337,21 +504,26 @@ fn component_type_name(t: ComponentType) -> String {
 
 fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i32) -> bool {
     let mut changed = false;
-    if common::custom_menu_item(ui, "Health", *type_ == NumberType::Health) {
-        *type_ = NumberType::Health;
-        changed = true;
+    let items = [
+        ("Health", NumberType::Health),
+        ("Armor", NumberType::Armor),
+        ("Frags", NumberType::Frags),
+        ("Kills", NumberType::Kills),
+        ("Items", NumberType::Items),
+        ("Secrets", NumberType::Secrets),
+    ];
+
+    for (label, target) in items {
+        if common::custom_menu_item(ui, label, *type_ == target) {
+            *type_ = target;
+            changed = true;
+        }
     }
-    if common::custom_menu_item(ui, "Armor", *type_ == NumberType::Armor) {
-        *type_ = NumberType::Armor;
-        changed = true;
-    }
-    if common::custom_menu_item(ui, "Frags", *type_ == NumberType::Frags) {
-        *type_ = NumberType::Frags;
-        changed = true;
-    }
+
     ui.add_space(4.0);
     ui.separator();
     ui.add_space(4.0);
+
     if common::custom_menu_item(ui, "Ammo (by Type)", *type_ == NumberType::Ammo) {
         *type_ = NumberType::Ammo;
         if !lookups::AMMO_TYPES.iter().any(|i| i.id == *param) {
@@ -366,9 +538,18 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
         }
         changed = true;
     }
+    if common::custom_menu_item(ui, "Powerup Time", *type_ == NumberType::PowerupDuration) {
+        *type_ = NumberType::PowerupDuration;
+        if !lookups::POWERUPS.iter().any(|i| i.id == *param) {
+            *param = 0;
+        }
+        changed = true;
+    }
+
     ui.add_space(4.0);
     ui.separator();
     ui.add_space(4.0);
+
     if common::custom_menu_item(ui, "Ammo (by Weapon)", *type_ == NumberType::AmmoWeapon) {
         *type_ = NumberType::AmmoWeapon;
         if !lookups::WEAPONS.iter().any(|i| i.id == *param) {
@@ -393,36 +574,21 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
 fn draw_component_options(ui: &mut egui::Ui, type_: &mut ComponentType) -> bool {
     use crate::model::ComponentType::*;
     let mut changed = false;
-    if common::custom_menu_item(ui, "Time", *type_ == Time) {
-        *type_ = Time;
-        changed = true;
-    }
-    if common::custom_menu_item(ui, "Level Title", *type_ == LevelTitle) {
-        *type_ = LevelTitle;
-        changed = true;
-    }
-    if common::custom_menu_item(ui, "Announce Level Title", *type_ == AnnounceLevelTitle) {
-        *type_ = AnnounceLevelTitle;
-        changed = true;
-    }
-    ui.add_space(4.0);
-    ui.separator();
-    ui.add_space(4.0);
-    if common::custom_menu_item(ui, "Message", *type_ == Message) {
-        *type_ = Message;
-        changed = true;
-    }
-    if common::custom_menu_item(ui, "Coordinates", *type_ == Coordinates) {
-        *type_ = Coordinates;
-        changed = true;
-    }
-    if common::custom_menu_item(ui, "FPS Counter", *type_ == FpsCounter) {
-        *type_ = FpsCounter;
-        changed = true;
-    }
-    if common::custom_menu_item(ui, "Stat Totals", *type_ == StatTotals) {
-        *type_ = StatTotals;
-        changed = true;
+    let items = [
+        ("Time", Time),
+        ("Level Title", LevelTitle),
+        ("Announce Level Title", AnnounceLevelTitle),
+        ("Message", Message),
+        ("Coordinates", Coordinates),
+        ("FPS Counter", FpsCounter),
+        ("Stat Totals", StatTotals),
+    ];
+
+    for (label, target) in items {
+        if common::custom_menu_item(ui, label, *type_ == target) {
+            *type_ = target;
+            changed = true;
+        }
     }
     changed
 }

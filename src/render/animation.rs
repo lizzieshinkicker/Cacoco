@@ -32,5 +32,6 @@ pub(super) fn draw_animation(ctx: &RenderContext, def: &AnimationDef, pos: egui:
         pos,
         def.common.alignment,
         alpha,
+        &None,
     );
 }

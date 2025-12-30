@@ -13,7 +13,7 @@ fn default_type() -> String {
     "statusbar".to_string()
 }
 fn default_version() -> String {
-    "1.0.0".to_string()
+    "1.2.0".to_string()
 }
 
 fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -28,14 +28,16 @@ where
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
     pub struct Alignment: u32 {
-        const LEFT          = 0x00;
-        const H_CENTER      = 0x01;
-        const RIGHT         = 0x02;
-        const TOP           = 0x00;
-        const V_CENTER      = 0x04;
-        const BOTTOM        = 0x08;
-        const DYNAMIC_LEFT  = 0x10;
-        const DYNAMIC_RIGHT = 0x20;
+        const LEFT              = 0x00;
+        const H_CENTER          = 0x01;
+        const RIGHT             = 0x02;
+        const TOP               = 0x00;
+        const V_CENTER          = 0x04;
+        const BOTTOM            = 0x08;
+        const NO_LEFT_OFFSET    = 0x10;
+        const NO_TOP_OFFSET     = 0x20;
+        const WIDESCREEN_LEFT   = 0x40;
+        const WIDESCREEN_RIGHT  = 0x80;
     }
 }
 
@@ -89,6 +91,16 @@ pub enum NumberType {
     MaxAmmo = 5,
     AmmoWeapon = 6,
     MaxAmmoWeapon = 7,
+    Kills = 8,
+    Items = 9,
+    Secrets = 10,
+    KillsPercent = 11,
+    ItemsPercent = 12,
+    SecretsPercent = 13,
+    MaxKills = 14,
+    MaxItems = 15,
+    MaxSecrets = 16,
+    PowerupDuration = 17,
 }
 
 #[derive(
@@ -152,6 +164,24 @@ pub enum ConditionType {
     EpisodeEq = 40,
     LevelGe = 41,
     LevelLt = 42,
+    PatchEmpty = 43,
+    PatchNotEmpty = 44,
+    KillsLt = 45,
+    KillsGe = 46,
+    ItemsLt = 47,
+    ItemsGe = 48,
+    SecretsLt = 49,
+    SecretsGe = 50,
+    KillsPercentLt = 51,
+    KillsPercentGe = 52,
+    ItemsPercentLt = 53,
+    ItemsPercentGe = 54,
+    SecretsPercentLt = 55,
+    SecretsPercentGe = 56,
+    PowerupTimeLt = 57,
+    PowerupTimeGe = 58,
+    PowerupTimePercentLt = 59,
+    PowerupTimePercentGe = 60,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -217,7 +247,6 @@ impl Default for StatusBarLayout {
 }
 
 impl StatusBarLayout {
-    /// Recursively reassigns all UIDs for every element within this layout.
     pub fn reassign_all_uids(&mut self) {
         for child in self.children.iter_mut() {
             child.reassign_uids();
@@ -249,6 +278,8 @@ pub enum Element {
     Percent(NumberDef),
     Component(ComponentDef),
     Carousel(CarouselDef),
+    List(ListDef),
+    String(StringDef),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -305,6 +336,21 @@ pub struct CommonAttrs {
     pub children: Vec<ElementWrapper>,
 }
 
+impl CommonAttrs {
+    /// Generates a default check for "Selected Weapon Has Ammo" used for ammo UI elements.
+    pub fn selected_ammo_check() -> Self {
+        Self {
+            conditions: vec![ConditionDef {
+                condition: ConditionType::SelectedWeaponHasAmmo,
+                param: 0,
+                param2: 0,
+                param_string: None,
+            }],
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConditionDef {
     pub condition: ConditionType,
@@ -312,12 +358,36 @@ pub struct ConditionDef {
     pub param: i32,
     #[serde(default)]
     pub param2: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param_string: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct CropDef {
+    pub width: i32,
+    pub height: i32,
+    pub left: i32,
+    pub top: i32,
+    #[serde(default)]
+    pub center: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CanvasDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ListDef {
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    #[serde(default)]
+    pub horizontal: bool,
+    #[serde(default)]
+    pub reverse: bool,
+    #[serde(default)]
+    pub spacing: i32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -335,6 +405,8 @@ pub struct GraphicDef {
     pub leftoffset: i32,
     #[serde(default)]
     pub midoffset: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crop: Option<CropDef>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -370,6 +442,8 @@ pub struct FaceDef {
     pub leftoffset: i32,
     #[serde(default)]
     pub midoffset: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crop: Option<CropDef>,
 }
 
 fn default_maxlength() -> i32 {
@@ -402,6 +476,17 @@ impl Default for NumberDef {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct StringDef {
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    #[serde(rename = "type")]
+    pub type_: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    pub font: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ComponentDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
@@ -431,12 +516,14 @@ impl ElementWrapper {
 
         match &self.data {
             Element::Canvas(_) => "Canvas Group".to_string(),
+            Element::List(_) => "List Container".to_string(),
             Element::Graphic(g) => format!("Graphic: {}", g.patch),
             Element::Animation(_) => "Animation".to_string(),
             Element::Face(_) => "Doomguy".to_string(),
             Element::FaceBackground(_) => "Face Background".to_string(),
             Element::Number(n) => format!("Number ({:?})", n.type_),
             Element::Percent(p) => format!("Percent ({:?})", p.type_),
+            Element::String(s) => format!("String (Type {})", s.type_),
             Element::Component(c) => format!("Component: {:?}", c.type_),
             Element::Carousel(_) => "Carousel".to_string(),
         }
@@ -445,12 +532,14 @@ impl ElementWrapper {
     pub fn children(&self) -> &[ElementWrapper] {
         match &self.data {
             Element::Canvas(e) => &e.common.children,
+            Element::List(e) => &e.common.children,
             Element::Graphic(e) => &e.common.children,
             Element::Animation(e) => &e.common.children,
             Element::Face(e) => &e.common.children,
             Element::FaceBackground(e) => &e.common.children,
             Element::Number(e) => &e.common.children,
             Element::Percent(e) => &e.common.children,
+            Element::String(e) => &e.common.children,
             Element::Component(e) => &e.common.children,
             Element::Carousel(e) => &e.common.children,
         }
@@ -459,12 +548,14 @@ impl ElementWrapper {
     pub fn get_common_mut(&mut self) -> &mut CommonAttrs {
         match &mut self.data {
             Element::Canvas(e) => &mut e.common,
+            Element::List(e) => &mut e.common,
             Element::Graphic(e) => &mut e.common,
             Element::Animation(e) => &mut e.common,
             Element::Face(e) => &mut e.common,
             Element::FaceBackground(e) => &mut e.common,
             Element::Number(e) => &mut e.common,
             Element::Percent(e) => &mut e.common,
+            Element::String(e) => &mut e.common,
             Element::Component(e) => &mut e.common,
             Element::Carousel(e) => &mut e.common,
         }
@@ -473,18 +564,19 @@ impl ElementWrapper {
     pub fn get_common(&self) -> &CommonAttrs {
         match &self.data {
             Element::Canvas(e) => &e.common,
+            Element::List(e) => &e.common,
             Element::Graphic(e) => &e.common,
             Element::Animation(e) => &e.common,
             Element::Face(e) => &e.common,
             Element::FaceBackground(e) => &e.common,
             Element::Number(e) => &e.common,
             Element::Percent(e) => &e.common,
+            Element::String(e) => &e.common,
             Element::Component(e) => &e.common,
             Element::Carousel(e) => &e.common,
         }
     }
 
-    /// Recursively reassigns UIDs for this element and all its children.
     pub fn reassign_uids(&mut self) {
         self.uid = new_uid();
         for child in self.get_common_mut().children.iter_mut() {
@@ -549,12 +641,14 @@ impl PropertiesUI for ElementWrapper {
     ) -> bool {
         match &mut self.data {
             Element::Canvas(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::List(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Graphic(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Animation(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Face(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::FaceBackground(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Number(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Percent(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::String(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Component(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Carousel(e) => e.draw_specific_fields(ui, fonts, assets, state),
         }
@@ -568,6 +662,7 @@ impl PropertiesUI for ElementWrapper {
     ) -> Option<PreviewContent> {
         match &self.data {
             Element::Canvas(e) => e.get_preview_content(ui, fonts, state),
+            Element::List(e) => e.get_preview_content(ui, fonts, state),
             Element::Graphic(e) => e.get_preview_content(ui, fonts, state),
             Element::Animation(e) => e.get_preview_content(ui, fonts, state),
             Element::Face(e) => e.get_preview_content(ui, fonts, state),
@@ -580,6 +675,7 @@ impl PropertiesUI for ElementWrapper {
                 }
                 Some(content)
             }
+            Element::String(e) => e.get_preview_content(ui, fonts, state),
             Element::Component(e) => e.get_preview_content(ui, fonts, state),
             Element::Carousel(e) => e.get_preview_content(ui, fonts, state),
         }
@@ -588,12 +684,14 @@ impl PropertiesUI for ElementWrapper {
     fn has_specific_fields(&self) -> bool {
         match &self.data {
             Element::Canvas(e) => e.has_specific_fields(),
+            Element::List(e) => e.has_specific_fields(),
             Element::Graphic(e) => e.has_specific_fields(),
             Element::Animation(e) => e.has_specific_fields(),
             Element::Face(e) => e.has_specific_fields(),
             Element::FaceBackground(e) => e.has_specific_fields(),
             Element::Number(e) => e.has_specific_fields(),
             Element::Percent(e) => e.has_specific_fields(),
+            Element::String(e) => e.has_specific_fields(),
             Element::Component(e) => e.has_specific_fields(),
             Element::Carousel(e) => e.has_specific_fields(),
         }

@@ -139,7 +139,7 @@ fn draw_layer_row(
 ) -> egui::Response {
     let is_selected = selection.contains(my_path);
     let common = element.get_common();
-    let is_visible = conditions::resolve(&common.conditions, state);
+    let is_visible = conditions::resolve(&common.conditions, state, assets);
     let is_container = matches!(element.data, Element::Canvas(_) | Element::Carousel(_));
 
     let (rect, response) = ui.allocate_exact_size(
