@@ -1,19 +1,20 @@
+use crate::assets::AssetStore;
 use crate::model::ConditionDef;
 use crate::state::PreviewState;
 
-pub fn resolve(conditions: &[ConditionDef], state: &PreviewState) -> bool {
+pub fn resolve(conditions: &[ConditionDef], state: &PreviewState, assets: &AssetStore) -> bool {
     if conditions.is_empty() {
         return true;
     }
     for condition in conditions {
-        if !check_single(condition, state) {
+        if !check_single(condition, state, assets) {
             return false;
         }
     }
     true
 }
 
-fn check_single(condition: &ConditionDef, state: &PreviewState) -> bool {
+fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetStore) -> bool {
     use crate::model::ConditionType::*;
     match condition.condition {
         WeaponOwned
@@ -54,12 +55,16 @@ fn check_single(condition: &ConditionDef, state: &PreviewState) -> bool {
         EpisodeEq | LevelGe | LevelLt => check_map_condition(condition, state),
 
         PatchEmpty | PatchNotEmpty => {
-            let patch_name = condition.param_string.as_deref().unwrap_or("");
-            let is_empty = patch_name.is_empty();
+            let patch_name = condition
+                .param_string
+                .as_deref()
+                .unwrap_or("")
+                .to_uppercase();
+            let exists = assets.textures.contains_key(&patch_name);
             if condition.condition == PatchEmpty {
-                is_empty
+                !exists
             } else {
-                !is_empty
+                exists
             }
         }
 

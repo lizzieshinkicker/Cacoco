@@ -336,6 +336,21 @@ pub struct CommonAttrs {
     pub children: Vec<ElementWrapper>,
 }
 
+impl CommonAttrs {
+    /// Generates a default check for "Selected Weapon Has Ammo" used for ammo UI elements.
+    pub fn selected_ammo_check() -> Self {
+        Self {
+            conditions: vec![ConditionDef {
+                condition: ConditionType::SelectedWeaponHasAmmo,
+                param: 0,
+                param2: 0,
+                param_string: None,
+            }],
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConditionDef {
     pub condition: ConditionType,

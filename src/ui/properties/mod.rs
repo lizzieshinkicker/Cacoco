@@ -159,7 +159,7 @@ pub fn draw_properties_panel(
     egui::ScrollArea::vertical()
         .id_salt("prop_content_scroll")
         .show(ui, |ui| {
-            ui.add_space(4.0); // Use 4.0 spacing from Main
+            ui.add_space(4.0);
 
             if let Some(f) = file {
                 let font_cache = FontCache::new(f);
@@ -169,26 +169,32 @@ pub fn draw_properties_panel(
                         if let Some(el) = f.get_element_mut(path) {
                             match current_tab {
                                 PropertyTab::Properties => {
-                                    if el._cacoco_text.is_none() {
-                                        ui.horizontal(|ui| {
-                                            ui.label("Name:");
-                                            let mut name =
-                                                el._cacoco_name.clone().unwrap_or_default();
-                                            let edit = egui::TextEdit::singleline(&mut name)
-                                                .desired_width(ui.available_width() - 50.0);
+                                    ui.vertical_centered(|ui| {
+                                        if el._cacoco_text.is_none() {
+                                            ui.horizontal(|ui| {
+                                                ui.add_space(
+                                                    (ui.available_width() - 210.0).max(0.0) / 2.0,
+                                                );
+                                                ui.label("Name:");
+                                                let mut name =
+                                                    el._cacoco_name.clone().unwrap_or_default();
+                                                let edit = egui::TextEdit::singleline(&mut name)
+                                                    .desired_width(150.0);
 
-                                            if ui.add(edit).changed() {
-                                                el._cacoco_name =
-                                                    if name.is_empty() { None } else { Some(name) };
-                                                changed = true;
-                                            }
-                                        });
+                                                if ui.add(edit).changed() {
+                                                    el._cacoco_name = if name.is_empty() {
+                                                        None
+                                                    } else {
+                                                        Some(name)
+                                                    };
+                                                    changed = true;
+                                                }
+                                            });
+                                            ui.add_space(4.0);
+                                        }
+                                        changed |= common::draw_transform_editor(ui, el);
                                         ui.add_space(4.0);
-                                    }
-                                    changed |= common::draw_transform_editor(ui, el);
-                                    ui.add_space(4.0);
-                                    if el._cacoco_text.is_some() || el.has_specific_fields() {
-                                        ui.group(|ui| {
+                                        if el._cacoco_text.is_some() || el.has_specific_fields() {
                                             if el._cacoco_text.is_some() {
                                                 changed |= text_helper::draw_text_helper_editor(
                                                     ui,
@@ -204,8 +210,8 @@ pub fn draw_properties_panel(
                                                     state,
                                                 );
                                             }
-                                        });
-                                    }
+                                        }
+                                    });
                                 }
                                 PropertyTab::Conditions => {
                                     changed |=
@@ -249,7 +255,7 @@ fn draw_static_header(ui: &mut egui::Ui, title: &str, desc: &str, color: egui::C
         ui.vertical(|ui| {
             ui.add_sized(
                 [ui.available_width(), 0.0],
-                egui::Label::new(egui::RichText::new(title).size(16.0).strong()), // Main uses .strong()
+                egui::Label::new(egui::RichText::new(title).size(16.0).strong()),
             );
             ui.add(egui::Separator::default().spacing(8.0));
             ui.vertical_centered(|ui| {

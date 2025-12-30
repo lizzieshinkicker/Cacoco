@@ -1,7 +1,9 @@
-use super::common::{self, paint_thumb_content};
+use super::common;
+use super::common::paint_thumb_content;
 use super::lookups;
 use crate::assets::AssetStore;
 use crate::model::{ConditionDef, ConditionType, Element, ElementWrapper, NumberType};
+use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
 
 pub fn draw_conditions_editor(
@@ -13,15 +15,15 @@ pub fn draw_conditions_editor(
     let mut changed = false;
     let is_ammo_selected = is_ammo_selected_type(element);
 
-    let common = element.get_common_mut();
+    let common_ref = element.get_common_mut();
 
     if is_ammo_selected {
-        let has_safety = common
+        let has_safety = common_ref
             .conditions
             .iter()
             .any(|c| c.condition == ConditionType::SelectedWeaponHasAmmo);
         if !has_safety {
-            common.conditions.insert(
+            common_ref.conditions.insert(
                 0,
                 ConditionDef {
                     condition: ConditionType::SelectedWeaponHasAmmo,
@@ -35,12 +37,14 @@ pub fn draw_conditions_editor(
     }
 
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(format!("Active Rules: {}", common.conditions.len())).weak());
+        ui.label(
+            egui::RichText::new(format!("Active Rules: {}", common_ref.conditions.len())).weak(),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(2.0);
 
             if ui.button("Add Condition").clicked() {
-                common.conditions.push(ConditionDef {
+                common_ref.conditions.push(ConditionDef {
                     condition: ConditionType::WeaponOwned,
                     param: 101,
                     param2: 0,
@@ -48,12 +52,12 @@ pub fn draw_conditions_editor(
                 });
                 changed = true;
             }
-            if !common.conditions.is_empty() {
+            if !common_ref.conditions.is_empty() {
                 if ui
                     .add_enabled(!is_ammo_selected, egui::Button::new("Clear All"))
                     .clicked()
                 {
-                    common.conditions.clear();
+                    common_ref.conditions.clear();
                     changed = true;
                 }
             }
@@ -63,7 +67,7 @@ pub fn draw_conditions_editor(
     ui.add_space(4.0);
 
     let mut remove_idx = None;
-    for (i, cond) in common.conditions.iter_mut().enumerate() {
+    for (i, cond) in common_ref.conditions.iter_mut().enumerate() {
         let id = ui.make_persistent_id(format!("cond_card_{}", i));
         ui.push_id(id, |ui| {
             let can_remove =
@@ -74,7 +78,7 @@ pub fn draw_conditions_editor(
     }
 
     if let Some(i) = remove_idx {
-        common.conditions.remove(i);
+        common_ref.conditions.remove(i);
         changed = true;
     }
 
@@ -98,7 +102,7 @@ fn draw_condition_card(
     can_remove: bool,
 ) -> bool {
     let mut changed = false;
-    let is_true = crate::conditions::resolve(&[cond.clone()], state);
+    let is_true = crate::conditions::resolve(&[cond.clone()], state, assets);
 
     let frame = egui::Frame::new()
         .inner_margin(4.0)
@@ -139,7 +143,10 @@ fn draw_condition_card(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
-                            .add_enabled(can_remove, egui::Button::new("X").small())
+                            .add_enabled(
+                                can_remove,
+                                egui::Button::new("X").min_size(egui::vec2(18.0, 18.0)),
+                            )
                             .on_hover_text("Remove Condition")
                             .clicked()
                         {
@@ -147,7 +154,9 @@ fn draw_condition_card(
                         }
 
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                            egui::ComboBox::from_id_salt(format!("group_dd_{}_{}", g_idx, my_idx))
+                            let id =
+                                ui.make_persistent_id(format!("group_dd_{}_{}", g_idx, my_idx));
+                            egui::ComboBox::from_id_salt(id)
                                 .selected_text(group.name)
                                 .width(ui.available_width())
                                 .height(1000.0)
@@ -269,24 +278,26 @@ fn draw_operator_selector(
         .find(|v| v.condition == cond.condition)
         .unwrap_or(&group.variants[0]);
 
-    let width = match group.style {
-        lookups::GroupStyle::Standard | lookups::GroupStyle::AmmoComplex => 55.0,
-        lookups::GroupStyle::Natural => 50.0,
-    };
+    let id = ui.make_persistent_id(format!("op_dd_{:?}_{}", cond.condition, my_idx));
+    let button_res =
+        ui.add(egui::Button::new(current_variant.label).min_size(egui::vec2(0.0, 18.0)));
 
-    egui::ComboBox::from_id_salt(format!("op_dd_{:?}_{}", cond.condition, my_idx))
-        .selected_text(current_variant.label)
-        .width(width)
-        .height(1000.0)
-        .show_ui(ui, |ui| {
-            ui.set_min_width(100.0);
+    if button_res.clicked() {
+        ContextMenu::open(ui, id, button_res.rect.left_bottom());
+    }
+
+    if let Some(menu) = ContextMenu::get(ui, id) {
+        ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
             for v in group.variants {
-                if common::custom_menu_item(ui, v.label, cond.condition == v.condition) {
+                if ContextMenu::button(ui, v.label, true) {
                     cond.condition = v.condition;
                     changed = true;
+                    ContextMenu::close(ui);
                 }
             }
         });
+    }
+
     changed
 }
 
@@ -303,9 +314,25 @@ fn draw_params_for_type(
     match get_param_usage(cond.condition) {
         ParamUsage::String => {
             let mut buf = cond.param_string.clone().unwrap_or_default();
-            if ui.text_edit_singleline(&mut buf).changed() {
+            let response = ui.text_edit_singleline(&mut buf);
+            if response.changed() {
                 cond.param_string = if buf.is_empty() { None } else { Some(buf) };
                 changed = true;
+            }
+
+            if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
+                if ui.rect_contains_pointer(response.rect) {
+                    ui.painter().rect_stroke(
+                        response.rect,
+                        2.0,
+                        egui::Stroke::new(1.0, egui::Color32::YELLOW),
+                        egui::StrokeKind::Inside,
+                    );
+                    if ui.input(|i| i.pointer.any_released()) {
+                        cond.param_string = Some(asset_keys[0].clone());
+                        changed = true;
+                    }
+                }
             }
         }
         ParamUsage::None => {

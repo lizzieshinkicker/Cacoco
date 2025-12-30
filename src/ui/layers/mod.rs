@@ -5,7 +5,7 @@ use crate::model::{
     GraphicDef, ListDef, NumberDef, NumberType, SBarDefFile, StringDef, TextHelperDef,
 };
 use crate::state::PreviewState;
-use crate::ui::context_menu::ContextMenu; // Added!
+use crate::ui::context_menu::ContextMenu;
 use crate::ui::font_wizard::FontWizardState;
 use crate::ui::shared;
 use eframe::egui;
@@ -267,11 +267,7 @@ pub fn draw_layers_panel(
         );
 
         if header_res.clicked() {
-            let pos = header_res.rect.left_bottom();
-            bottom_ui.data_mut(|d| {
-                d.insert_temp(egui::Id::new("cacoco_context_menu_id"), layers_menu_id);
-                d.insert_temp(egui::Id::new("cacoco_context_menu_pos"), pos);
-            });
+            ContextMenu::open(&bottom_ui, layers_menu_id, header_res.rect.left_bottom());
         }
 
         if let Some(menu) = ContextMenu::get(&bottom_ui, layers_menu_id) {
@@ -350,7 +346,7 @@ pub fn draw_layers_panel(
                         new_element = Some(ElementWrapper {
                             data: Element::String(StringDef {
                                 font: default_hud_font.clone().unwrap(),
-                                type_: 1, // Level Title
+                                type_: 1,
                                 ..Default::default()
                             }),
                             ..Default::default()
@@ -373,16 +369,7 @@ pub fn draw_layers_panel(
                             data: Element::Number(NumberDef {
                                 font: default_num_font.clone().unwrap(),
                                 type_: NumberType::AmmoSelected,
-                                common: crate::model::CommonAttrs {
-                                    conditions: vec![crate::model::ConditionDef {
-                                        condition:
-                                            crate::model::ConditionType::SelectedWeaponHasAmmo,
-                                        param: 0,
-                                        param2: 0,
-                                        param_string: None,
-                                    }],
-                                    ..Default::default()
-                                },
+                                common: crate::model::CommonAttrs::selected_ammo_check(),
                                 ..Default::default()
                             }),
                             ..Default::default()
@@ -405,16 +392,7 @@ pub fn draw_layers_panel(
                             data: Element::Percent(NumberDef {
                                 font: default_num_font.unwrap(),
                                 type_: NumberType::AmmoSelected,
-                                common: crate::model::CommonAttrs {
-                                    conditions: vec![crate::model::ConditionDef {
-                                        condition:
-                                            crate::model::ConditionType::SelectedWeaponHasAmmo,
-                                        param: 0,
-                                        param2: 0,
-                                        param_string: None,
-                                    }],
-                                    ..Default::default()
-                                },
+                                common: crate::model::CommonAttrs::selected_ammo_check(),
                                 ..Default::default()
                             }),
                             ..Default::default()

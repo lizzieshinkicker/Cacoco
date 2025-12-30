@@ -8,6 +8,7 @@ use crate::model::{
     ComponentDef, ComponentType, Element, ElementWrapper, NumberDef, NumberType, StringDef,
 };
 use crate::state::PreviewState;
+use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
 
 const HEADER_MENU_KEY: &str = "cacoco_prop_header_menu_id";
@@ -21,75 +22,83 @@ impl PropertiesUI for NumberDef {
         _state: &PreviewState,
     ) -> bool {
         let mut changed = false;
-        ui.horizontal(|ui| {
-            ui.label("Font:");
-            egui::ComboBox::from_id_salt("num_font_selector")
-                .selected_text(self.font.clone())
-                .width(120.0) // Tightened width
-                .height(1000.0)
-                .show_ui(ui, |ui| {
-                    let h = (fonts.number_font_names.len() as f32 * 42.0).min(1000.0);
-                    ui.set_min_height(h);
-                    for (i, name) in fonts.number_font_names.iter().enumerate() {
-                        let stem = fonts.get_number_stem(name);
-                        changed |= common::draw_font_selection_row(
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
+                ui.label("Font:");
+
+                let id = ui.make_persistent_id("num_font_selector");
+                let button_res =
+                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
+
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        let h = (fonts.number_font_names.len() as f32 * 42.0).min(400.0);
+                        ui.set_min_height(h);
+                        ui.set_width(200.0);
+                        changed |=
+                            common::draw_number_font_selectors(ui, &mut self.font, fonts, assets);
+                    });
+                }
+            });
+
+            match self.type_ {
+                NumberType::Ammo | NumberType::MaxAmmo => {
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
+                        ui.label("Ammo Type:");
+                        changed |= common::draw_lookup_param_dd(
                             ui,
-                            &mut self.font,
-                            name,
-                            stem.as_ref(),
+                            "num_param_ammo",
+                            &mut self.param,
+                            lookups::AMMO_TYPES,
                             assets,
-                            true,
-                            i,
                         );
-                    }
-                });
-        });
+                    });
+                }
+                NumberType::AmmoWeapon | NumberType::MaxAmmoWeapon => {
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 220.0).max(0.0) / 2.0);
+                        ui.label("Weapon Source:");
+                        changed |= common::draw_lookup_param_dd(
+                            ui,
+                            "num_param_weapon",
+                            &mut self.param,
+                            lookups::WEAPONS,
+                            assets,
+                        );
+                    });
+                }
+                NumberType::PowerupDuration => {
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
+                        ui.label("Powerup:");
+                        changed |= common::draw_lookup_param_dd(
+                            ui,
+                            "num_param_powerup",
+                            &mut self.param,
+                            lookups::POWERUPS,
+                            assets,
+                        );
+                    });
+                }
+                _ => {}
+            }
 
-        match self.type_ {
-            NumberType::Ammo | NumberType::MaxAmmo => {
-                ui.horizontal(|ui| {
-                    ui.label("Ammo Type:");
-                    changed |= common::draw_lookup_param_dd(
-                        ui,
-                        "num_param_ammo",
-                        &mut self.param,
-                        lookups::AMMO_TYPES,
-                        assets,
-                    );
-                });
-            }
-            NumberType::AmmoWeapon | NumberType::MaxAmmoWeapon => {
-                ui.horizontal(|ui| {
-                    ui.label("Weapon Source:");
-                    changed |= common::draw_lookup_param_dd(
-                        ui,
-                        "num_param_weapon",
-                        &mut self.param,
-                        lookups::WEAPONS,
-                        assets,
-                    );
-                });
-            }
-            NumberType::PowerupDuration => {
-                ui.horizontal(|ui| {
-                    ui.label("Powerup:");
-                    changed |= common::draw_lookup_param_dd(
-                        ui,
-                        "num_param_powerup",
-                        &mut self.param,
-                        lookups::POWERUPS,
-                        assets,
-                    );
-                });
-            }
-            _ => {}
-        }
-
-        ui.horizontal(|ui| {
-            ui.label("Max Length:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut self.maxlength).range(0..=9))
-                .changed();
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 130.0).max(0.0) / 2.0);
+                ui.label("Max Length:");
+                changed |= ui
+                    .add_sized(
+                        [40.0, 18.0],
+                        egui::DragValue::new(&mut self.maxlength).range(0..=9),
+                    )
+                    .changed();
+            });
         });
 
         changed
@@ -154,57 +163,61 @@ impl PropertiesUI for StringDef {
         _state: &PreviewState,
     ) -> bool {
         let mut changed = false;
-
-        ui.horizontal(|ui| {
-            ui.label("String Type:");
-            let mut current_type = self.type_ as i32;
-            if common::draw_lookup_param_dd(
-                ui,
-                "string_type_selector",
-                &mut current_type,
-                lookups::STRING_TYPES,
-                assets,
-            ) {
-                self.type_ = current_type as u8;
-                changed = true;
-            }
-        });
-
-        if self.type_ == 0 {
+        ui.vertical_centered(|ui| {
             ui.horizontal(|ui| {
-                ui.label("Data:");
-                let mut buf = self.data.clone().unwrap_or_default();
-                if ui.text_edit_singleline(&mut buf).changed() {
-                    self.data = Some(buf);
+                ui.add_space((ui.available_width() - 210.0).max(0.0) / 2.0);
+                ui.label("String Type:");
+                let mut current_type = self.type_ as i32;
+                if common::draw_lookup_param_dd(
+                    ui,
+                    "string_type_selector",
+                    &mut current_type,
+                    lookups::STRING_TYPES,
+                    assets,
+                ) {
+                    self.type_ = current_type as u8;
                     changed = true;
                 }
             });
-        }
 
-        ui.horizontal(|ui| {
-            ui.label("Font:");
-            egui::ComboBox::from_id_salt("string_font_selector")
-                .selected_text(self.font.clone())
-                .width(120.0) // Tightened width
-                .height(600.0)
-                .show_ui(ui, |ui| {
-                    let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
-                    ui.set_min_height(h);
-                    for (i, name) in fonts.hud_font_names.iter().enumerate() {
-                        let stem = fonts.get_hud_stem(name);
-                        changed |= common::draw_font_selection_row(
-                            ui,
-                            &mut self.font,
-                            name,
-                            stem.as_ref(),
-                            assets,
-                            false,
-                            i,
-                        );
+            if self.type_ == 0 {
+                ui.horizontal(|ui| {
+                    ui.add_space((ui.available_width() - 220.0).max(0.0) / 2.0);
+                    ui.label("Data:");
+                    let mut buf = self.data.clone().unwrap_or_default();
+                    if ui
+                        .add_sized([140.0, 18.0], egui::TextEdit::singleline(&mut buf))
+                        .changed()
+                    {
+                        self.data = Some(buf);
+                        changed = true;
                     }
                 });
-        });
+            }
 
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
+                ui.label("Font:");
+
+                let id = ui.make_persistent_id("string_font_selector");
+                let button_res =
+                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
+
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        let h = (fonts.hud_font_names.len() as f32 * 42.0).min(400.0);
+                        ui.set_min_height(h);
+                        ui.set_width(200.0);
+                        changed |=
+                            common::draw_hud_font_selectors(ui, &mut self.font, fonts, assets);
+                    });
+                }
+            });
+        });
         changed
     }
 
@@ -216,10 +229,14 @@ impl PropertiesUI for StringDef {
     ) -> Option<PreviewContent> {
         let stem = fonts.get_hud_stem(&self.font);
         let text = match self.type_ {
-            0 => self.data.clone().unwrap_or_default(),
-            1 => "MAP01: ENTRYWAY".to_string(),
-            2 => "LEVEL 1".to_string(),
-            3 => "ID SOFTWARE".to_string(),
+            0 => self
+                .data
+                .as_deref()
+                .unwrap_or("Having Fun with Cacoco!")
+                .to_string(),
+            1 => "Entryway".to_string(),
+            2 => "MAP01".to_string(),
+            3 => "Sandy Petersen".to_string(),
             _ => String::new(),
         };
         Some(PreviewContent::Text {
@@ -239,28 +256,29 @@ impl PropertiesUI for ComponentDef {
         _state: &PreviewState,
     ) -> bool {
         let mut changed = false;
-        ui.horizontal(|ui| {
-            ui.label("Font:");
-            egui::ComboBox::from_id_salt("hud_font_selector")
-                .selected_text(self.font.clone())
-                .width(120.0) // Tightened width
-                .height(600.0)
-                .show_ui(ui, |ui| {
-                    let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
-                    ui.set_min_height(h);
-                    for (i, name) in fonts.hud_font_names.iter().enumerate() {
-                        let stem = fonts.get_hud_stem(name);
-                        changed |= common::draw_font_selection_row(
-                            ui,
-                            &mut self.font,
-                            name,
-                            stem.as_ref(),
-                            assets,
-                            false,
-                            i,
-                        );
-                    }
-                });
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
+                ui.label("Font:");
+
+                let id = ui.make_persistent_id("hud_font_selector");
+                let button_res =
+                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
+
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
+                        ui.set_min_height(h);
+                        ui.set_width(200.0);
+                        changed |=
+                            common::draw_hud_font_selectors(ui, &mut self.font, fonts, assets);
+                    });
+                }
+            });
         });
         changed
     }
@@ -369,7 +387,9 @@ pub fn draw_interactive_header(
                 .order(egui::Order::Foreground)
                 .fixed_pos(response.rect.left_bottom())
                 .show(ui.ctx(), |ui| {
-                    let frame = egui::Frame::popup(ui.style());
+                    let frame = egui::Frame::popup(ui.style())
+                        .inner_margin(4.0)
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(60)));
                     frame.show(ui, |ui| {
                         ui.set_min_width(response.rect.width().max(100.0));
                         ui.set_max_width(200.0);

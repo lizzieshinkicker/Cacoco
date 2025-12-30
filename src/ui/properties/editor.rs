@@ -24,7 +24,7 @@ pub trait PropertiesUI {
         _fonts: &FontCache,
         _state: &PreviewState,
     ) -> Option<PreviewContent> {
-        None // Default: no preview
+        None
     }
 
     /// Check if we have anything additional to show in the properties.

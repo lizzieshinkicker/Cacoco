@@ -15,7 +15,7 @@ pub struct PlayerStats {
     pub max_kills: i32,
     pub max_items: i32,
     pub max_secrets: i32,
-    pub powerup_durations: HashMap<i32, f32>, // param -> seconds remaining
+    pub powerup_durations: HashMap<i32, f32>,
 }
 
 impl Default for PlayerStats {
@@ -210,7 +210,6 @@ impl PreviewState {
         }
 
         for (id, duration) in self.player.powerup_durations.iter_mut() {
-            // ID 1 (Berserk) and ID 4 (Map) are toggles/infinite
             if *id != 1 && *id != 4 {
                 *duration = (*duration - dt).max(0.0);
             } else if *duration > 0.0 {

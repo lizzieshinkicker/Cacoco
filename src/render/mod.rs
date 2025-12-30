@@ -82,7 +82,7 @@ pub fn draw_element_wrapper(
         }
     }
 
-    let conditions_met = conditions::resolve(&common.conditions, ctx.state);
+    let conditions_met = conditions::resolve(&common.conditions, ctx.state, ctx.assets);
     if !is_selected_branch && !conditions_met {
         return;
     }
@@ -121,7 +121,6 @@ pub fn draw_element_wrapper(
         Element::Carousel(_) => {}
     }
 
-    // List handles its own recursion to calculate layout
     if !matches!(element.data, Element::List(_)) {
         recurse_children(ctx, &common.children, pos, current_path);
     }

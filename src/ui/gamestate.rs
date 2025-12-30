@@ -18,12 +18,12 @@ enum ItemId {
     BlueSkull,
     YellowSkull,
     RedSkull,
-    Berserk,      // Powerup #1
-    Invisibility, // Powerup #2
-    Map,          // Powerup #4
-    Radsuit,      // Powerup #3
-    Liteamp,      // Powerup #5
-    Invuln,       // Powerup #0
+    Berserk,
+    Invisibility,
+    Map,
+    Radsuit,
+    Liteamp,
+    Invuln,
     Chainsaw,
     Pistol,
     Shotgun,

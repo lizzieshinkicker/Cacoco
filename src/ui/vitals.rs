@@ -126,7 +126,6 @@ pub fn draw_vitals_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &A
                             ui.end_row();
                         });
 
-                    // 1.2.0 Stats integration
                     ui.add_space(2.0);
                     ui.horizontal(|ui| {
                         ui.label("K/I/S:");
