@@ -18,6 +18,7 @@ pub mod thumbnails;
 pub(crate) mod tree;
 
 const TAB_STATE_KEY: &str = "cacoco_layers_tab_state";
+const LAST_TAB_STATE_KEY: &str = "cacoco_layers_last_tab_state";
 const THUMB_ZOOM_KEY: &str = "cacoco_layers_thumb_zoom";
 const SHOW_FONTS_KEY: &str = "cacoco_show_fonts_state";
 
@@ -52,23 +53,39 @@ pub fn draw_layers_panel(
             .unwrap_or(Some(BrowserTab::Layouts))
     });
 
+    let mut last_tab: BrowserTab = ui.data(|d| {
+        d.get_temp(egui::Id::new(LAST_TAB_STATE_KEY))
+            .unwrap_or(BrowserTab::Layouts)
+    });
+
+    if let Some(active) = current_tab {
+        last_tab = active;
+    }
+
     let mut zoom = ui.data(|d| d.get_temp(egui::Id::new(THUMB_ZOOM_KEY)).unwrap_or(1.0f32));
     let mut show_fonts = ui.data(|d| d.get_temp(egui::Id::new(SHOW_FONTS_KEY)).unwrap_or(true));
 
     let available_height = ui.available_height();
     let min_h = 100.0;
-    let is_collapsed = current_tab.is_none();
 
     let header_h = 32.0;
-    let top_height = if is_collapsed {
+    let is_collapsed = current_tab.is_none();
+
+    let target_h = if is_collapsed {
         header_h
     } else {
         (available_height * split_fraction).clamp(min_h, available_height - min_h)
     };
 
+    let anim_top_h = ui.ctx().animate_value_with_time(
+        ui.make_persistent_id("browser_panel_anim"),
+        target_h,
+        0.1,
+    );
+
     let top_rect = egui::Rect::from_min_size(
         ui.cursor().min,
-        egui::vec2(ui.available_width(), top_height),
+        egui::vec2(ui.available_width(), anim_top_h),
     );
 
     ui.allocate_rect(top_rect, egui::Sense::hover());
@@ -104,9 +121,11 @@ pub fn draw_layers_panel(
         draw_tab(ui, BrowserTab::Library, "Library");
     });
 
-    if let Some(active_tab) = current_tab {
+    if anim_top_h > header_h + 1.0 {
         top_ui.add_space(8.0);
         let header_bottom = top_rect.min.y + 36.0;
+
+        let active_tab = current_tab.unwrap_or(last_tab);
         let has_footer = !matches!(active_tab, BrowserTab::Fonts | BrowserTab::Layouts);
         let footer_h = if has_footer { 28.0 } else { 0.0 };
 
@@ -232,13 +251,12 @@ pub fn draw_layers_panel(
 
     ui.data_mut(|d| {
         d.insert_temp(egui::Id::new(TAB_STATE_KEY), current_tab);
+        d.insert_temp(egui::Id::new(LAST_TAB_STATE_KEY), last_tab);
         d.insert_temp(egui::Id::new(THUMB_ZOOM_KEY), zoom);
         d.insert_temp(egui::Id::new(SHOW_FONTS_KEY), show_fonts);
     });
 
-    if is_collapsed {
-        ui.add_space(0.0);
-    } else {
+    if !is_collapsed {
         ui.add_space(2.0);
     }
 
@@ -251,7 +269,7 @@ pub fn draw_layers_panel(
     let mut bottom_ui = ui.new_child(egui::UiBuilder::new().max_rect(bottom_rect));
     bottom_ui.set_clip_rect(bottom_rect);
 
-    if current_tab.is_none() {
+    if is_collapsed && anim_top_h <= header_h + 1.0 {
         bottom_ui.add_space(1.0);
     }
 
