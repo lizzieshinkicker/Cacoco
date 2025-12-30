@@ -68,11 +68,42 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             ui.separator();
 
             let tab_id = ui.make_persistent_id("sidebar_tab_idx");
+            let last_tab_id = ui.make_persistent_id("sidebar_last_tab_idx");
+            let heights_id = ui.make_persistent_id("sidebar_tab_heights");
+
             let mut tab_idx: Option<usize> = ui.data(|d| d.get_temp(tab_id).unwrap_or(Some(0)));
+            let mut last_tab: usize = ui.data(|d| d.get_temp(last_tab_id).unwrap_or(0));
+
+            let mut heights: [f32; 2] =
+                ui.data(|d| d.get_temp(heights_id).unwrap_or([428.0, 428.0]));
+
+            if let Some(current) = tab_idx {
+                last_tab = current;
+            }
+
+            let header_h = 38.0;
+            let content_h = if let Some(idx) = tab_idx {
+                heights[idx]
+            } else {
+                0.0
+            };
+
+            let target_h = if tab_idx.is_some() {
+                header_h + content_h
+            } else {
+                header_h
+            };
+
+            let anim_h = ui.ctx().animate_value_with_time(
+                ui.make_persistent_id("sidebar_drawer_anim"),
+                target_h,
+                0.1,
+            );
 
             egui::TopBottomPanel::bottom("left_sidebar_footer")
                 .frame(egui::Frame::NONE)
                 .resizable(false)
+                .exact_height(anim_h)
                 .show_inside(ui, |ui| {
                     ui.add_space(7.0);
 
@@ -111,24 +142,42 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
 
                     ui.separator();
 
-                    if let Some(idx) = tab_idx {
-                        ui.add_space(3.0);
-                        if idx == 0 {
-                            ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
-                        } else {
-                            ui::gamestate::draw_context_panel(
-                                ui,
-                                &mut app.preview_state,
-                                &app.assets,
-                            );
-                        }
-                        ui.add_space(10.0);
-                    } else {
-                        ui.add_space(3.0);
+                    if anim_h > header_h + 1.0 {
+                        let content_rect = ui.available_rect_before_wrap();
+                        ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
+                            let inner_response = ui.vertical(|ui| {
+                                ui.add_space(3.0);
+                                if last_tab == 0 {
+                                    ui::draw_gamestate_panel(
+                                        ui,
+                                        &mut app.preview_state,
+                                        &app.assets,
+                                    );
+                                } else {
+                                    ui::gamestate::draw_context_panel(
+                                        ui,
+                                        &mut app.preview_state,
+                                        &app.assets,
+                                    );
+                                }
+                                ui.add_space(10.0);
+                            });
+
+                            if tab_idx.is_some() || anim_h > header_h + 10.0 {
+                                let measured = inner_response.response.rect.height();
+                                if measured > 10.0 {
+                                    heights[last_tab] = measured;
+                                }
+                            }
+                        });
                     }
                 });
 
-            ui.data_mut(|d| d.insert_temp(tab_id, tab_idx));
+            ui.data_mut(|d| {
+                d.insert_temp(tab_id, tab_idx);
+                d.insert_temp(last_tab_id, last_tab);
+                d.insert_temp(heights_id, heights);
+            });
 
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE)
