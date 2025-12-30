@@ -28,6 +28,29 @@ pub(super) fn draw_number(
             .state
             .get_weapon_ammo_type(def.param)
             .map_or(0, |idx| ctx.state.get_max_ammo(idx)),
+        // --- 1.2.0 Stats ---
+        NumberType::Kills => ctx.state.player.kills,
+        NumberType::Items => ctx.state.player.items,
+        NumberType::Secrets => ctx.state.player.secrets,
+        NumberType::MaxKills => ctx.state.player.max_kills,
+        NumberType::MaxItems => ctx.state.player.max_items,
+        NumberType::MaxSecrets => ctx.state.player.max_secrets,
+        NumberType::KillsPercent => ctx
+            .state
+            .get_stat_percent(ctx.state.player.kills, ctx.state.player.max_kills),
+        NumberType::ItemsPercent => ctx
+            .state
+            .get_stat_percent(ctx.state.player.items, ctx.state.player.max_items),
+        NumberType::SecretsPercent => ctx
+            .state
+            .get_stat_percent(ctx.state.player.secrets, ctx.state.player.max_secrets),
+        NumberType::PowerupDuration => ctx
+            .state
+            .player
+            .powerup_durations
+            .get(&def.param)
+            .cloned()
+            .unwrap_or(0.0) as i32,
     };
 
     if def.maxlength > 0 {
@@ -55,6 +78,25 @@ pub(super) fn draw_number(
         pos,
         def.common.alignment,
         true,
+        alpha,
+    );
+}
+
+pub(super) fn draw_string(ctx: &RenderContext, def: &StringDef, pos: egui::Pos2, alpha: f32) {
+    let text = match def.type_ {
+        0 => def.data.clone().unwrap_or_default(),
+        1 => "MAP01: ENTRYWAY".to_string(), // Placeholder
+        2 => "LEVEL 1".to_string(),
+        3 => "ID SOFTWARE".to_string(),
+        _ => String::new(),
+    };
+    draw_text_line(
+        ctx,
+        &text,
+        &def.font,
+        pos,
+        def.common.alignment,
+        false,
         alpha,
     );
 }
@@ -152,12 +194,10 @@ fn layout_text_line<'a>(
             let mut y_offset = 0.0;
             let mut advance = sz.x;
 
-            // Hardcode spacing offset for STT from the IWAD.
             if stem_upper == "STT" && c == '1' {
                 advance += 2.0;
             }
 
-            // Hardcode vertical offsets specifically for the IWAD HUD font characters.
             if stem_upper == "STCFN" {
                 match c {
                     '.' | ',' => y_offset = 4.0,

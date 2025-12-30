@@ -1,6 +1,8 @@
 use crate::assets::AssetStore;
 use crate::constants::{DOOM_TICS_PER_SEC, DOOM_W, DOOM_W_WIDE};
-use crate::model::{AnimationDef, CanvasDef, CarouselDef, FaceDef, FrameDef, GraphicDef};
+use crate::model::{
+    AnimationDef, CanvasDef, CarouselDef, CropDef, FaceDef, FrameDef, GraphicDef, ListDef,
+};
 use crate::state::PreviewState;
 use crate::ui::layers::thumbnails;
 use crate::ui::shared::{self, VIEWPORT_RECT_ID};
@@ -24,6 +26,10 @@ impl PropertiesUI for GraphicDef {
             ui.label("Patch:");
             changed |= ui.text_edit_singleline(&mut self.patch).changed();
         });
+
+        ui.add_space(4.0);
+        changed |= draw_crop_editor(ui, &mut self.crop);
+
         changed
     }
 
@@ -38,6 +44,16 @@ impl PropertiesUI for GraphicDef {
 }
 
 impl PropertiesUI for FaceDef {
+    fn draw_specific_fields(
+        &mut self,
+        ui: &mut egui::Ui,
+        _: &FontCache,
+        _: &AssetStore,
+        _: &PreviewState,
+    ) -> bool {
+        draw_crop_editor(ui, &mut self.crop)
+    }
+
     fn get_preview_content(
         &self,
         ui: &egui::Ui,
@@ -83,8 +99,73 @@ impl PropertiesUI for FaceDef {
     }
 
     fn has_specific_fields(&self) -> bool {
-        false
+        self.crop.is_some()
     }
+}
+
+impl PropertiesUI for ListDef {
+    fn draw_specific_fields(
+        &mut self,
+        ui: &mut egui::Ui,
+        _: &FontCache,
+        _: &AssetStore,
+        _: &PreviewState,
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            changed |= ui.checkbox(&mut self.horizontal, "Horizontal").changed();
+            changed |= ui.checkbox(&mut self.reverse, "Reverse").changed();
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Spacing:");
+            changed |= ui.add(egui::DragValue::new(&mut self.spacing)).changed();
+        });
+
+        changed
+    }
+}
+
+fn draw_crop_editor(ui: &mut egui::Ui, crop: &mut Option<CropDef>) -> bool {
+    let mut changed = false;
+    let mut is_enabled = crop.is_some();
+
+    if ui.checkbox(&mut is_enabled, "Enable Cropping").changed() {
+        if is_enabled {
+            *crop = Some(CropDef::default());
+        } else {
+            *crop = None;
+        }
+        changed = true;
+    }
+
+    if let Some(c) = crop {
+        ui.indent("crop_fields", |ui| {
+            egui::Grid::new("crop_grid").show(ui, |ui| {
+                ui.label("Width:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut c.width).range(0..=4096))
+                    .changed();
+                ui.label("Height:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut c.height).range(0..=4096))
+                    .changed();
+                ui.end_row();
+
+                ui.label("Left:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut c.left).range(-2048..=2048))
+                    .changed();
+                ui.label("Top:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut c.top).range(-2048..=2048))
+                    .changed();
+                ui.end_row();
+            });
+            changed |= ui.checkbox(&mut c.center, "Center Offset").changed();
+        });
+    }
+    changed
 }
 
 enum FrameAction {

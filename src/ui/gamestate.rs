@@ -18,12 +18,12 @@ enum ItemId {
     BlueSkull,
     YellowSkull,
     RedSkull,
-    Berserk,
-    Invisibility,
-    Map,
-    Radsuit,
-    Liteamp,
-    Invuln,
+    Berserk,      // Powerup #1
+    Invisibility, // Powerup #2
+    Map,          // Powerup #4
+    Radsuit,      // Powerup #3
+    Liteamp,      // Powerup #5
+    Invuln,       // Powerup #0
     Chainsaw,
     Pistol,
     Shotgun,
@@ -251,20 +251,32 @@ fn item_btn(
     item_id: ItemId,
     label: &str,
 ) {
-    let is_owned = match item_id {
-        ItemId::BlueCard => state.inventory.has_blue_card,
-        ItemId::YellowCard => state.inventory.has_yellow_card,
-        ItemId::RedCard => state.inventory.has_red_card,
-        ItemId::BlueSkull => state.inventory.has_blue_skull,
-        ItemId::YellowSkull => state.inventory.has_yellow_skull,
-        ItemId::RedSkull => state.inventory.has_red_skull,
-        ItemId::Berserk => state.inventory.has_berserk,
-        ItemId::Invisibility => state.inventory.has_invisibility,
-        ItemId::Map => state.inventory.has_automap,
-        ItemId::Radsuit => state.inventory.has_radsuit,
-        ItemId::Liteamp => state.inventory.has_liteamp,
-        ItemId::Invuln => state.inventory.has_invulnerability,
-        _ => false,
+    let pwr_id = match item_id {
+        ItemId::Invuln => Some(0),
+        ItemId::Berserk => Some(1),
+        ItemId::Invisibility => Some(2),
+        ItemId::Radsuit => Some(3),
+        ItemId::Map => Some(4),
+        ItemId::Liteamp => Some(5),
+        _ => None,
+    };
+
+    let is_owned = if let Some(id) = pwr_id {
+        state
+            .player
+            .powerup_durations
+            .get(&id)
+            .map_or(false, |v| *v > 0.0)
+    } else {
+        match item_id {
+            ItemId::BlueCard => state.inventory.has_blue_card,
+            ItemId::YellowCard => state.inventory.has_yellow_card,
+            ItemId::RedCard => state.inventory.has_red_card,
+            ItemId::BlueSkull => state.inventory.has_blue_skull,
+            ItemId::YellowSkull => state.inventory.has_yellow_skull,
+            ItemId::RedSkull => state.inventory.has_red_skull,
+            _ => false,
+        }
     };
 
     ui.vertical_centered(|ui| {
@@ -273,42 +285,49 @@ fn item_btn(
 
         if response.clicked() {
             let new_val = !is_owned;
-            match item_id {
-                ItemId::BlueCard => state.inventory.has_blue_card = new_val,
-                ItemId::YellowCard => state.inventory.has_yellow_card = new_val,
-                ItemId::RedCard => state.inventory.has_red_card = new_val,
-                ItemId::BlueSkull => state.inventory.has_blue_skull = new_val,
-                ItemId::YellowSkull => state.inventory.has_yellow_skull = new_val,
-                ItemId::RedSkull => state.inventory.has_red_skull = new_val,
-                ItemId::Berserk => state.inventory.has_berserk = new_val,
-                ItemId::Invisibility => state.inventory.has_invisibility = new_val,
-                ItemId::Map => state.inventory.has_automap = new_val,
-                ItemId::Radsuit => state.inventory.has_radsuit = new_val,
-                ItemId::Liteamp => state.inventory.has_liteamp = new_val,
-                ItemId::Invuln => state.inventory.has_invulnerability = new_val,
-                _ => {}
-            }
-
-            if new_val {
-                let msg = match item_id {
-                    ItemId::BlueCard => "Picked up a blue keycard.",
-                    ItemId::YellowCard => "Picked up a yellow keycard.",
-                    ItemId::RedCard => "Picked up a red keycard.",
-                    ItemId::BlueSkull => "Picked up a blue skull key.",
-                    ItemId::YellowSkull => "Picked up a yellow skull key.",
-                    ItemId::RedSkull => "Picked up a red skull key.",
-                    ItemId::Invisibility => "Invisibility!",
-                    ItemId::Invuln => "Invulnerability!",
-                    ItemId::Berserk => "Berserk!",
-                    ItemId::Map => "Computer Area Map!",
-                    ItemId::Radsuit => "Radiation Shielding Suit",
-                    ItemId::Liteamp => "Light Amplification Goggles",
-                    _ => "Picked up an item.",
+            if let Some(id) = pwr_id {
+                let dur = if new_val {
+                    match id {
+                        0 => 30.0,
+                        1 => 1.0,
+                        2 => 60.0,
+                        3 => 60.0,
+                        4 => 1.0,
+                        5 => 120.0,
+                        _ => 30.0,
+                    }
+                } else {
+                    0.0
                 };
-                state.push_message(msg);
+                state.player.powerup_durations.insert(id, dur);
+            } else {
+                match item_id {
+                    ItemId::BlueCard => state.inventory.has_blue_card = new_val,
+                    ItemId::YellowCard => state.inventory.has_yellow_card = new_val,
+                    ItemId::RedCard => state.inventory.has_red_card = new_val,
+                    ItemId::BlueSkull => state.inventory.has_blue_skull = new_val,
+                    ItemId::YellowSkull => state.inventory.has_yellow_skull = new_val,
+                    ItemId::RedSkull => state.inventory.has_red_skull = new_val,
+                    _ => {}
+                }
             }
         }
-        ui.label(egui::RichText::new(label).size(11.0));
+
+        let mut display_label = label.to_string();
+        if let Some(id) = pwr_id {
+            let dur = state
+                .player
+                .powerup_durations
+                .get(&id)
+                .cloned()
+                .unwrap_or(0.0);
+            if dur > 0.0 && id != 1 && id != 4 {
+                let secs = dur as i32;
+                display_label = format!("{}:{:02}", secs / 60, secs % 60);
+            }
+        }
+
+        ui.label(egui::RichText::new(display_label).size(11.0));
     });
 }
 
@@ -351,21 +370,6 @@ fn weapon_complex_btn(
         let (_rect, response) =
             draw_asset_button(ui, assets, Some(&patch_to_use), is_truly_selected, owned);
 
-        let push_weapon_msg = |s: &mut PreviewState, id: ItemId| {
-            let msg = match id {
-                ItemId::Chainsaw => "A chainsaw!  Find some meat!".to_string(),
-                ItemId::Shotgun => "You got the shotgun!".to_string(),
-                ItemId::SuperShotgun => "You got the super shotgun!".to_string(),
-                ItemId::Chaingun => "You got the chaingun!".to_string(),
-                ItemId::RocketLauncher => "You got the rocket launcher!".to_string(),
-                ItemId::PlasmaGun => "You got the plasma rifle!".to_string(),
-                ItemId::BFG => "You got the BFG9000! Oh, yes.".to_string(),
-                _ => format!("You got the {}!", label),
-            };
-            s.push_message(msg);
-            s.evil_timer = 1.0;
-        };
-
         if response.clicked() {
             let new_owned = !owned;
             match item_id {
@@ -379,9 +383,6 @@ fn weapon_complex_btn(
                 ItemId::BFG => state.inventory.has_bfg = new_owned,
                 _ => {}
             }
-            if new_owned {
-                push_weapon_msg(state, item_id);
-            }
             if !new_owned && is_truly_selected {
                 state.selected_weapon_slot = 0;
             }
@@ -392,60 +393,16 @@ fn weapon_complex_btn(
                 state.selected_weapon_slot = 0;
             } else {
                 state.selected_weapon_slot = slot;
-                let mut became_owned = false;
                 match item_id {
-                    ItemId::Chainsaw => {
-                        if !state.inventory.has_chainsaw {
-                            state.inventory.has_chainsaw = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::Pistol => {
-                        if !state.inventory.has_pistol {
-                            state.inventory.has_pistol = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::Shotgun => {
-                        if !state.inventory.has_shotgun {
-                            state.inventory.has_shotgun = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::SuperShotgun => {
-                        if !state.inventory.has_super_shotgun {
-                            state.inventory.has_super_shotgun = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::Chaingun => {
-                        if !state.inventory.has_chaingun {
-                            state.inventory.has_chaingun = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::RocketLauncher => {
-                        if !state.inventory.has_rocket_launcher {
-                            state.inventory.has_rocket_launcher = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::PlasmaGun => {
-                        if !state.inventory.has_plasma_gun {
-                            state.inventory.has_plasma_gun = true;
-                            became_owned = true;
-                        }
-                    }
-                    ItemId::BFG => {
-                        if !state.inventory.has_bfg {
-                            state.inventory.has_bfg = true;
-                            became_owned = true;
-                        }
-                    }
+                    ItemId::Chainsaw => state.inventory.has_chainsaw = true,
+                    ItemId::Pistol => state.inventory.has_pistol = true,
+                    ItemId::Shotgun => state.inventory.has_shotgun = true,
+                    ItemId::SuperShotgun => state.inventory.has_super_shotgun = true,
+                    ItemId::Chaingun => state.inventory.has_chaingun = true,
+                    ItemId::RocketLauncher => state.inventory.has_rocket_launcher = true,
+                    ItemId::PlasmaGun => state.inventory.has_plasma_gun = true,
+                    ItemId::BFG => state.inventory.has_bfg = true,
                     _ => {}
-                }
-                if became_owned {
-                    push_weapon_msg(state, item_id);
                 }
                 if slot == 3 {
                     state.use_super_shotgun = is_ssg_variant;
@@ -467,17 +424,7 @@ fn draw_asset_button(
     let size = egui::vec2(BTN_SIZE, BTN_SIZE);
     let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
 
-    let (bg_color, stroke) = if is_selected {
-        (
-            ui.visuals().selection.bg_fill,
-            ui.visuals().selection.stroke,
-        )
-    } else if response.hovered() {
-        (
-            ui.visuals().widgets.hovered.bg_fill,
-            ui.visuals().widgets.hovered.bg_stroke,
-        )
-    } else if is_owned {
+    let (bg_color, stroke) = if is_owned {
         (
             egui::Color32::from_gray(40),
             egui::Stroke::new(1.0, egui::Color32::from_gray(60)),
@@ -489,8 +436,27 @@ fn draw_asset_button(
         )
     };
 
-    ui.painter()
-        .rect(rect, ROUNDING, bg_color, stroke, egui::StrokeKind::Middle);
+    let (final_bg, final_stroke) = if is_selected {
+        (
+            ui.visuals().selection.bg_fill,
+            ui.visuals().selection.stroke,
+        )
+    } else if response.hovered() {
+        (
+            ui.visuals().widgets.hovered.bg_fill,
+            ui.visuals().widgets.hovered.bg_stroke,
+        )
+    } else {
+        (bg_color, stroke)
+    };
+
+    ui.painter().rect(
+        rect,
+        ROUNDING,
+        final_bg,
+        final_stroke,
+        egui::StrokeKind::Middle,
+    );
 
     let tint = if is_owned {
         egui::Color32::WHITE

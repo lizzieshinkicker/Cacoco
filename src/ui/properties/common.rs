@@ -80,14 +80,24 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
             });
         ui.add_space(8.0);
         ui.vertical(|ui| {
-            let mut dyn_left = align.contains(Alignment::DYNAMIC_LEFT);
-            if ui.toggle_value(&mut dyn_left, "Dynamic Left").changed() {
-                align.set(Alignment::DYNAMIC_LEFT, dyn_left);
+            let mut wl = align.contains(Alignment::WIDESCREEN_LEFT);
+            if ui.toggle_value(&mut wl, "Widescreen Left").changed() {
+                align.set(Alignment::WIDESCREEN_LEFT, wl);
                 changed = true;
             }
-            let mut dyn_right = align.contains(Alignment::DYNAMIC_RIGHT);
-            if ui.toggle_value(&mut dyn_right, "Dynamic Right").changed() {
-                align.set(Alignment::DYNAMIC_RIGHT, dyn_right);
+            let mut wr = align.contains(Alignment::WIDESCREEN_RIGHT);
+            if ui.toggle_value(&mut wr, "Widescreen Right").changed() {
+                align.set(Alignment::WIDESCREEN_RIGHT, wr);
+                changed = true;
+            }
+            let mut nl = align.contains(Alignment::NO_LEFT_OFFSET);
+            if ui.toggle_value(&mut nl, "Ignore Left Offset").changed() {
+                align.set(Alignment::NO_LEFT_OFFSET, nl);
+                changed = true;
+            }
+            let mut nt = align.contains(Alignment::NO_TOP_OFFSET);
+            if ui.toggle_value(&mut nt, "Ignore Top Offset").changed() {
+                align.set(Alignment::NO_TOP_OFFSET, nt);
                 changed = true;
             }
         });
@@ -240,6 +250,7 @@ pub fn draw_lookup_param_dd(
 
     egui::ComboBox::from_id_salt(salt)
         .selected_text(current_name)
+        .width(ui.available_width().min(120.0)) // Cap width to prevent overflow
         .height(1000.0)
         .show_ui(ui, |ui| {
             ui.set_min_width(120.0);

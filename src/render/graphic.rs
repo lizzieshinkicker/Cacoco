@@ -8,7 +8,14 @@ pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, mut pos: egui:
     }
 
     let patch_name = def.patch.to_uppercase();
-    draw_simple_graphic_patch(ctx, &patch_name, pos, def.common.alignment, alpha);
+    draw_simple_graphic_patch(
+        ctx,
+        &patch_name,
+        pos,
+        def.common.alignment,
+        alpha,
+        &def.crop,
+    );
 }
 
 pub(super) fn draw_simple_graphic_patch(
@@ -17,16 +24,46 @@ pub(super) fn draw_simple_graphic_patch(
     pos: egui::Pos2,
     alignment: Alignment,
     alpha: f32,
+    crop: &Option<CropDef>,
 ) {
     if let Some(tex) = ctx.assets.textures.get(patch_name) {
-        let size = tex.size_vec2();
+        let mut size = tex.size_vec2();
 
-        let (off_x, off_y) = ctx
+        let (mut off_x, mut off_y) = ctx
             .assets
             .offsets
             .get(patch_name)
             .map(|(x, y)| (*x as f32, *y as f32))
             .unwrap_or((0.0, 0.0));
+
+        if alignment.contains(Alignment::NO_LEFT_OFFSET) {
+            off_x = 0.0;
+        }
+        if alignment.contains(Alignment::NO_TOP_OFFSET) {
+            off_y = 0.0;
+        }
+
+        let mut uv_rect = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+
+        if let Some(c) = crop {
+            let mut crop_l = c.left as f32;
+            let mut crop_t = c.top as f32;
+
+            if c.center {
+                crop_l += (size.x / 2.0).floor();
+                crop_t += (size.y / 2.0).floor();
+            }
+
+            let crop_w = (c.width as f32).max(1.0).min(size.x - crop_l);
+            let crop_h = (c.height as f32).max(1.0).min(size.y - crop_t);
+
+            uv_rect = egui::Rect::from_min_max(
+                egui::pos2(crop_l / size.x, crop_t / size.y),
+                egui::pos2((crop_l + crop_w) / size.x, (crop_t + crop_h) / size.y),
+            );
+
+            size = egui::vec2(crop_w, crop_h);
+        }
 
         let align_offset = get_alignment_anchor_offset(alignment, size.x, size.y);
 
@@ -47,7 +84,7 @@ pub(super) fn draw_simple_graphic_patch(
         ctx.painter.image(
             tex.id(),
             egui::Rect::from_min_size(screen_pos, screen_size),
-            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            uv_rect,
             tint,
         );
     } else {

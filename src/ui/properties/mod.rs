@@ -67,6 +67,8 @@ pub fn draw_properties_panel(
                                 text::number_type_name(p.type_).to_string()
                             }
                             crate::model::Element::Component(c) => format!("{:?}", c.type_),
+                            crate::model::Element::List(_) => "List Container".to_string(),
+                            crate::model::Element::String(_) => "Dynamic String".to_string(),
                             _ => el.display_name(),
                         }
                     };
@@ -135,7 +137,7 @@ pub fn draw_properties_panel(
                 None,
                 current_tab == PropertyTab::Properties,
             )
-                .clicked()
+            .clicked()
             {
                 current_tab = PropertyTab::Properties;
             }
@@ -145,17 +147,19 @@ pub fn draw_properties_panel(
                 None,
                 current_tab == PropertyTab::Conditions,
             )
-                .clicked()
+            .clicked()
             {
                 current_tab = PropertyTab::Conditions;
             }
         });
+        ui.add_space(3.0);
+        ui.separator();
     }
 
     egui::ScrollArea::vertical()
         .id_salt("prop_content_scroll")
         .show(ui, |ui| {
-            ui.add_space(4.0);
+            ui.add_space(4.0); // Use 4.0 spacing from Main
 
             if let Some(f) = file {
                 let font_cache = FontCache::new(f);
@@ -245,7 +249,7 @@ fn draw_static_header(ui: &mut egui::Ui, title: &str, desc: &str, color: egui::C
         ui.vertical(|ui| {
             ui.add_sized(
                 [ui.available_width(), 0.0],
-                egui::Label::new(egui::RichText::new(title).size(16.0)),
+                egui::Label::new(egui::RichText::new(title).size(16.0).strong()), // Main uses .strong()
             );
             ui.add(egui::Separator::default().spacing(8.0));
             ui.vertical_centered(|ui| {

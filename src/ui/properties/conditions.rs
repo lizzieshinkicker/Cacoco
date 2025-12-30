@@ -27,6 +27,7 @@ pub fn draw_conditions_editor(
                     condition: ConditionType::SelectedWeaponHasAmmo,
                     param: 0,
                     param2: 0,
+                    param_string: None,
                 },
             );
             changed = true;
@@ -43,6 +44,7 @@ pub fn draw_conditions_editor(
                     condition: ConditionType::WeaponOwned,
                     param: 101,
                     param2: 0,
+                    param_string: None,
                 });
                 changed = true;
             }
@@ -158,6 +160,7 @@ fn draw_condition_card(
                                                 cond.condition = new_group.variants[0].condition;
                                                 cond.param = new_group.default_param;
                                                 cond.param2 = 0;
+                                                cond.param_string = None;
                                                 changed = true;
                                             }
                                         }
@@ -227,11 +230,24 @@ fn draw_condition_predicate(
                         .range(0..=999),
                 )
                 .changed();
+
+            let items = if matches!(
+                cond.condition,
+                ConditionType::PowerupTimeGe
+                    | ConditionType::PowerupTimeLt
+                    | ConditionType::PowerupTimePercentGe
+                    | ConditionType::PowerupTimePercentLt
+            ) {
+                lookups::POWERUPS
+            } else {
+                lookups::AMMO_TYPES
+            };
+
             changed |= common::draw_lookup_param_dd(
                 ui,
                 &format!("param2_{}", my_idx),
                 &mut cond.param2,
-                lookups::AMMO_TYPES,
+                items,
                 assets,
             );
         }
@@ -284,83 +300,90 @@ fn draw_params_for_type(
     use lookups::*;
 
     let mut changed = false;
-    match cond.condition {
-        WeaponOwned | WeaponNotOwned | WeaponSelected | WeaponNotSelected | WeaponHasAmmo => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_wpn_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                WEAPONS,
-                assets,
-            );
+    match get_param_usage(cond.condition) {
+        ParamUsage::String => {
+            let mut buf = cond.param_string.clone().unwrap_or_default();
+            if ui.text_edit_singleline(&mut buf).changed() {
+                cond.param_string = if buf.is_empty() { None } else { Some(buf) };
+                changed = true;
+            }
         }
-        ItemOwned | ItemNotOwned => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_item_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                ITEMS,
-                assets,
-            );
+        ParamUsage::None => {
+            ui.label(egui::RichText::new("(No Params)").weak().size(11.0));
         }
-        AmmoMatch => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_ammo_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                AMMO_TYPES,
-                assets,
-            );
-        }
-        SessionTypeEq | SessionTypeNeq => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_sess_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                SESSION_TYPES,
-                assets,
-            );
-        }
-        HudModeEq => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_hud_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                HUD_MODES,
-                assets,
-            );
-        }
-        WidescreenModeEq => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_wide_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                WIDESCREEN_MODES,
-                assets,
-            );
-        }
-        GameVersionGe | GameVersionLt => {
-            changed |= common::draw_lookup_param_dd(
-                ui,
-                &format!("p1_ver_{:?}_{}", cond.condition, my_idx),
-                &mut cond.param,
-                FEATURE_LEVELS,
-                assets,
-            );
-        }
-        AutomapModeEq => {
-            changed |= draw_automap_param(ui, &mut cond.param);
-        }
-        SlotOwned | SlotNotOwned | SlotSelected | SlotNotSelected => {
-            changed |= ui
-                .add(egui::DragValue::new(&mut cond.param).range(1..=9))
-                .changed();
-        }
-        _ => {
-            if matches!(
-                get_param_usage(cond.condition),
-                ParamUsage::Param1 | ParamUsage::Both
-            ) {
+        _ => match cond.condition {
+            WeaponOwned | WeaponNotOwned | WeaponSelected | WeaponNotSelected | WeaponHasAmmo => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_wpn_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    WEAPONS,
+                    assets,
+                );
+            }
+            ItemOwned | ItemNotOwned => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_item_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    ITEMS,
+                    assets,
+                );
+            }
+            AmmoMatch => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_ammo_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    AMMO_TYPES,
+                    assets,
+                );
+            }
+            SessionTypeEq | SessionTypeNeq => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_sess_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    SESSION_TYPES,
+                    assets,
+                );
+            }
+            HudModeEq => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_hud_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    HUD_MODES,
+                    assets,
+                );
+            }
+            WidescreenModeEq => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_wide_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    WIDESCREEN_MODES,
+                    assets,
+                );
+            }
+            GameVersionGe | GameVersionLt => {
+                changed |= common::draw_lookup_param_dd(
+                    ui,
+                    &format!("p1_ver_{:?}_{}", cond.condition, my_idx),
+                    &mut cond.param,
+                    FEATURE_LEVELS,
+                    assets,
+                );
+            }
+            AutomapModeEq => {
+                changed |= draw_automap_param(ui, &mut cond.param);
+            }
+            SlotOwned | SlotNotOwned | SlotSelected | SlotNotSelected => {
+                changed |= ui
+                    .add(egui::DragValue::new(&mut cond.param).range(1..=9))
+                    .changed();
+            }
+            _ => {
                 changed |= ui
                     .add(
                         egui::DragValue::new(&mut cond.param)
@@ -369,7 +392,7 @@ fn draw_params_for_type(
                     )
                     .changed();
             }
-        }
+        },
     }
     changed
 }

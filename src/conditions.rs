@@ -27,7 +27,9 @@ fn check_single(condition: &ConditionDef, state: &PreviewState) -> bool {
         | SlotNotOwned
         | SlotSelected
         | SlotNotSelected => check_weapon_condition(condition, state),
+
         ItemOwned | ItemNotOwned => check_item_condition(condition, state),
+
         HealthGe
         | HealthLt
         | HealthPercentGe
@@ -44,10 +46,30 @@ fn check_single(condition: &ConditionDef, state: &PreviewState) -> bool {
         | AmmoLt
         | AmmoPercentGe
         | AmmoPercentLt => check_vitals_condition(condition, state),
+
         GameVersionGe | GameVersionLt | SessionTypeEq | SessionTypeNeq | GameModeEq
         | GameModeNeq | HudModeEq | AutomapModeEq | WidgetEnabled | WidgetDisabled
         | WidescreenModeEq => check_game_state_condition(condition, state),
+
         EpisodeEq | LevelGe | LevelLt => check_map_condition(condition, state),
+
+        PatchEmpty | PatchNotEmpty => {
+            let patch_name = condition.param_string.as_deref().unwrap_or("");
+            let is_empty = patch_name.is_empty();
+            if condition.condition == PatchEmpty {
+                is_empty
+            } else {
+                !is_empty
+            }
+        }
+
+        KillsLt | KillsGe | ItemsLt | ItemsGe | SecretsLt | SecretsGe | KillsPercentLt
+        | KillsPercentGe | ItemsPercentLt | ItemsPercentGe | SecretsPercentLt
+        | SecretsPercentGe => check_stats_condition(condition, state),
+
+        PowerupTimeLt | PowerupTimeGe | PowerupTimePercentLt | PowerupTimePercentGe => {
+            check_powerup_condition(condition, state)
+        }
     }
 }
 
@@ -67,7 +89,7 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
         WeaponNotOwned => !check_weapon_condition(
             &ConditionDef {
                 condition: WeaponOwned,
-                ..*condition
+                ..condition.clone()
             },
             state,
         ),
@@ -84,7 +106,7 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
         SlotNotOwned => !check_weapon_condition(
             &ConditionDef {
                 condition: SlotOwned,
-                ..*condition
+                ..condition.clone()
             },
             state,
         ),
@@ -103,7 +125,7 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
         WeaponNotSelected => !check_weapon_condition(
             &ConditionDef {
                 condition: WeaponSelected,
-                ..*condition
+                ..condition.clone()
             },
             state,
         ),
@@ -138,7 +160,7 @@ fn check_item_condition(condition: &ConditionDef, state: &PreviewState) -> bool 
         ItemNotOwned => !check_item_condition(
             &ConditionDef {
                 condition: ItemOwned,
-                ..*condition
+                ..condition.clone()
             },
             state,
         ),
@@ -158,18 +180,10 @@ fn check_vitals_condition(condition: &ConditionDef, state: &PreviewState) -> boo
         ArmorGe => state.player.armor >= param,
         ArmorLt => state.player.armor < param,
         ArmorPercentGe => {
-            if state.player.armor_max == 0 {
-                false
-            } else {
-                (state.player.armor * 100 / state.player.armor_max) >= param
-            }
+            state.get_stat_percent(state.player.armor, state.player.armor_max) >= param
         }
         ArmorPercentLt => {
-            if state.player.armor_max == 0 {
-                false
-            } else {
-                (state.player.armor * 100 / state.player.armor_max) < param
-            }
+            state.get_stat_percent(state.player.armor, state.player.armor_max) < param
         }
         SelectedAmmoGe => {
             let idx = state.get_selected_ammo_type();
@@ -192,12 +206,7 @@ fn check_vitals_condition(condition: &ConditionDef, state: &PreviewState) -> boo
             if idx == -1 {
                 false
             } else {
-                let max = state.get_max_ammo(idx);
-                if max == 0 {
-                    false
-                } else {
-                    (state.get_ammo(idx) * 100 / max) >= param
-                }
+                state.get_stat_percent(state.get_ammo(idx), state.get_max_ammo(idx)) >= param
             }
         }
         SelectedAmmoPercentLt => {
@@ -205,31 +214,16 @@ fn check_vitals_condition(condition: &ConditionDef, state: &PreviewState) -> boo
             if idx == -1 {
                 false
             } else {
-                let max = state.get_max_ammo(idx);
-                if max == 0 {
-                    false
-                } else {
-                    (state.get_ammo(idx) * 100 / max) < param
-                }
+                state.get_stat_percent(state.get_ammo(idx), state.get_max_ammo(idx)) < param
             }
         }
         AmmoGe => state.get_ammo(param2) >= param,
         AmmoLt => state.get_ammo(param2) < param,
         AmmoPercentGe => {
-            let max = state.get_max_ammo(param2);
-            if max == 0 {
-                false
-            } else {
-                (state.get_ammo(param2) * 100 / max) >= param
-            }
+            state.get_stat_percent(state.get_ammo(param2), state.get_max_ammo(param2)) >= param
         }
         AmmoPercentLt => {
-            let max = state.get_max_ammo(param2);
-            if max == 0 {
-                false
-            } else {
-                (state.get_ammo(param2) * 100 / max) < param
-            }
+            state.get_stat_percent(state.get_ammo(param2), state.get_max_ammo(param2)) < param
         }
         _ => true,
     }
@@ -263,8 +257,20 @@ fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) ->
             }
             true
         }
-        WidgetEnabled => !state.engine.disabled_widgets.contains(&param),
-        WidgetDisabled => state.engine.disabled_widgets.contains(&param),
+        WidgetEnabled => {
+            if let Some(name) = &condition.param_string {
+                !state.engine.disabled_components.contains(name)
+            } else {
+                !state.engine.disabled_widgets.contains(&param)
+            }
+        }
+        WidgetDisabled => {
+            if let Some(name) = &condition.param_string {
+                state.engine.disabled_components.contains(name)
+            } else {
+                state.engine.disabled_widgets.contains(&param)
+            }
+        }
         WidescreenModeEq => state.engine.widescreen_mode == (param != 0),
         _ => true,
     }
@@ -276,6 +282,70 @@ fn check_map_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
         EpisodeEq => state.world.episode == condition.param,
         LevelGe => state.world.level >= condition.param,
         LevelLt => state.world.level < condition.param,
+        _ => true,
+    }
+}
+
+fn check_stats_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
+    use crate::model::ConditionType::*;
+    let p = condition.param;
+    match condition.condition {
+        KillsLt => state.player.kills < p,
+        KillsGe => state.player.kills >= p,
+        ItemsLt => state.player.items < p,
+        ItemsGe => state.player.items >= p,
+        SecretsLt => state.player.secrets < p,
+        SecretsGe => state.player.secrets >= p,
+        KillsPercentLt => state.get_stat_percent(state.player.kills, state.player.max_kills) < p,
+        KillsPercentGe => state.get_stat_percent(state.player.kills, state.player.max_kills) >= p,
+        ItemsPercentLt => state.get_stat_percent(state.player.items, state.player.max_items) < p,
+        ItemsPercentGe => state.get_stat_percent(state.player.items, state.player.max_items) >= p,
+        SecretsPercentLt => {
+            state.get_stat_percent(state.player.secrets, state.player.max_secrets) < p
+        }
+        SecretsPercentGe => {
+            state.get_stat_percent(state.player.secrets, state.player.max_secrets) >= p
+        }
+        _ => true,
+    }
+}
+
+fn check_powerup_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
+    use crate::model::ConditionType::*;
+    let duration = state
+        .player
+        .powerup_durations
+        .get(&condition.param2)
+        .cloned()
+        .unwrap_or(0.0);
+    let id = condition.param2;
+    let p = condition.param as f32;
+
+    match condition.condition {
+        PowerupTimeLt => duration < p,
+        PowerupTimeGe => duration >= p,
+        PowerupTimePercentLt | PowerupTimePercentGe => {
+            let percent = if (id == 1 || id == 4) && duration > 0.0 {
+                100.0
+            } else if duration <= 0.0 {
+                0.0
+            } else {
+                let max_dur = match id {
+                    0 => 30.0,
+                    2 => 60.0,
+                    3 => 60.0,
+                    5 => 120.0,
+                    _ => 30.0,
+                };
+                duration * 100.0 / max_dur
+            };
+
+            if condition.condition == PowerupTimePercentLt {
+                percent < p
+            } else {
+                percent >= p
+            }
+        }
         _ => true,
     }
 }

@@ -1,14 +1,43 @@
 use crate::constants::DOOM_TICS_PER_SEC;
 use crate::model::FeatureLevel;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerStats {
     pub health: i32,
     pub armor: i32,
     pub armor_max: i32,
     pub is_god_mode: bool,
+    pub kills: i32,
+    pub items: i32,
+    pub secrets: i32,
+    pub max_kills: i32,
+    pub max_items: i32,
+    pub max_secrets: i32,
+    pub powerup_durations: HashMap<i32, f32>, // param -> seconds remaining
+}
+
+impl Default for PlayerStats {
+    fn default() -> Self {
+        let mut durations = HashMap::new();
+        for i in 0..6 {
+            durations.insert(i, 0.0);
+        }
+        Self {
+            health: 100,
+            armor: 0,
+            armor_max: 100,
+            is_god_mode: false,
+            kills: 0,
+            items: 0,
+            secrets: 0,
+            max_kills: 100,
+            max_items: 50,
+            max_secrets: 10,
+            powerup_durations: durations,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -60,6 +89,7 @@ pub struct EngineContext {
     pub automap_active: bool,
     pub automap_overlay: bool,
     pub disabled_widgets: HashSet<i32>,
+    pub disabled_components: HashSet<String>,
 }
 
 impl Default for EngineContext {
@@ -71,6 +101,7 @@ impl Default for EngineContext {
             automap_active: false,
             automap_overlay: false,
             disabled_widgets: HashSet::new(),
+            disabled_components: HashSet::new(),
         }
     }
 }
@@ -113,12 +144,7 @@ pub struct PreviewState {
 impl Default for PreviewState {
     fn default() -> Self {
         Self {
-            player: PlayerStats {
-                health: 100,
-                armor: 0,
-                armor_max: 100,
-                is_god_mode: false,
-            },
+            player: PlayerStats::default(),
             inventory: Inventory {
                 has_fist: true,
                 has_pistol: true,
@@ -183,7 +209,27 @@ impl PreviewState {
             self.pain_timer = (self.pain_timer - dt).max(0.0);
         }
 
+        for (id, duration) in self.player.powerup_durations.iter_mut() {
+            // ID 1 (Berserk) and ID 4 (Map) are toggles/infinite
+            if *id != 1 && *id != 4 {
+                *duration = (*duration - dt).max(0.0);
+            } else if *duration > 0.0 {
+                *duration = 1.0;
+            }
+        }
+
+        self.sync_inventory_with_durations();
         self.update_weapon_animation(dt);
+    }
+
+    fn sync_inventory_with_durations(&mut self) {
+        let d = &self.player.powerup_durations;
+        self.inventory.has_invulnerability = d.get(&0).map_or(false, |v| *v > 0.0);
+        self.inventory.has_berserk = d.get(&1).map_or(false, |v| *v > 0.0);
+        self.inventory.has_invisibility = d.get(&2).map_or(false, |v| *v > 0.0);
+        self.inventory.has_radsuit = d.get(&3).map_or(false, |v| *v > 0.0);
+        self.inventory.has_automap = d.get(&4).map_or(false, |v| *v > 0.0);
+        self.inventory.has_liteamp = d.get(&5).map_or(false, |v| *v > 0.0);
     }
 
     fn update_weapon_animation(&mut self, dt: f32) {
@@ -249,6 +295,10 @@ impl PreviewState {
             105 | 106 | 6 | 7 => Some(2),
             _ => None,
         }
+    }
+
+    pub fn get_stat_percent(&self, current: i32, max: i32) -> i32 {
+        if max <= 0 { 0 } else { (current * 100) / max }
     }
 
     pub fn get_face_sprite(&self, ouch: bool, look_dir: u8) -> String {
