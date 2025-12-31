@@ -5,14 +5,17 @@ use crate::render::projection::ViewportProjection;
 use crate::render::{self, RenderPass};
 use crate::state::PreviewState;
 use crate::ui::shared::VIEWPORT_RECT_ID;
+use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
 
+/// Draws the main HUD viewport, handling rendering and delegating interaction logic.
 pub fn draw_viewport(
     ui: &mut egui::Ui,
     file: &Option<SBarDefFile>,
     assets: &AssetStore,
     preview_state: &mut PreviewState,
+    controller: &mut ViewportController,
     selection: &HashSet<Vec<usize>>,
     current_bar_idx: usize,
 ) -> Vec<LayerAction> {
@@ -45,7 +48,6 @@ pub fn draw_viewport(
     let background_rect = ui.available_rect_before_wrap();
     ui.painter()
         .rect_filled(background_rect, 0.0, egui::Color32::from_rgb(15, 15, 15));
-
     ui.data_mut(|d| d.insert_temp(egui::Id::new(VIEWPORT_RECT_ID), background_rect));
 
     let file_ref = match file {
@@ -65,45 +67,7 @@ pub fn draw_viewport(
         sense,
     );
 
-    let is_dragging = viewport_res.dragged_by(egui::PointerButton::Primary);
-
-    let is_viewport_clicked = viewport_res.contains_pointer()
-        && ui.input(|i| i.pointer.button_down(egui::PointerButton::Primary));
-
-    if is_dragging && !selection.is_empty() {
-        if egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()).is_none() {
-            if viewport_res.drag_started() {
-                actions.push(LayerAction::UndoSnapshot);
-            }
-
-            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-
-            let delta = ui.input(|i| i.pointer.delta());
-            let accum_id = ui.make_persistent_id("move_accumulator");
-            let mut accum: egui::Vec2 = ui.data(|d| d.get_temp(accum_id).unwrap_or_default());
-
-            accum.x += delta.x / proj.final_scale_x;
-            accum.y += delta.y / proj.final_scale_y;
-
-            let move_x = accum.x.trunc() as i32;
-            let move_y = accum.y.trunc() as i32;
-
-            accum.x -= move_x as f32;
-            accum.y -= move_y as f32;
-            ui.data_mut(|d| d.insert_temp(accum_id, accum));
-
-            if move_x != 0 || move_y != 0 {
-                actions.push(LayerAction::TranslateSelection {
-                    paths: selection.iter().cloned().collect(),
-                    dx: move_x,
-                    dy: move_y,
-                });
-            }
-        }
-    } else if viewport_res.drag_stopped() {
-        let accum_id = ui.make_persistent_id("move_accumulator");
-        ui.data_mut(|d| d.remove::<egui::Vec2>(accum_id));
-    }
+    actions.extend(controller.handle_selection_drag(ui, &proj, selection, &viewport_res));
 
     ui.painter()
         .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
@@ -134,7 +98,10 @@ pub fn draw_viewport(
     let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(proj.screen_rect));
     screen_ui.set_clip_rect(proj.screen_rect);
 
-    if let Some(tex) = assets.textures.get("_BG_MASTER") {
+    if let Some(tex) = assets
+        .textures
+        .get(&crate::assets::AssetId::new("_BG_MASTER"))
+    {
         let mut uv_rect = if preview_state.engine.widescreen_mode {
             egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0))
         } else {
@@ -157,7 +124,8 @@ pub fn draw_viewport(
 
     if !is_fullscreen && bar_height > 0.0 {
         let flat_key = fill_flat_name.unwrap_or_else(|| "GRNROCK".to_string());
-        if let Some(tex) = assets.textures.get(&flat_key.to_uppercase()) {
+        let id = crate::assets::AssetId::new(&flat_key);
+        if let Some(tex) = assets.textures.get(&id) {
             let tile_size_px = 64.0 * proj.final_scale_x;
             let bar_area_rect = egui::Rect::from_min_max(
                 egui::pos2(
@@ -175,7 +143,6 @@ pub fn draw_viewport(
                     let draw_h = (bar_area_rect.max.y - y).min(tile_size_px);
                     let uv_w = draw_w / tile_size_px;
                     let uv_h = draw_h / tile_size_px;
-
                     screen_ui.painter().image(
                         tex.id(),
                         egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(draw_w, draw_h)),
@@ -191,7 +158,6 @@ pub fn draw_viewport(
 
     let mut world_clip_rect = proj.screen_rect;
     world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
-
     {
         let mut weapon_ui = screen_ui.new_child(egui::UiBuilder::new());
         weapon_ui.set_clip_rect(world_clip_rect.intersect(proj.screen_rect));
@@ -209,8 +175,7 @@ pub fn draw_viewport(
         let mouse_pos = ui
             .input(|i| i.pointer.latest_pos())
             .unwrap_or(egui::pos2(-1000.0, -1000.0));
-
-        preview_state.virtual_mouse_pos = proj.to_virtual(mouse_pos);
+        preview_state.editor.virtual_mouse_pos = proj.to_virtual(mouse_pos);
 
         let ctx = render::RenderContext {
             painter: screen_ui.painter(),
@@ -218,13 +183,14 @@ pub fn draw_viewport(
             file: file_ref,
             state: preview_state,
             time: ui.input(|i| i.time),
-            fps: preview_state.display_fps,
-            mouse_pos: preview_state.virtual_mouse_pos,
+            fps: preview_state.editor.display_fps,
+            mouse_pos: preview_state.editor.virtual_mouse_pos,
             selection,
             pass: RenderPass::Background,
             proj: &proj,
-            is_dragging,
-            is_viewport_clicked,
+            is_dragging: controller.is_dragging,
+            is_viewport_clicked: viewport_res.contains_pointer()
+                && ui.input(|i| i.pointer.button_down(egui::PointerButton::Primary)),
         };
 
         let render_status_bar = |render_ctx: &render::RenderContext| {
@@ -241,7 +207,7 @@ pub fn draw_viewport(
 
         render_status_bar(&ctx);
 
-        if !selection.is_empty() && preview_state.strobe_timer > 0.0 {
+        if !selection.is_empty() && preview_state.editor.strobe_timer > 0.0 {
             let fg_ctx = render::RenderContext {
                 pass: RenderPass::Foreground,
                 ..ctx
@@ -250,10 +216,8 @@ pub fn draw_viewport(
         }
 
         if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
-            let pointer_pos = ui.input(|i| i.pointer.latest_pos());
-            let is_over_viewport = pointer_pos.map_or(false, |pos| proj.screen_rect.contains(pos));
-
-            if is_over_viewport {
+            let is_over = viewport_res.contains_pointer();
+            if is_over {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::None);
                 screen_ui.painter().rect_stroke(
                     proj.screen_rect,
@@ -262,7 +226,7 @@ pub fn draw_viewport(
                     egui::StrokeKind::Inside,
                 );
 
-                if let Some(pos) = pointer_pos {
+                if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
                     let virtual_pos = proj.to_virtual(pos);
                     let final_x = (virtual_pos.x - proj.origin_x).round() as i32;
                     let final_y = (virtual_pos.y - root_y).round() as i32;
@@ -328,7 +292,7 @@ fn render_player_weapon(
     proj: &ViewportProjection,
     v_shift: f32,
 ) {
-    let (weapon_lump_name, constant_offset) = match state.display_weapon_slot {
+    let (weapon_lump_name, constant_offset) = match state.editor.display_weapon_slot {
         1 => {
             if state.inventory.has_chainsaw {
                 (Some("SAWGC0"), 0.0)
@@ -338,7 +302,7 @@ fn render_player_weapon(
         }
         2 => (Some("PISGA0"), 0.0),
         3 => {
-            if state.display_super_shotgun {
+            if state.editor.display_super_shotgun {
                 (Some("SHT2A0"), 0.0)
             } else {
                 (Some("SHTGA0"), 0.0)
@@ -352,18 +316,17 @@ fn render_player_weapon(
     };
 
     if let Some(lump) = weapon_lump_name {
-        if let Some(tex) = assets.textures.get(lump) {
+        let id = crate::assets::AssetId::new(lump);
+        if let Some(tex) = assets.textures.get(&id) {
             let tex_size = tex.size_vec2();
             let scaled_size = egui::vec2(
                 tex_size.x * proj.final_scale_x,
                 tex_size.y * proj.final_scale_y,
             );
             let draw_x = proj.screen_rect.center().x - (scaled_size.x / 2.0);
-
             let total_offset_y =
-                (state.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
+                (state.editor.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
             let draw_y = (proj.screen_rect.max.y - scaled_size.y) + total_offset_y;
-
             ui.painter().image(
                 tex.id(),
                 egui::Rect::from_min_size(egui::pos2(draw_x, draw_y), scaled_size),

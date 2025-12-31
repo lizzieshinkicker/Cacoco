@@ -1,4 +1,4 @@
-use crate::assets::AssetStore;
+use crate::assets::{AssetId, AssetStore};
 use crate::model::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::shared;
@@ -9,10 +9,14 @@ const ROUNDING: f32 = 4.0;
 const BG_COLOR: egui::Color32 = egui::Color32::from_rgb(30, 30, 30);
 const INNER_MARGIN: f32 = 2.0;
 
+/// Draws a simple dark background box for a thumbnail.
 pub fn draw_thumb_bg(ui: &mut egui::Ui, rect: egui::Rect) {
     ui.painter().rect_filled(rect, ROUNDING, BG_COLOR);
 }
 
+/// Draws a live, context-aware thumbnail for an element in the layer tree.
+///
+/// Specialized for components and numbers to show the current game values.
 pub fn draw_thumbnail(
     ui: &mut egui::Ui,
     element: &ElementWrapper,
@@ -54,6 +58,7 @@ pub fn draw_thumbnail(
     response
 }
 
+/// Draws a static icon or texture within a thumbnail box.
 pub fn draw_thumbnail_widget(
     ui: &mut egui::Ui,
     texture: Option<&egui::TextureHandle>,
@@ -82,19 +87,21 @@ fn draw_static_texture_content(
 
     if let Some(tex) = texture {
         shared::draw_scaled_image(ui, rect.shrink(INNER_MARGIN), tex, tint, 4.0);
-    } else if let Some(icon) = fallback_icon {
-        let color = if is_dimmed {
-            egui::Color32::from_gray(100)
-        } else {
-            egui::Color32::from_gray(160)
-        };
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            icon,
-            egui::FontId::proportional(18.0),
-            color,
-        );
+    } else {
+        if let Some(icon) = fallback_icon {
+            let color = if is_dimmed {
+                egui::Color32::from_gray(100)
+            } else {
+                egui::Color32::from_gray(160)
+            };
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                icon,
+                egui::FontId::proportional(18.0),
+                color,
+            );
+        }
     }
 }
 
@@ -122,11 +129,16 @@ fn draw_live_number_thumbnail(
     let val = match number_def.type_ {
         NumberType::Health => state.player.health,
         NumberType::Armor => state.player.armor,
-        NumberType::AmmoSelected => state.get_ammo(state.get_selected_ammo_type()),
-        NumberType::Ammo => state.get_ammo(number_def.param),
-        NumberType::MaxAmmo => state.get_max_ammo(number_def.param),
+        NumberType::AmmoSelected => {
+            let slot = state.selected_weapon_slot;
+            let idx = state.inventory.get_selected_ammo_type(slot);
+            state.inventory.get_ammo(idx)
+        }
+        NumberType::Ammo => state.inventory.get_ammo(number_def.param),
+        NumberType::MaxAmmo => state.inventory.get_max_ammo(number_def.param),
         _ => 0,
     };
+
     let text = if is_percent {
         format!("{}%", val)
     } else {
@@ -188,7 +200,7 @@ fn draw_live_component_thumbnail(
         ComponentType::Coordinates => "XYZ",
         ComponentType::FpsCounter => {
             ui.ctx().request_repaint();
-            text_buf = format!("{:.0}", state.display_fps);
+            text_buf = format!("{:.0}", state.editor.display_fps);
             &text_buf
         }
         _ => "TXT",
@@ -197,6 +209,7 @@ fn draw_live_component_thumbnail(
     draw_live_patches(ui, rect, text, stem, assets, tint, false);
 }
 
+/// Renders a sequence of patches into a thumbnail area using AssetId lookups.
 pub fn draw_live_patches(
     ui: &mut egui::Ui,
     rect: egui::Rect,
@@ -208,8 +221,8 @@ pub fn draw_live_patches(
 ) {
     let mut textures = Vec::new();
     for char in text.chars() {
-        let patch_name = assets.resolve_patch_name(stem, char, is_number_font);
-        if let Some(tex) = assets.textures.get(&patch_name) {
+        let id = assets.resolve_patch_id(stem, char, is_number_font);
+        if let Some(tex) = assets.textures.get(&id) {
             textures.push(tex);
         }
     }
@@ -224,6 +237,7 @@ pub fn draw_live_patches(
         .map(|t| t.size_vec2().y)
         .reduce(f32::max)
         .unwrap_or(8.0);
+
     if total_width == 0.0 || max_height == 0.0 {
         return;
     }
@@ -251,6 +265,7 @@ pub fn draw_live_patches(
     }
 }
 
+/// Resolves a preview texture handle for an element based on current state.
 pub fn get_preview_texture<'a>(
     element: &'a ElementWrapper,
     assets: &'a AssetStore,
@@ -258,29 +273,37 @@ pub fn get_preview_texture<'a>(
     state: &PreviewState,
     ouch: bool,
 ) -> Option<&'a egui::TextureHandle> {
-    let patch_name = match &element.data {
-        Element::Graphic(g) => Some(g.patch.clone()),
-        Element::Animation(a) => a.frames.first().map(|f| f.lump.clone()),
-        Element::Face(_) => Some(state.get_face_sprite(ouch, 1)),
-        Element::FaceBackground(_) => Some("STFB0".to_string()),
+    let patch_id = match &element.data {
+        Element::Graphic(g) => Some(AssetId::new(&g.patch)),
+        Element::Animation(a) => a.frames.first().map(|f| AssetId::new(&f.lump)),
+        Element::Face(_) => {
+            let sprite = state.player.get_face_sprite(
+                ouch,
+                1,
+                state.editor.pain_timer,
+                state.editor.evil_timer,
+            );
+            Some(AssetId::new(&sprite))
+        }
+        Element::FaceBackground(_) => Some(AssetId::new("STFB0")),
         Element::Number(n) => file
             .data
             .number_fonts
             .iter()
             .find(|f| f.name.eq_ignore_ascii_case(&n.font))
-            .map(|f| format!("{}0", f.stem.to_uppercase())),
+            .map(|f| AssetId::new(&format!("{}0", f.stem))),
         _ => None,
     };
 
-    if let Some(name) = patch_name {
-        let key = name.to_uppercase();
-        if let Some(tex) = assets.textures.get(&key) {
+    if let Some(id) = patch_id {
+        if let Some(tex) = assets.textures.get(&id) {
             return Some(tex);
         }
     }
     None
 }
 
+/// A stylized row used in the browser lists (Fonts, Assets).
 pub struct ListRow<'a> {
     pub title: String,
     pub subtitle: Option<String>,
@@ -354,17 +377,15 @@ impl<'a> ListRow<'a> {
         ui.painter()
             .rect(rect, 4.0, bg, stroke, egui::StrokeKind::Outside);
 
-        let center_y = rect.center().y;
         let thumb_rect = egui::Rect::from_center_size(
-            egui::pos2(rect.min.x + 22.0, center_y),
+            egui::pos2(rect.min.x + 22.0, rect.center().y),
             egui::vec2(THUMB_SIZE, THUMB_SIZE),
         );
-
         let mut thumb_ui = ui.new_child(egui::UiBuilder::new().max_rect(thumb_rect));
         draw_thumbnail_widget(&mut thumb_ui, self.texture, self.fallback_icon, self.dimmed);
 
         let title_pos_x = rect.min.x + 44.0;
-        let text_color = ui.visuals().text_color();
+        let center_y = rect.center().y;
 
         if let Some(sub) = self.subtitle {
             ui.painter().text(
@@ -372,7 +393,7 @@ impl<'a> ListRow<'a> {
                 egui::Align2::LEFT_CENTER,
                 self.title,
                 egui::FontId::proportional(14.0),
-                text_color,
+                ui.visuals().text_color(),
             );
             ui.painter().text(
                 egui::pos2(title_pos_x, center_y + 8.0),
@@ -387,7 +408,7 @@ impl<'a> ListRow<'a> {
                 egui::Align2::LEFT_CENTER,
                 self.title,
                 egui::FontId::proportional(14.0),
-                text_color,
+                ui.visuals().text_color(),
             );
         }
 

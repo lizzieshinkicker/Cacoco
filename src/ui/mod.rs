@@ -3,11 +3,14 @@ pub mod font_wizard;
 pub mod gamestate;
 pub mod layers;
 pub mod menu;
+pub mod modals;
 pub(crate) mod properties;
 pub mod root;
 pub mod shared;
 pub mod viewport;
+pub mod viewport_controller;
 
+pub use gamestate::draw_context_panel;
 pub use gamestate::draw_gamestate_panel;
 pub use layers::draw_layers_panel;
 pub use menu::{MenuAction, draw_menu_bar, draw_settings_window};

@@ -1,20 +1,20 @@
 use crate::assets::AssetStore;
 use crate::cheats::CheatEngine;
 use crate::config::AppConfig;
-use crate::document::{self, LayerAction};
-use crate::history::HistoryManager;
-use crate::hotkeys::HotkeyRegistry;
+use crate::document::{LayerAction, SBarDocument};
 use crate::io;
 use crate::library::Template;
 use crate::model::SBarDefFile;
 use crate::state::PreviewState;
 use crate::ui;
 use crate::ui::font_wizard::FontWizardState;
+use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
 
 const MAX_RECENT_FILES: usize = 5;
 
+/// Actions that require user confirmation (usually due to unsaved changes).
 #[derive(Clone)]
 pub enum PendingAction {
     New,
@@ -23,6 +23,7 @@ pub enum PendingAction {
     Quit,
 }
 
+/// Requests for user confirmation before performing destructive operations.
 #[derive(Clone)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
@@ -31,51 +32,58 @@ pub enum ConfirmationRequest {
     DiscardChanges(PendingAction),
 }
 
+/// The main application container for the Cacoco SBARDEF editor.
 pub struct CacocoApp {
-    pub current_file: Option<SBarDefFile>,
-    pub opened_file_path: Option<String>,
-    pub selection: HashSet<Vec<usize>>,
-    pub last_selection: HashSet<Vec<usize>>,
-    pub selection_pivot: Option<Vec<usize>>,
+    /// The active project document, if any.
+    pub doc: Option<SBarDocument>,
+    /// Registry of all loaded textures and raw asset data.
     pub assets: AssetStore,
+    /// Persistent application configuration (IWAD paths, recent files).
     pub config: AppConfig,
+    /// The simulated game state used to render the viewport preview.
     pub preview_state: PreviewState,
+    /// Controller for handling viewport interactions and dragging.
+    pub viewport_ctrl: ViewportController,
+    /// Logic for handling cheat codes and weapon hotkeys.
     pub cheat_engine: CheatEngine,
+    /// Index of the status bar layout currently being edited.
     pub current_statusbar_idx: usize,
+    /// Cached selection from the previous frame used for strobe triggers.
+    pub last_selection: HashSet<Vec<usize>>,
+    /// Controls the visibility of the settings modal.
     pub settings_open: bool,
+    /// State for the font auto-detection wizard.
     pub font_wizard: Option<FontWizardState>,
+    /// State for any active confirmation dialog.
     pub confirmation_modal: Option<ConfirmationRequest>,
-    pub history: HistoryManager,
-    pub hotkeys: HotkeyRegistry,
+    /// Registry for global keyboard shortcuts.
+    pub hotkeys: crate::hotkeys::HotkeyRegistry,
+    /// True if a valid Doom II IWAD has been verified.
     pub iwad_verified: bool,
-    pub dirty: bool,
 }
 
 impl Default for CacocoApp {
     fn default() -> Self {
         Self {
-            current_file: None,
-            opened_file_path: None,
-            selection: HashSet::new(),
-            last_selection: HashSet::new(),
-            selection_pivot: None,
+            doc: None,
             assets: AssetStore::default(),
             config: AppConfig::load(),
             preview_state: PreviewState::default(),
+            viewport_ctrl: ViewportController::default(),
             cheat_engine: CheatEngine::default(),
             current_statusbar_idx: 0,
+            last_selection: HashSet::new(),
             settings_open: false,
             font_wizard: None,
             confirmation_modal: None,
-            history: HistoryManager::default(),
-            hotkeys: HotkeyRegistry::default(),
+            hotkeys: crate::hotkeys::HotkeyRegistry::default(),
             iwad_verified: false,
-            dirty: false,
         }
     }
 }
 
 impl CacocoApp {
+    /// Creates a new instance of the application and loads initial assets.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
 
@@ -89,6 +97,7 @@ impl CacocoApp {
         app
     }
 
+    /// Loads built-in branding, badges, and template assets into the store.
     pub fn load_system_assets(&mut self, ctx: &egui::Context) {
         self.assets.load_smooth_image(
             ctx,
@@ -105,6 +114,7 @@ impl CacocoApp {
         }
     }
 
+    /// Updates the recent files list and saves the configuration.
     pub fn add_to_recent(&mut self, path: &str) {
         self.config.recent_files.retain(|p| p != path);
         self.config.recent_files.push_front(path.to_string());
@@ -112,73 +122,57 @@ impl CacocoApp {
         self.config.save();
     }
 
+    /// Loads a project from a file and resets the application state.
     pub fn load_project(&mut self, ctx: &egui::Context, loaded: io::LoadedProject, path_str: &str) {
-        self.current_file = Some(loaded.file);
-        self.opened_file_path = Some(path_str.to_string());
+        self.doc = Some(SBarDocument::new(loaded.file, Some(path_str.to_string())));
         self.assets = loaded.assets;
-
         self.preview_state = PreviewState::default();
 
         self.load_system_assets(ctx);
-
         if let Some(path) = &self.config.base_wad_path {
             io::load_wad_from_path(ctx, path, &mut self.assets);
         }
 
-        self.selection.clear();
         self.last_selection.clear();
-        self.selection_pivot = None;
         self.current_statusbar_idx = 0;
         self.add_to_recent(path_str);
-
-        self.history.undo_stack.clear();
-        self.history.redo_stack.clear();
-        self.dirty = false;
 
         self.preview_state
             .push_message(format!("Project Loaded: {}", path_str));
     }
 
+    /// Initializes a new empty SBARDEF project.
     pub fn new_project(&mut self, ctx: &egui::Context) {
-        self.current_file = Some(SBarDefFile {
+        let file = SBarDefFile {
             type_: "statusbar".to_string(),
             version: "1.0.0".to_string(),
             data: crate::model::StatusBarDefinition {
                 status_bars: vec![crate::model::StatusBarLayout::default()],
                 ..Default::default()
             },
-        });
+        };
 
-        self.opened_file_path = None;
+        self.doc = Some(SBarDocument::new(file, None));
         self.assets = AssetStore::default();
-
         self.preview_state = PreviewState::default();
 
         self.load_system_assets(ctx);
-
         if let Some(path) = &self.config.base_wad_path {
             io::load_wad_from_path(ctx, path, &mut self.assets);
         }
 
-        self.selection.clear();
         self.last_selection.clear();
-        self.selection_pivot = None;
         self.current_statusbar_idx = 0;
-        self.history.undo_stack.clear();
-        self.history.redo_stack.clear();
-        self.dirty = false;
         self.preview_state
             .push_message("Created new empty project.");
     }
 
+    /// Applies a library template as the current project.
     pub fn apply_template(&mut self, ctx: &egui::Context, template: &Template) {
         match serde_json::from_str::<SBarDefFile>(template.json_content) {
             Ok(parsed_file) => {
-                self.current_file = Some(parsed_file);
-                self.opened_file_path = None;
-
+                self.doc = Some(SBarDocument::new(parsed_file, None));
                 self.assets = AssetStore::default();
-
                 self.preview_state = PreviewState::default();
 
                 self.load_system_assets(ctx);
@@ -186,13 +180,8 @@ impl CacocoApp {
                     io::load_wad_from_path(ctx, path, &mut self.assets);
                 }
 
-                self.selection.clear();
                 self.last_selection.clear();
-                self.selection_pivot = None;
                 self.current_statusbar_idx = 0;
-                self.history.undo_stack.clear();
-                self.history.redo_stack.clear();
-                self.dirty = false;
 
                 for prefix in template.required_prefixes {
                     for lib_asset in crate::library::ASSETS {
@@ -205,36 +194,32 @@ impl CacocoApp {
                 self.preview_state
                     .push_message(format!("Template: {}", template.name));
             }
-            Err(e) => {
-                eprintln!("Failed to parse template JSON: {}", e);
-            }
+            Err(e) => eprintln!("Failed to parse template JSON: {}", e),
         }
     }
 
-    /// Centralized handler for executing a batch of editor actions.
+    /// Delegation helper to execute actions on the current document.
     pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
-        let Some(f) = &mut self.current_file else {
-            return;
-        };
+        if let Some(doc) = &mut self.doc {
+            let old_selection = doc.selection.clone();
+            doc.execute_actions(actions);
 
-        for action in actions {
-            self.dirty = true;
-            if matches!(action, LayerAction::UndoSnapshot) {
-                self.history.take_snapshot(f, &self.selection);
-            } else {
-                document::execute_layer_action(f, action, &mut self.selection);
+            if doc.selection != old_selection {
+                self.preview_state.editor.strobe_timer = 0.5;
+            }
 
-                if self.selection.len() == 1 {
-                    let path = self.selection.iter().next().unwrap();
-                    if path.len() == 1 {
-                        self.current_statusbar_idx = path[0];
-                    }
+            if doc.selection.len() == 1 {
+                let path = doc.selection.iter().next().unwrap();
+                if path.len() == 1 {
+                    self.current_statusbar_idx = path[0];
                 }
             }
         }
 
-        if self.current_statusbar_idx >= f.data.status_bars.len() {
-            self.current_statusbar_idx = f.data.status_bars.len().saturating_sub(1);
+        if let Some(doc) = &self.doc {
+            if self.current_statusbar_idx >= doc.file.data.status_bars.len() {
+                self.current_statusbar_idx = doc.file.data.status_bars.len().saturating_sub(1);
+            }
         }
     }
 
@@ -251,12 +236,6 @@ impl CacocoApp {
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_visuals(egui::Visuals::dark());
-
-        if self.selection != self.last_selection {
-            self.preview_state.strobe_timer = 0.5;
-            self.last_selection = self.selection.clone();
-        }
-
         ui::draw_root_ui(ctx, self);
     }
 }

@@ -1,5 +1,4 @@
-use crate::assets::AssetStore;
-use crate::model::FeatureLevel;
+use crate::assets::{AssetId, AssetStore};
 use crate::state::PreviewState;
 use crate::ui::shared;
 use eframe::egui;
@@ -9,8 +8,10 @@ const ROUNDING: f32 = 4.0;
 const INNER_MARGIN: f32 = 5.0;
 const GRID_SPACING: f32 = 11.0;
 
+/// The total width required to fit 4 columns of buttons and their spacing.
 const TOTAL_GRID_WIDTH: f32 = (4.0 * BTN_SIZE) + (3.0 * GRID_SPACING);
 
+/// Internal identifier for inventory and powerup items within the UI panels.
 #[derive(Copy, Clone, PartialEq)]
 enum ItemId {
     BlueCard,
@@ -35,6 +36,10 @@ enum ItemId {
     BFG,
 }
 
+/// Draws the "Held Items" grid.
+///
+/// Arranges the Doom items and powerups in a 4-column grid that mirrors
+/// the logical grouping of the classic status bar.
 pub fn draw_gamestate_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &AssetStore) {
     ui.vertical(|ui| {
         ui.style_mut().spacing.item_spacing = egui::vec2(4.0, 4.0);
@@ -243,243 +248,7 @@ pub fn draw_gamestate_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets:
     });
 }
 
-fn item_btn(
-    ui: &mut egui::Ui,
-    assets: &AssetStore,
-    state: &mut PreviewState,
-    patch: &str,
-    badge: Option<&str>,
-    item_id: ItemId,
-    label: &str,
-) {
-    let pwr_id = match item_id {
-        ItemId::Invuln => Some(0),
-        ItemId::Berserk => Some(1),
-        ItemId::Invisibility => Some(2),
-        ItemId::Radsuit => Some(3),
-        ItemId::Map => Some(4),
-        ItemId::Liteamp => Some(5),
-        _ => None,
-    };
-
-    let is_owned = if let Some(id) = pwr_id {
-        state
-            .player
-            .powerup_durations
-            .get(&id)
-            .map_or(false, |v| *v > 0.0)
-    } else {
-        match item_id {
-            ItemId::BlueCard => state.inventory.has_blue_card,
-            ItemId::YellowCard => state.inventory.has_yellow_card,
-            ItemId::RedCard => state.inventory.has_red_card,
-            ItemId::BlueSkull => state.inventory.has_blue_skull,
-            ItemId::YellowSkull => state.inventory.has_yellow_skull,
-            ItemId::RedSkull => state.inventory.has_red_skull,
-            _ => false,
-        }
-    };
-
-    ui.vertical_centered(|ui| {
-        let key = badge.or(Some(patch));
-        let (_rect, response) = draw_asset_button(ui, assets, key, false, is_owned);
-
-        if response.clicked() {
-            let new_val = !is_owned;
-            if let Some(id) = pwr_id {
-                let dur = if new_val {
-                    match id {
-                        0 => 30.0,
-                        1 => 1.0,
-                        2 => 60.0,
-                        3 => 60.0,
-                        4 => 1.0,
-                        5 => 120.0,
-                        _ => 30.0,
-                    }
-                } else {
-                    0.0
-                };
-                state.player.powerup_durations.insert(id, dur);
-            } else {
-                match item_id {
-                    ItemId::BlueCard => state.inventory.has_blue_card = new_val,
-                    ItemId::YellowCard => state.inventory.has_yellow_card = new_val,
-                    ItemId::RedCard => state.inventory.has_red_card = new_val,
-                    ItemId::BlueSkull => state.inventory.has_blue_skull = new_val,
-                    ItemId::YellowSkull => state.inventory.has_yellow_skull = new_val,
-                    ItemId::RedSkull => state.inventory.has_red_skull = new_val,
-                    _ => {}
-                }
-            }
-        }
-
-        let mut display_label = label.to_string();
-        if let Some(id) = pwr_id {
-            let dur = state
-                .player
-                .powerup_durations
-                .get(&id)
-                .cloned()
-                .unwrap_or(0.0);
-            if dur > 0.0 && id != 1 && id != 4 {
-                let secs = dur as i32;
-                display_label = format!("{}:{:02}", secs / 60, secs % 60);
-            }
-        }
-
-        ui.label(egui::RichText::new(display_label).size(11.0));
-    });
-}
-
-fn weapon_complex_btn(
-    ui: &mut egui::Ui,
-    assets: &AssetStore,
-    state: &mut PreviewState,
-    patch: &str,
-    slot: u8,
-    item_id: ItemId,
-    label: &str,
-) {
-    let owned = match item_id {
-        ItemId::Chainsaw => state.inventory.has_chainsaw,
-        ItemId::Pistol => state.inventory.has_pistol,
-        ItemId::Shotgun => state.inventory.has_shotgun,
-        ItemId::SuperShotgun => state.inventory.has_super_shotgun,
-        ItemId::Chaingun => state.inventory.has_chaingun,
-        ItemId::RocketLauncher => state.inventory.has_rocket_launcher,
-        ItemId::PlasmaGun => state.inventory.has_plasma_gun,
-        ItemId::BFG => state.inventory.has_bfg,
-        _ => false,
-    };
-
-    let is_selected_slot = state.selected_weapon_slot == slot;
-    let is_ssg_variant = item_id == ItemId::SuperShotgun;
-    let is_truly_selected = if slot == 3 {
-        is_selected_slot && state.use_super_shotgun == is_ssg_variant
-    } else {
-        is_selected_slot
-    };
-
-    let patch_to_use = if is_truly_selected && patch.starts_with("STGNUM") {
-        format!("STYSNUM{}", slot)
-    } else {
-        patch.to_string()
-    };
-
-    ui.vertical_centered(|ui| {
-        let (_rect, response) =
-            draw_asset_button(ui, assets, Some(&patch_to_use), is_truly_selected, owned);
-
-        if response.clicked() {
-            let new_owned = !owned;
-            match item_id {
-                ItemId::Chainsaw => state.inventory.has_chainsaw = new_owned,
-                ItemId::Pistol => state.inventory.has_pistol = new_owned,
-                ItemId::Shotgun => state.inventory.has_shotgun = new_owned,
-                ItemId::SuperShotgun => state.inventory.has_super_shotgun = new_owned,
-                ItemId::Chaingun => state.inventory.has_chaingun = new_owned,
-                ItemId::RocketLauncher => state.inventory.has_rocket_launcher = new_owned,
-                ItemId::PlasmaGun => state.inventory.has_plasma_gun = new_owned,
-                ItemId::BFG => state.inventory.has_bfg = new_owned,
-                _ => {}
-            }
-            if !new_owned && is_truly_selected {
-                state.selected_weapon_slot = 0;
-            }
-        }
-
-        if response.secondary_clicked() {
-            if is_truly_selected {
-                state.selected_weapon_slot = 0;
-            } else {
-                state.selected_weapon_slot = slot;
-                match item_id {
-                    ItemId::Chainsaw => state.inventory.has_chainsaw = true,
-                    ItemId::Pistol => state.inventory.has_pistol = true,
-                    ItemId::Shotgun => state.inventory.has_shotgun = true,
-                    ItemId::SuperShotgun => state.inventory.has_super_shotgun = true,
-                    ItemId::Chaingun => state.inventory.has_chaingun = true,
-                    ItemId::RocketLauncher => state.inventory.has_rocket_launcher = true,
-                    ItemId::PlasmaGun => state.inventory.has_plasma_gun = true,
-                    ItemId::BFG => state.inventory.has_bfg = true,
-                    _ => {}
-                }
-                if slot == 3 {
-                    state.use_super_shotgun = is_ssg_variant;
-                }
-            }
-        }
-
-        ui.label(egui::RichText::new(label).size(11.0));
-    });
-}
-
-fn draw_asset_button(
-    ui: &mut egui::Ui,
-    assets: &AssetStore,
-    patch_key: Option<&str>,
-    is_selected: bool,
-    is_owned: bool,
-) -> (egui::Rect, egui::Response) {
-    let size = egui::vec2(BTN_SIZE, BTN_SIZE);
-    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
-
-    let (bg_color, stroke) = if is_owned {
-        (
-            egui::Color32::from_gray(40),
-            egui::Stroke::new(1.0, egui::Color32::from_gray(60)),
-        )
-    } else {
-        (
-            egui::Color32::from_gray(25),
-            egui::Stroke::new(1.0, egui::Color32::from_gray(50)),
-        )
-    };
-
-    let (final_bg, final_stroke) = if is_selected {
-        (
-            ui.visuals().selection.bg_fill,
-            ui.visuals().selection.stroke,
-        )
-    } else if response.hovered() {
-        (
-            ui.visuals().widgets.hovered.bg_fill,
-            ui.visuals().widgets.hovered.bg_stroke,
-        )
-    } else {
-        (bg_color, stroke)
-    };
-
-    ui.painter().rect(
-        rect,
-        ROUNDING,
-        final_bg,
-        final_stroke,
-        egui::StrokeKind::Middle,
-    );
-
-    let tint = if is_owned {
-        egui::Color32::WHITE
-    } else {
-        egui::Color32::from_gray(100)
-    };
-
-    if let Some(tex) = patch_key.and_then(|k| assets.textures.get(k)) {
-        shared::draw_scaled_image(ui, rect.shrink(INNER_MARGIN), tex, tint, 4.0);
-    } else {
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "?",
-            egui::FontId::proportional(14.0),
-            tint,
-        );
-    }
-
-    (rect, response)
-}
-
+/// Draws the "Game Context" panel (Health, Ammo counts, World level, Engine settings).
 pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &AssetStore) {
     ui.vertical_centered(|ui| {
         ui.style_mut().spacing.item_spacing = egui::vec2(4.0, 6.0);
@@ -513,8 +282,16 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                 let patch = if is_blue { "ARM2A0" } else { "ARM1A0" };
                 let is_active = state.player.armor > 0;
 
-                let icon_res = draw_icon_button(ui, assets, patch, is_active, "Armor");
-                if icon_res.clicked() {
+                let tooltip = if is_blue {
+                    "Blue Armor (Megaarmor)"
+                } else {
+                    "Green Armor"
+                };
+
+                let response =
+                    draw_icon_button(ui, assets, patch, is_active, "Armor").on_hover_text(tooltip);
+
+                if response.clicked() {
                     state.player.armor_max = if is_blue { 100 } else { 200 };
                 }
             });
@@ -529,10 +306,10 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
             ui.spacing_mut().item_spacing.x = 12.0;
 
             ui.vertical(|ui| {
-                let m_bul = state.get_max_ammo(0);
-                let m_shl = state.get_max_ammo(1);
-                let m_rkt = state.get_max_ammo(3);
-                let m_cel = state.get_max_ammo(2);
+                let m_bul = state.inventory.get_max_ammo(0);
+                let m_shl = state.inventory.get_max_ammo(1);
+                let m_rkt = state.inventory.get_max_ammo(3);
+                let m_cel = state.inventory.get_max_ammo(2);
 
                 egui::Grid::new("sb_amm_grid")
                     .spacing(egui::vec2(4.0, 1.0))
@@ -638,17 +415,9 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         });
                     ui.end_row();
 
-                    ui.label("CompLevel:");
+                    ui.label("Feature Set:");
                     egui::ComboBox::from_id_salt("sb_ver_dd")
-                        .selected_text(match state.world.game_version {
-                            FeatureLevel::Doom19 => "Doom 1.9",
-                            FeatureLevel::LimitRemoving => "Limit Removing",
-                            FeatureLevel::Boom => "Boom 2.02",
-                            FeatureLevel::Complevel9 => "Comp Lvl 9",
-                            FeatureLevel::MBF => "MBF",
-                            FeatureLevel::MBF21 => "MBF21",
-                            FeatureLevel::ID24 => "ID24",
-                        })
+                        .selected_text(format!("{:?}", state.world.game_version))
                         .width(110.0)
                         .show_ui(ui, |ui| {
                             use crate::model::FeatureLevel::*;
@@ -677,8 +446,6 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                             ui.add(
                                 egui::DragValue::new(&mut state.world.level)
                                     .range(1..=999)
-                                    .custom_formatter(|n, _| format!("{:02}", n as i32))
-                                    .custom_parser(|s| s.parse::<f64>().ok())
                                     .prefix("MAP"),
                             );
                         } else {
@@ -693,8 +460,7 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                                     .range(1..=32),
                             );
                         }
-                        ui.add_space(2.0);
-                        if ui.button("🔄").on_hover_text("Switch Map Format").clicked() {
+                        if ui.button("🔄").clicked() {
                             is_doom2 = !is_doom2;
                         }
                     });
@@ -709,23 +475,8 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
         ui.checkbox(&mut state.engine.widescreen_mode, "Widescreen Mode");
 
         ui.horizontal(|ui| {
-            ui.add_space((ui.available_width() - 140.0).max(0.0) / 2.0);
-            ui.label("HUD Style:");
-            ui.add_space(8.0);
-            let hud_text = if state.engine.hud_mode == 0 {
-                "Standard"
-            } else {
-                "Compact"
-            };
-            if ui.button(hud_text).clicked() {
-                state.engine.hud_mode = 1 - state.engine.hud_mode;
-            }
-        });
-
-        ui.horizontal(|ui| {
             ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
             ui.label("Automap:");
-            ui.add_space(4.0);
             if ui
                 .toggle_value(&mut state.engine.automap_active, "Active")
                 .changed()
@@ -740,6 +491,160 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
         });
 
         ui.data_mut(|d| d.insert_temp(map_format_id, is_doom2));
+    });
+}
+
+fn item_btn(
+    ui: &mut egui::Ui,
+    assets: &AssetStore,
+    state: &mut PreviewState,
+    patch: &str,
+    badge: Option<&str>,
+    item_id: ItemId,
+    label: &str,
+) {
+    let pwr_id = match item_id {
+        ItemId::Invuln => Some(0),
+        ItemId::Berserk => Some(1),
+        ItemId::Invisibility => Some(2),
+        ItemId::Radsuit => Some(3),
+        ItemId::Map => Some(4),
+        ItemId::Liteamp => Some(5),
+        _ => None,
+    };
+
+    let is_owned = if let Some(id) = pwr_id {
+        state
+            .player
+            .powerup_durations
+            .get(&id)
+            .map_or(false, |v| *v > 0.0)
+    } else {
+        match item_id {
+            ItemId::BlueCard => state.inventory.has_blue_card,
+            ItemId::YellowCard => state.inventory.has_yellow_card,
+            ItemId::RedCard => state.inventory.has_red_card,
+            ItemId::BlueSkull => state.inventory.has_blue_skull,
+            ItemId::YellowSkull => state.inventory.has_yellow_skull,
+            ItemId::RedSkull => state.inventory.has_red_skull,
+            _ => false,
+        }
+    };
+
+    ui.vertical_centered(|ui| {
+        let key = badge.or(Some(patch)).unwrap();
+        let (_rect, response) = draw_asset_button(ui, assets, key, false, is_owned);
+
+        if response.clicked() {
+            let new_val = !is_owned;
+            if let Some(id) = pwr_id {
+                let dur = if new_val {
+                    match id {
+                        0 => 30.0,
+                        1 => 1.0,
+                        2 => 60.0,
+                        3 => 60.0,
+                        4 => 1.0,
+                        5 => 120.0,
+                        _ => 30.0,
+                    }
+                } else {
+                    0.0
+                };
+                state.player.powerup_durations.insert(id, dur);
+            } else {
+                match item_id {
+                    ItemId::BlueCard => state.inventory.has_blue_card = new_val,
+                    ItemId::YellowCard => state.inventory.has_yellow_card = new_val,
+                    ItemId::RedCard => state.inventory.has_red_card = new_val,
+                    ItemId::BlueSkull => state.inventory.has_blue_skull = new_val,
+                    ItemId::YellowSkull => state.inventory.has_yellow_skull = new_val,
+                    ItemId::RedSkull => state.inventory.has_red_skull = new_val,
+                    _ => {}
+                }
+            }
+        }
+
+        let mut display_label = label.to_string();
+        if let Some(id) = pwr_id {
+            let dur = state
+                .player
+                .powerup_durations
+                .get(&id)
+                .cloned()
+                .unwrap_or(0.0);
+            if dur > 0.0 && id != 1 && id != 4 {
+                let secs = dur as i32;
+                display_label = format!("{}:{:02}", secs / 60, secs % 60);
+            }
+        }
+
+        ui.label(egui::RichText::new(display_label).size(11.0));
+    });
+}
+
+fn weapon_complex_btn(
+    ui: &mut egui::Ui,
+    assets: &AssetStore,
+    state: &mut PreviewState,
+    patch: &str,
+    slot: u8,
+    item_id: ItemId,
+    label: &str,
+) {
+    let owned = match item_id {
+        ItemId::Chainsaw => state.inventory.has_chainsaw,
+        ItemId::Pistol => state.inventory.has_pistol,
+        ItemId::Shotgun => state.inventory.has_shotgun,
+        ItemId::SuperShotgun => state.inventory.has_super_shotgun,
+        ItemId::Chaingun => state.inventory.has_chaingun,
+        ItemId::RocketLauncher => state.inventory.has_rocket_launcher,
+        ItemId::PlasmaGun => state.inventory.has_plasma_gun,
+        ItemId::BFG => state.inventory.has_bfg,
+        _ => false,
+    };
+
+    let is_selected_slot = state.selected_weapon_slot == slot;
+    let is_ssg_variant = item_id == ItemId::SuperShotgun;
+    let is_truly_selected = if slot == 3 {
+        is_selected_slot && state.use_super_shotgun == is_ssg_variant
+    } else {
+        is_selected_slot
+    };
+
+    let patch_to_use = if is_truly_selected && patch.starts_with("STGNUM") {
+        format!("STYSNUM{}", slot)
+    } else {
+        patch.to_string()
+    };
+
+    ui.vertical_centered(|ui| {
+        let (_rect, response) =
+            draw_asset_button(ui, assets, &patch_to_use, is_truly_selected, owned);
+
+        if response.clicked() {
+            let new_owned = !owned;
+            match item_id {
+                ItemId::Chainsaw => state.inventory.has_chainsaw = new_owned,
+                ItemId::Pistol => state.inventory.has_pistol = new_owned,
+                ItemId::Shotgun => state.inventory.has_shotgun = new_owned,
+                ItemId::SuperShotgun => state.inventory.has_super_shotgun = new_owned,
+                ItemId::Chaingun => state.inventory.has_chaingun = new_owned,
+                ItemId::RocketLauncher => state.inventory.has_rocket_launcher = new_owned,
+                ItemId::PlasmaGun => state.inventory.has_plasma_gun = new_owned,
+                ItemId::BFG => state.inventory.has_bfg = new_owned,
+                _ => {}
+            }
+        }
+
+        if response.secondary_clicked() {
+            state.selected_weapon_slot = if is_truly_selected { 0 } else { slot };
+            if slot == 3 {
+                state.use_super_shotgun = is_ssg_variant;
+            }
+        }
+
+        ui.label(egui::RichText::new(label).size(11.0));
     });
 }
 
@@ -771,6 +676,7 @@ fn draw_icon_button(
     } else {
         ui.painter().rect_filled(rect, 4.0, bg_color);
     }
+
     ui.painter()
         .rect_stroke(rect, 4.0, stroke, egui::StrokeKind::Middle);
 
@@ -780,22 +686,9 @@ fn draw_icon_button(
         egui::Color32::from_gray(100)
     };
 
-    if let Some(tex) = assets.textures.get(patch) {
-        let content_size = size - 8.0;
-        let tex_size = tex.size_vec2();
-        if tex_size.x > 0.0 && tex_size.y > 0.0 {
-            let scale = (content_size / tex_size.x)
-                .min(content_size / tex_size.y)
-                .min(2.0);
-            let final_size = tex_size * scale;
-            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
-            ui.painter().image(
-                tex.id(),
-                draw_rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                tint,
-            );
-        }
+    let id = AssetId::new(patch);
+    if let Some(tex) = assets.textures.get(&id) {
+        shared::draw_scaled_image(ui, rect.shrink(4.0), tex, tint, 4.0);
     } else {
         ui.painter().text(
             rect.center(),
@@ -806,4 +699,64 @@ fn draw_icon_button(
         );
     }
     response
+}
+
+fn draw_asset_button(
+    ui: &mut egui::Ui,
+    assets: &AssetStore,
+    patch_key: &str,
+    is_selected: bool,
+    is_owned: bool,
+) -> (egui::Rect, egui::Response) {
+    let size = egui::vec2(BTN_SIZE, BTN_SIZE);
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+
+    let bg_color = if is_owned {
+        egui::Color32::from_gray(40)
+    } else {
+        egui::Color32::from_gray(25)
+    };
+    let (final_bg, final_stroke) = if is_selected {
+        (
+            ui.visuals().selection.bg_fill,
+            ui.visuals().selection.stroke,
+        )
+    } else if response.hovered() {
+        (
+            ui.visuals().widgets.hovered.bg_fill,
+            ui.visuals().widgets.hovered.bg_stroke,
+        )
+    } else {
+        (
+            bg_color,
+            egui::Stroke::new(1.0, egui::Color32::from_gray(50)),
+        )
+    };
+
+    ui.painter().rect(
+        rect,
+        ROUNDING,
+        final_bg,
+        final_stroke,
+        egui::StrokeKind::Middle,
+    );
+    let tint = if is_owned {
+        egui::Color32::WHITE
+    } else {
+        egui::Color32::from_gray(100)
+    };
+
+    let id = AssetId::new(patch_key);
+    if let Some(tex) = assets.textures.get(&id) {
+        shared::draw_scaled_image(ui, rect.shrink(INNER_MARGIN), tex, tint, 4.0);
+    } else {
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            "?",
+            egui::FontId::proportional(14.0),
+            tint,
+        );
+    }
+    (rect, response)
 }

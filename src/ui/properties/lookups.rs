@@ -1,5 +1,6 @@
 use crate::model::{ConditionDef, ConditionType};
 
+/// Represents a selectable item in a property dropdown menu.
 #[derive(Clone, Copy)]
 pub struct LookupItem {
     pub id: i32,
@@ -24,6 +25,7 @@ macro_rules! item {
     };
 }
 
+/// Registry of SBARDEF inventory item indices (Cards, Skulls, Powerups).
 pub const ITEMS: &[LookupItem] = &[
     item!(1, "Blue Card", "BKEYA0"),
     item!(2, "Yellow Card", "YKEYA0"),
@@ -42,6 +44,7 @@ pub const ITEMS: &[LookupItem] = &[
     item!(21, "Invulnerability", "PINVA0"),
 ];
 
+/// Registry of weapon parameter indices used for ownership and source queries.
 pub const WEAPONS: &[LookupItem] = &[
     item!(100, "Chainsaw", "SAWGA0"),
     item!(101, "Shotgun", "SHTGA0"),
@@ -52,6 +55,7 @@ pub const WEAPONS: &[LookupItem] = &[
     item!(106, "BFG 9000", "BFGGA0"),
 ];
 
+/// Registry of internal ammo type indices.
 pub const AMMO_TYPES: &[LookupItem] = &[
     item!(0, "Bullets", "AMMOA0"),
     item!(1, "Shells", "SHELA0"),
@@ -59,6 +63,7 @@ pub const AMMO_TYPES: &[LookupItem] = &[
     item!(3, "Rockets", "ROCKA0"),
 ];
 
+/// Registry of powerup indices used for duration conditions.
 pub const POWERUPS: &[LookupItem] = &[
     item!(0, "Invulnerability", "PINVA0"),
     item!(1, "Berserk", "PSTRA0"),
@@ -130,6 +135,7 @@ macro_rules! v {
     };
 }
 
+/// The high-level grouping of SBARDEF conditions for the properties editor.
 pub const GROUPS: &[ConditionGroup] = &[
     ConditionGroup {
         name: "Weapon",
@@ -290,6 +296,7 @@ pub const GROUPS: &[ConditionGroup] = &[
     },
 ];
 
+/// Finds the group and variant index for a specific SBARDEF condition type.
 pub fn find_group_for_type(t: ConditionType) -> (usize, usize) {
     for (g_idx, group) in GROUPS.iter().enumerate() {
         for (v_idx, variant) in group.variants.iter().enumerate() {
@@ -308,6 +315,7 @@ pub enum ParamUsage {
     String,
 }
 
+/// Identifies which parameters an SBARDEF condition logic block requires.
 pub fn get_param_usage(condition: ConditionType) -> ParamUsage {
     use ConditionType::*;
     match condition {
@@ -325,6 +333,7 @@ fn find_icon(list: &[LookupItem], id: i32) -> Option<&'static str> {
     list.iter().find(|i| i.id == id).and_then(|i| i.icon)
 }
 
+/// Resolves the most relevant Doom patch name to use as an icon for a specific condition.
 pub fn resolve_condition_icon(
     cond: &ConditionDef,
     state: &crate::state::PreviewState,
@@ -350,7 +359,10 @@ pub fn resolve_condition_icon(
         | SelectedAmmoPercentGe
         | SelectedAmmoPercentLt
         | SelectedWeaponHasAmmo => {
-            return match state.get_selected_ammo_type() {
+            return match state
+                .inventory
+                .get_selected_ammo_type(state.selected_weapon_slot)
+            {
                 0 => Some("AMMOA0".to_string()),
                 1 => Some("SHELA0".to_string()),
                 2 => Some("CELLA0".to_string()),

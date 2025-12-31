@@ -1,10 +1,4 @@
-use crate::assets::AssetStore;
-use crate::state::PreviewState;
-use crate::ui::properties::editor::PropertiesUI;
-use crate::ui::properties::font_cache::FontCache;
-use crate::ui::properties::preview::PreviewContent;
 use bitflags::bitflags;
-use eframe::egui;
 use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -16,6 +10,7 @@ fn default_version() -> String {
     "1.2.0".to_string()
 }
 
+/// A helper for serde to handle null values by falling back to the Default implementation.
 fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     T: Default + Deserialize<'de>,
@@ -26,6 +21,8 @@ where
 }
 
 bitflags! {
+    /// Defines how an element is anchored and offset within its parent container.
+    /// Supports widescreen anchoring and offset suppression.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
     pub struct Alignment: u32 {
         const LEFT              = 0x00;
@@ -34,9 +31,13 @@ bitflags! {
         const TOP               = 0x00;
         const V_CENTER          = 0x04;
         const BOTTOM            = 0x08;
+        /// Ignores the patch's internal X-offset (Doom patch format).
         const NO_LEFT_OFFSET    = 0x10;
+        /// Ignores the patch's internal Y-offset (Doom patch format).
         const NO_TOP_OFFSET     = 0x20;
+        /// Anchors to the far left edge of a widescreen view.
         const WIDESCREEN_LEFT   = 0x40;
+        /// Anchors to the far right edge of a widescreen view.
         const WIDESCREEN_RIGHT  = 0x80;
     }
 }
@@ -61,6 +62,7 @@ impl<'de> Deserialize<'de> for Alignment {
     }
 }
 
+/// Identifiers for specialized engine-driven components like the clock or FPS counter.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ComponentType {
@@ -79,6 +81,7 @@ pub enum ComponentType {
     Chat,
 }
 
+/// Mapping for numeric values pulled from the player's game state.
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
 pub enum NumberType {
@@ -103,6 +106,7 @@ pub enum NumberType {
     PowerupDuration = 17,
 }
 
+/// The feature set compatibility for the status bar.
 #[derive(
     Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default,
 )]
@@ -118,6 +122,7 @@ pub enum FeatureLevel {
     ID24 = 6,
 }
 
+/// Logic types used in conditions to determine if an element should be rendered.
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ConditionType {
@@ -184,52 +189,68 @@ pub enum ConditionType {
     PowerupTimePercentGe = 60,
 }
 
+/// The root structure representing a complete SBARDEF file.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SBarDefFile {
+    /// The document type (usually "statusbar").
     #[serde(default = "default_type", rename = "type")]
     pub type_: String,
-
+    /// SBARDEF Spec version.
     #[serde(default = "default_version")]
     pub version: String,
-
+    /// The actual definitions for fonts and layouts.
     pub data: StatusBarDefinition,
 }
 
+/// Container for all font and layout definitions in a project.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct StatusBarDefinition {
+    /// List of fonts intended for numeric stats (Ammo, Health).
     #[serde(default, rename = "numberfonts")]
     pub number_fonts: Vec<NumberFontDef>,
+    /// List of fonts intended for alphanumeric HUD text.
     #[serde(default, rename = "hudfonts")]
     pub hud_fonts: Vec<HudFontDef>,
+    /// The rendering layouts (can hold multiple versions of the HUD).
     #[serde(default, rename = "statusbars")]
     pub status_bars: Vec<StatusBarLayout>,
 }
 
+/// Definition for a number-only font using the 'STT' naming convention.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NumberFontDef {
     pub name: String,
     #[serde(rename = "type")]
     pub type_: u8,
+    /// The prefix used to find patches (e.g., 'STT' finds 'STTNUM0').
     pub stem: String,
 }
 
+/// Definition for a full HUD font using character code suffixes.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HudFontDef {
     pub name: String,
     #[serde(rename = "type")]
     pub type_: u8,
+    /// The prefix used to find patches (e.g., 'STCFN' finds 'STCFN033').
     pub stem: String,
 }
 
+/// A specific HUD configuration, defining height and visual properties.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StatusBarLayout {
+    /// Optional human-readable name for the layout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// Height of the status bar area in virtual pixels.
     pub height: i32,
+    /// If true, the HUD renders over the world view.
     #[serde(rename = "fullscreenrender", default)]
     pub fullscreen_render: bool,
+    /// Name of the flat used to fill the background (e.g., "GRNROCK").
     #[serde(rename = "fillflat")]
     pub fill_flat: Option<String>,
+    /// The hierarchy of elements inside this layout.
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub children: Vec<ElementWrapper>,
 }
@@ -247,6 +268,7 @@ impl Default for StatusBarLayout {
 }
 
 impl StatusBarLayout {
+    /// Recursively regenerates UIDs for all children. Used during duplication/pasting.
     pub fn reassign_all_uids(&mut self) {
         for child in self.children.iter_mut() {
             child.reassign_uids();
@@ -254,10 +276,12 @@ impl StatusBarLayout {
     }
 }
 
+/// Generates a new random unique identifier for editor tracking.
 pub fn new_uid() -> u64 {
     rand::rng().random()
 }
 
+/// Metadata used by Cacoco's "Text String" helper to regenerate children graphics.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct TextHelperDef {
     pub text: String,
@@ -265,6 +289,7 @@ pub struct TextHelperDef {
     pub spacing: i32,
 }
 
+/// The available types of HUD elements.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Element {
@@ -282,17 +307,22 @@ pub enum Element {
     String(StringDef),
 }
 
+/// A polymorphic wrapper that holds an Element along with editor-specific metadata.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ElementWrapper {
+    /// The actual SBARDEF element data.
     #[serde(flatten)]
     pub data: Element,
 
+    /// Internal: If present, this element is treated as a single "Text String".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub _cacoco_text: Option<TextHelperDef>,
 
+    /// Internal: User-defined name for organizational purposes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub _cacoco_name: Option<String>,
 
+    /// Internal: Runtime-only UID used for UI state and selection tracking.
     #[serde(skip, default = "new_uid")]
     pub uid: u64,
 }
@@ -308,26 +338,35 @@ impl Default for ElementWrapper {
     }
 }
 
+/// Attributes shared by nearly all HUD elements.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CommonAttrs {
+    /// Horizontal position relative to parent or alignment anchor.
     #[serde(default)]
     pub x: i32,
+    /// Vertical position relative to parent or alignment anchor.
     #[serde(default)]
     pub y: i32,
+    /// How the element is anchored.
     #[serde(default)]
     pub alignment: Alignment,
+    /// Optional translation lump name (e.g., player color).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tranmap: Option<String>,
+    /// Optional translation range string.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub translation: Option<String>,
+    /// Enables additive translucency (Boom/MBF feature).
     #[serde(default)]
     pub translucency: bool,
+    /// Conditions that must be true for this element to render.
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
         deserialize_with = "deserialize_null_default"
     )]
     pub conditions: Vec<ConditionDef>,
+    /// Child elements nested inside this one.
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
@@ -337,7 +376,7 @@ pub struct CommonAttrs {
 }
 
 impl CommonAttrs {
-    /// Generates a default check for "Selected Weapon Has Ammo" used for ammo UI elements.
+    /// Utility to generate the required visibility check for ammo-selected elements.
     pub fn selected_ammo_check() -> Self {
         Self {
             conditions: vec![ConditionDef {
@@ -351,6 +390,7 @@ impl CommonAttrs {
     }
 }
 
+/// A logic rule used to toggle element visibility.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConditionDef {
     pub condition: ConditionType,
@@ -362,22 +402,26 @@ pub struct ConditionDef {
     pub param_string: Option<String>,
 }
 
+/// Defines a rectangular area of a patch to render.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CropDef {
     pub width: i32,
     pub height: i32,
     pub left: i32,
     pub top: i32,
+    /// If true, offsets the crop from the center of the patch.
     #[serde(default)]
     pub center: bool,
 }
 
+/// A logical grouping element used to offset children.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CanvasDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
 }
 
+/// A container that automatically stacks its children horizontally or vertically.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ListDef {
     #[serde(flatten)]
@@ -386,14 +430,17 @@ pub struct ListDef {
     pub horizontal: bool,
     #[serde(default)]
     pub reverse: bool,
+    /// Spacing between children in virtual pixels.
     #[serde(default)]
     pub spacing: i32,
 }
 
+/// Renders a static image from a WAD patch.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GraphicDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
+    /// The lump name of the patch to draw.
     pub patch: String,
     #[serde(default)]
     pub width: i32,
@@ -405,15 +452,19 @@ pub struct GraphicDef {
     pub leftoffset: i32,
     #[serde(default)]
     pub midoffset: i32,
+    /// Optional cropping parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crop: Option<CropDef>,
 }
 
+/// Renders a timed sequence of patches.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AnimationDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
+    /// The sequence of frames.
     pub frames: Vec<FrameDef>,
+    /// Target frame rate (standard is 35).
     #[serde(default = "default_fps")]
     pub framerate: f64,
 }
@@ -422,12 +473,15 @@ fn default_fps() -> f64 {
     10.0
 }
 
+/// A single frame within an animation sequence.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FrameDef {
     pub lump: String,
+    /// Duration of this frame in seconds.
     pub duration: f64,
 }
 
+/// Renders the Doom status bar face (Doomguy).
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FaceDef {
     #[serde(flatten)]
@@ -450,15 +504,20 @@ fn default_maxlength() -> i32 {
     3
 }
 
+/// Renders a numeric player statistic.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NumberDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
+    /// The name of a registered Number Font.
     pub font: String,
+    /// The stat type to display.
     #[serde(rename = "type")]
     pub type_: NumberType,
+    /// ID used for ammo types or powerup indices.
     #[serde(default)]
     pub param: i32,
+    /// Max digits to display before capping.
     #[serde(default = "default_maxlength")]
     pub maxlength: i32,
 }
@@ -475,17 +534,21 @@ impl Default for NumberDef {
     }
 }
 
+/// Renders a dynamic alphanumeric string (like Map Titles).
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct StringDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
     #[serde(rename = "type")]
     pub type_: u8,
+    /// Hardcoded data for custom strings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<String>,
+    /// The name of a registered HUD Font.
     pub font: String,
 }
 
+/// Renders complex engine-driven components.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ComponentDef {
     #[serde(flatten)]
@@ -499,6 +562,7 @@ pub struct ComponentDef {
     pub duration: f64,
 }
 
+/// Represents the KEX/Woof style weapon selection carousel.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CarouselDef {
     #[serde(flatten)]
@@ -506,6 +570,7 @@ pub struct CarouselDef {
 }
 
 impl ElementWrapper {
+    /// Returns a human-friendly name for use in the layer tree.
     pub fn display_name(&self) -> String {
         if let Some(t) = &self._cacoco_text {
             return format!("\"{}\"", t.text);
@@ -529,6 +594,7 @@ impl ElementWrapper {
         }
     }
 
+    /// Accessor for children regardless of the underlying element type.
     pub fn children(&self) -> &[ElementWrapper] {
         match &self.data {
             Element::Canvas(e) => &e.common.children,
@@ -545,6 +611,7 @@ impl ElementWrapper {
         }
     }
 
+    /// Accessor for common attributes.
     pub fn get_common_mut(&mut self) -> &mut CommonAttrs {
         match &mut self.data {
             Element::Canvas(e) => &mut e.common,
@@ -561,6 +628,7 @@ impl ElementWrapper {
         }
     }
 
+    /// Immutable accessor for common attributes.
     pub fn get_common(&self) -> &CommonAttrs {
         match &self.data {
             Element::Canvas(e) => &e.common,
@@ -577,6 +645,7 @@ impl ElementWrapper {
         }
     }
 
+    /// Recursively regenerates UIDs for this element and all its children.
     pub fn reassign_uids(&mut self) {
         self.uid = new_uid();
         for child in self.get_common_mut().children.iter_mut() {
@@ -586,6 +655,7 @@ impl ElementWrapper {
 }
 
 impl SBarDefFile {
+    /// Traverses the element tree to find a mutable reference by path.
     pub fn get_element_mut(&mut self, path: &[usize]) -> Option<&mut ElementWrapper> {
         if path.is_empty() {
             return None;
@@ -612,6 +682,7 @@ impl SBarDefFile {
         Some(current_element)
     }
 
+    /// Traverses the element tree to find an immutable reference by path.
     pub fn get_element(&self, path: &[usize]) -> Option<&ElementWrapper> {
         if path.is_empty() {
             return None;
@@ -628,72 +699,5 @@ impl SBarDefFile {
         }
 
         Some(current_element)
-    }
-}
-
-impl PropertiesUI for ElementWrapper {
-    fn draw_specific_fields(
-        &mut self,
-        ui: &mut egui::Ui,
-        fonts: &FontCache,
-        assets: &AssetStore,
-        state: &PreviewState,
-    ) -> bool {
-        match &mut self.data {
-            Element::Canvas(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::List(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Graphic(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Animation(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Face(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::FaceBackground(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Number(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Percent(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::String(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Component(e) => e.draw_specific_fields(ui, fonts, assets, state),
-            Element::Carousel(e) => e.draw_specific_fields(ui, fonts, assets, state),
-        }
-    }
-
-    fn get_preview_content(
-        &self,
-        ui: &egui::Ui,
-        fonts: &FontCache,
-        state: &PreviewState,
-    ) -> Option<PreviewContent> {
-        match &self.data {
-            Element::Canvas(e) => e.get_preview_content(ui, fonts, state),
-            Element::List(e) => e.get_preview_content(ui, fonts, state),
-            Element::Graphic(e) => e.get_preview_content(ui, fonts, state),
-            Element::Animation(e) => e.get_preview_content(ui, fonts, state),
-            Element::Face(e) => e.get_preview_content(ui, fonts, state),
-            Element::FaceBackground(_) => Some(PreviewContent::Image("STFB0".to_string())),
-            Element::Number(e) => e.get_preview_content(ui, fonts, state),
-            Element::Percent(e) => {
-                let mut content = e.get_preview_content(ui, fonts, state)?;
-                if let PreviewContent::Text { text, .. } = &mut content {
-                    *text = format!("{}%", text);
-                }
-                Some(content)
-            }
-            Element::String(e) => e.get_preview_content(ui, fonts, state),
-            Element::Component(e) => e.get_preview_content(ui, fonts, state),
-            Element::Carousel(e) => e.get_preview_content(ui, fonts, state),
-        }
-    }
-
-    fn has_specific_fields(&self) -> bool {
-        match &self.data {
-            Element::Canvas(e) => e.has_specific_fields(),
-            Element::List(e) => e.has_specific_fields(),
-            Element::Graphic(e) => e.has_specific_fields(),
-            Element::Animation(e) => e.has_specific_fields(),
-            Element::Face(e) => e.has_specific_fields(),
-            Element::FaceBackground(e) => e.has_specific_fields(),
-            Element::Number(e) => e.has_specific_fields(),
-            Element::Percent(e) => e.has_specific_fields(),
-            Element::String(e) => e.has_specific_fields(),
-            Element::Component(e) => e.has_specific_fields(),
-            Element::Carousel(e) => e.has_specific_fields(),
-        }
     }
 }

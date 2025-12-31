@@ -3,6 +3,7 @@ use crate::model::FeatureLevel;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+/// Represents the physical state of the player character.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerStats {
     pub health: i32,
@@ -15,6 +16,7 @@ pub struct PlayerStats {
     pub max_kills: i32,
     pub max_items: i32,
     pub max_secrets: i32,
+    /// Maps powerup IDs to remaining time in seconds.
     pub powerup_durations: HashMap<i32, f32>,
 }
 
@@ -40,6 +42,45 @@ impl Default for PlayerStats {
     }
 }
 
+impl PlayerStats {
+    /// Determines the correct STF patch name based on health and timers.
+    pub fn get_face_sprite(
+        &self,
+        ouch: bool,
+        look_dir: u8,
+        pain_timer: f32,
+        evil_timer: f32,
+    ) -> String {
+        if self.health <= 0 {
+            return "STFDEAD0".to_string();
+        }
+        if self.is_god_mode && !ouch {
+            return "STFGOD0".to_string();
+        }
+
+        let damage_level = match self.health {
+            80.. => 0,
+            60..=79 => 1,
+            40..=59 => 2,
+            20..=39 => 3,
+            _ => 4,
+        };
+
+        if pain_timer > 0.0 {
+            return format!("STFKILL{}", damage_level);
+        }
+        if evil_timer > 0.0 {
+            return format!("STFEVL{}", damage_level);
+        }
+        if ouch {
+            return format!("STFOUCH{}", damage_level);
+        }
+
+        format!("STFST{}{}", damage_level, look_dir)
+    }
+}
+
+/// Manages ammo counts, weapon ownership, and keycards.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Inventory {
     pub ammo_bullets: i32,
@@ -73,6 +114,54 @@ pub struct Inventory {
     pub has_liteamp: bool,
 }
 
+impl Inventory {
+    /// Returns the current ammo count for a specific ammo type index.
+    pub fn get_ammo(&self, type_idx: i32) -> i32 {
+        match type_idx {
+            0 => self.ammo_bullets,
+            1 => self.ammo_shells,
+            2 => self.ammo_cells,
+            3 => self.ammo_rockets,
+            _ => 0,
+        }
+    }
+
+    /// Returns the max capacity for a specific ammo type, factoring in the backpack.
+    pub fn get_max_ammo(&self, type_idx: i32) -> i32 {
+        let (base, pack) = match type_idx {
+            0 => (200, 400),
+            1 => (50, 100),
+            2 => (300, 600),
+            3 => (50, 100),
+            _ => (0, 0),
+        };
+        if self.has_backpack { pack } else { base }
+    }
+
+    /// Maps the selected weapon slot to its associated ammo type index.
+    pub fn get_selected_ammo_type(&self, slot: u8) -> i32 {
+        match slot {
+            2 | 4 => 0,
+            3 => 1,
+            5 => 3,
+            6 | 7 => 2,
+            _ => -1,
+        }
+    }
+
+    /// Maps a weapon parameter (ID24) to an ammo type.
+    pub fn get_weapon_ammo_type(&self, weapon_param: i32) -> Option<i32> {
+        match weapon_param {
+            101 | 3 => Some(1),
+            103 | 2 | 4 => Some(0),
+            104 | 5 => Some(3),
+            105 | 106 | 6 | 7 => Some(2),
+            _ => None,
+        }
+    }
+}
+
+/// Context regarding the current level and game session.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WorldContext {
     pub session_type: i32,
@@ -81,6 +170,7 @@ pub struct WorldContext {
     pub game_version: FeatureLevel,
 }
 
+/// Rendering and engine-level behavior settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EngineContext {
     pub widescreen_mode: bool,
@@ -106,6 +196,24 @@ impl Default for EngineContext {
     }
 }
 
+/// Transient state used only within the Cacoco editor (not serialized).
+#[derive(Debug, Clone, Default)]
+pub struct EditorContext {
+    pub message_log: Vec<String>,
+    pub smoothed_fps: f32,
+    pub display_fps: f32,
+    pub fps_update_timer: f32,
+    pub strobe_timer: f32,
+    pub evil_timer: f32,
+    pub pain_timer: f32,
+    pub virtual_mouse_pos: eframe::egui::Pos2,
+
+    pub display_weapon_slot: u8,
+    pub display_super_shotgun: bool,
+    pub weapon_offset_y: f32,
+}
+
+/// The top-level state object representing everything the editor knows about the "Game".
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreviewState {
     pub player: PlayerStats,
@@ -116,29 +224,9 @@ pub struct PreviewState {
     pub selected_weapon_slot: u8,
     pub use_super_shotgun: bool,
 
+    /// Editor-only metadata (timers, log, etc)
     #[serde(skip)]
-    pub message_log: Vec<String>,
-    #[serde(skip)]
-    pub display_weapon_slot: u8,
-    #[serde(skip)]
-    pub display_super_shotgun: bool,
-    #[serde(skip)]
-    pub weapon_offset_y: f32,
-
-    #[serde(skip)]
-    pub smoothed_fps: f32,
-    #[serde(skip)]
-    pub display_fps: f32,
-    #[serde(skip)]
-    pub fps_update_timer: f32,
-    #[serde(skip)]
-    pub strobe_timer: f32,
-    #[serde(skip)]
-    pub evil_timer: f32,
-    #[serde(skip)]
-    pub pain_timer: f32,
-    #[serde(skip)]
-    pub virtual_mouse_pos: eframe::egui::Pos2,
+    pub editor: EditorContext,
 }
 
 impl Default for PreviewState {
@@ -160,54 +248,45 @@ impl Default for PreviewState {
             engine: EngineContext::default(),
             selected_weapon_slot: 2,
             use_super_shotgun: true,
-            display_weapon_slot: 2,
-            display_super_shotgun: true,
-            weapon_offset_y: 0.0,
-            smoothed_fps: 60.0,
-            display_fps: 60.0,
-            fps_update_timer: 0.0,
-            strobe_timer: 0.0,
-            evil_timer: 0.0,
-            pain_timer: 0.0,
-            virtual_mouse_pos: eframe::egui::pos2(0.0, 0.0),
-            message_log: vec!["You got the Shotgun!".to_string()],
+            editor: EditorContext {
+                display_weapon_slot: 2,
+                display_super_shotgun: true,
+                smoothed_fps: 60.0,
+                display_fps: 60.0,
+                message_log: vec!["You got the Shotgun!".to_string()],
+                ..Default::default()
+            },
         }
     }
 }
 
 impl PreviewState {
+    /// Adds a message to the editor console log.
     pub fn push_message(&mut self, msg: impl Into<String>) {
         let text = msg.into();
-        println!("HUD: {}", text);
-        self.message_log.push(text);
-        if self.message_log.len() > 10 {
-            self.message_log.remove(0);
+        self.editor.message_log.push(text);
+        if self.editor.message_log.len() > 10 {
+            self.editor.message_log.remove(0);
         }
     }
 
+    /// Advances the simulation timers and animations.
     pub fn update(&mut self, dt: f32) {
         if dt > 0.0 {
             let instant_fps = 1.0 / dt;
-            self.smoothed_fps = (instant_fps * 0.05) + (self.smoothed_fps * 0.95);
+            self.editor.smoothed_fps = (instant_fps * 0.05) + (self.editor.smoothed_fps * 0.95);
         }
 
-        self.fps_update_timer += dt;
-
+        self.editor.fps_update_timer += dt;
         let tic_duration = 1.0 / (DOOM_TICS_PER_SEC as f32);
-        if self.fps_update_timer >= tic_duration {
-            self.display_fps = self.smoothed_fps;
-            self.fps_update_timer = 0.0;
+        if self.editor.fps_update_timer >= tic_duration {
+            self.editor.display_fps = self.editor.smoothed_fps;
+            self.editor.fps_update_timer = 0.0;
         }
 
-        if self.strobe_timer > 0.0 {
-            self.strobe_timer = (self.strobe_timer - dt).max(0.0);
-        }
-        if self.evil_timer > 0.0 {
-            self.evil_timer = (self.evil_timer - dt).max(0.0);
-        }
-        if self.pain_timer > 0.0 {
-            self.pain_timer = (self.pain_timer - dt).max(0.0);
-        }
+        self.editor.strobe_timer = (self.editor.strobe_timer - dt).max(0.0);
+        self.editor.evil_timer = (self.editor.evil_timer - dt).max(0.0);
+        self.editor.pain_timer = (self.editor.pain_timer - dt).max(0.0);
 
         for (id, duration) in self.player.powerup_durations.iter_mut() {
             if *id != 1 && *id != 4 {
@@ -235,102 +314,24 @@ impl PreviewState {
         let speed = 600.0 * dt;
         let clear_height = 150.0;
 
-        let distinct_weapons = self.display_weapon_slot != self.selected_weapon_slot;
-        let distinct_variants = self.display_weapon_slot == 3
+        let distinct_weapons = self.editor.display_weapon_slot != self.selected_weapon_slot;
+        let distinct_variants = self.editor.display_weapon_slot == 3
             && self.selected_weapon_slot == 3
-            && self.display_super_shotgun != self.use_super_shotgun;
+            && self.editor.display_super_shotgun != self.use_super_shotgun;
 
         if distinct_weapons || distinct_variants {
-            self.weapon_offset_y += speed;
-            if self.weapon_offset_y >= clear_height {
-                self.display_weapon_slot = self.selected_weapon_slot;
-                self.display_super_shotgun = self.use_super_shotgun;
+            self.editor.weapon_offset_y += speed;
+            if self.editor.weapon_offset_y >= clear_height {
+                self.editor.display_weapon_slot = self.selected_weapon_slot;
+                self.editor.display_super_shotgun = self.use_super_shotgun;
             }
-        } else if self.weapon_offset_y > 0.0 {
-            self.weapon_offset_y = (self.weapon_offset_y - speed).max(0.0);
+        } else if self.editor.weapon_offset_y > 0.0 {
+            self.editor.weapon_offset_y = (self.editor.weapon_offset_y - speed).max(0.0);
         }
     }
 
-    pub fn get_ammo(&self, type_idx: i32) -> i32 {
-        match type_idx {
-            0 => self.inventory.ammo_bullets,
-            1 => self.inventory.ammo_shells,
-            2 => self.inventory.ammo_cells,
-            3 => self.inventory.ammo_rockets,
-            _ => 0,
-        }
-    }
-
-    pub fn get_max_ammo(&self, type_idx: i32) -> i32 {
-        let (base, pack) = match type_idx {
-            0 => (200, 400),
-            1 => (50, 100),
-            2 => (300, 600),
-            3 => (50, 100),
-            _ => (0, 0),
-        };
-        if self.inventory.has_backpack {
-            pack
-        } else {
-            base
-        }
-    }
-
-    pub fn get_selected_ammo_type(&self) -> i32 {
-        match self.selected_weapon_slot {
-            2 | 4 => 0,
-            3 => 1,
-            5 => 3,
-            6 | 7 => 2,
-            _ => -1,
-        }
-    }
-
-    pub fn get_weapon_ammo_type(&self, weapon_param: i32) -> Option<i32> {
-        match weapon_param {
-            101 | 3 => Some(1),
-            103 | 2 | 4 => Some(0),
-            104 | 5 => Some(3),
-            105 | 106 | 6 | 7 => Some(2),
-            _ => None,
-        }
-    }
-
+    /// Facade method to calculate a percentage based on game stats.
     pub fn get_stat_percent(&self, current: i32, max: i32) -> i32 {
         if max <= 0 { 0 } else { (current * 100) / max }
-    }
-
-    pub fn get_face_sprite(&self, ouch: bool, look_dir: u8) -> String {
-        if self.player.health <= 0 {
-            return "STFDEAD0".to_string();
-        }
-
-        if self.player.is_god_mode && !ouch {
-            return "STFGOD0".to_string();
-        }
-
-        let damage_level = if self.player.health >= 80 {
-            0
-        } else if self.player.health >= 60 {
-            1
-        } else if self.player.health >= 40 {
-            2
-        } else if self.player.health >= 20 {
-            3
-        } else {
-            4
-        };
-
-        if self.pain_timer > 0.0 {
-            return format!("STFKILL{}", damage_level);
-        }
-        if self.evil_timer > 0.0 {
-            return format!("STFEVL{}", damage_level);
-        }
-        if ouch {
-            return format!("STFOUCH{}", damage_level);
-        }
-
-        format!("STFST{}{}", damage_level, look_dir)
     }
 }

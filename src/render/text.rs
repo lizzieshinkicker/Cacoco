@@ -3,6 +3,7 @@ use crate::constants::{DEFAULT_GLYPH_H, DEFAULT_GLYPH_W};
 use crate::model::*;
 use eframe::egui;
 
+/// Renders a numeric player statistic.
 pub(super) fn draw_number(
     ctx: &RenderContext,
     def: &NumberDef,
@@ -14,20 +15,25 @@ pub(super) fn draw_number(
         NumberType::Health => ctx.state.player.health,
         NumberType::Armor => ctx.state.player.armor,
         NumberType::Frags => 0,
-        NumberType::Ammo => ctx.state.get_ammo(def.param),
+        NumberType::Ammo => ctx.state.inventory.get_ammo(def.param),
         NumberType::AmmoSelected => {
-            let idx = ctx.state.get_selected_ammo_type();
-            ctx.state.get_ammo(idx)
+            let idx = ctx
+                .state
+                .inventory
+                .get_selected_ammo_type(ctx.state.selected_weapon_slot);
+            ctx.state.inventory.get_ammo(idx)
         }
-        NumberType::MaxAmmo => ctx.state.get_max_ammo(def.param),
+        NumberType::MaxAmmo => ctx.state.inventory.get_max_ammo(def.param),
         NumberType::AmmoWeapon => ctx
             .state
+            .inventory
             .get_weapon_ammo_type(def.param)
-            .map_or(0, |idx| ctx.state.get_ammo(idx)),
+            .map_or(0, |idx| ctx.state.inventory.get_ammo(idx)),
         NumberType::MaxAmmoWeapon => ctx
             .state
+            .inventory
             .get_weapon_ammo_type(def.param)
-            .map_or(0, |idx| ctx.state.get_max_ammo(idx)),
+            .map_or(0, |idx| ctx.state.inventory.get_max_ammo(idx)),
         NumberType::Kills => ctx.state.player.kills,
         NumberType::Items => ctx.state.player.items,
         NumberType::Secrets => ctx.state.player.secrets,
@@ -81,6 +87,7 @@ pub(super) fn draw_number(
     );
 }
 
+/// Renders a dynamic alphanumeric string.
 pub(super) fn draw_string(ctx: &RenderContext, def: &StringDef, pos: egui::Pos2, alpha: f32) {
     let text = match def.type_ {
         0 => def
@@ -104,6 +111,7 @@ pub(super) fn draw_string(ctx: &RenderContext, def: &StringDef, pos: egui::Pos2,
     );
 }
 
+/// High-performance text rendering logic.
 pub fn draw_text_line(
     ctx: &RenderContext,
     txt: &str,
@@ -151,6 +159,7 @@ pub fn draw_text_line(
     }
 }
 
+/// Calculates the virtual width of a rendered string.
 pub fn measure_text_line(ctx: &RenderContext, txt: &str, font: &str, is_num: bool) -> f32 {
     layout_text_line(ctx, txt, font, is_num).map_or(0.0, |l| l.size.x)
 }
@@ -190,8 +199,9 @@ fn layout_text_line<'a>(
             continue;
         }
 
-        let name = ctx.assets.resolve_patch_name(&stem, c, is_num);
-        if let Some(tex) = ctx.assets.textures.get(&name) {
+        let id = ctx.assets.resolve_patch_id(&stem, c, is_num);
+
+        if let Some(tex) = ctx.assets.textures.get(&id) {
             let sz = tex.size_vec2();
 
             let mut y_offset = 0.0;

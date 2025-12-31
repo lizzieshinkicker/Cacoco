@@ -1,7 +1,10 @@
-use crate::assets::AssetStore;
+use crate::assets::{AssetId, AssetStore};
 use crate::model::ConditionDef;
 use crate::state::PreviewState;
 
+/// Resolves a set of SBARDEF conditions against the current simulated game state.
+///
+/// Returns `true` if all conditions are met (logical AND), or if the list is empty.
 pub fn resolve(conditions: &[ConditionDef], state: &PreviewState, assets: &AssetStore) -> bool {
     if conditions.is_empty() {
         return true;
@@ -14,6 +17,7 @@ pub fn resolve(conditions: &[ConditionDef], state: &PreviewState, assets: &Asset
     true
 }
 
+/// Evaluates a single SBARDEF condition logic block.
 fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetStore) -> bool {
     use crate::model::ConditionType::*;
     match condition.condition {
@@ -55,12 +59,11 @@ fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetSt
         EpisodeEq | LevelGe | LevelLt => check_map_condition(condition, state),
 
         PatchEmpty | PatchNotEmpty => {
-            let patch_name = condition
-                .param_string
-                .as_deref()
-                .unwrap_or("")
-                .to_uppercase();
-            let exists = assets.textures.contains_key(&patch_name);
+            let patch_name = condition.param_string.as_deref().unwrap_or("");
+
+            let id = AssetId::new(patch_name);
+            let exists = assets.textures.contains_key(&id);
+
             if condition.condition == PatchEmpty {
                 !exists
             } else {
@@ -78,17 +81,20 @@ fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetSt
     }
 }
 
+/// Evaluation for conditions involving weapons, slots, and ownership.
 fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
+    let inv = &state.inventory;
+
     match condition.condition {
         WeaponOwned => match condition.param {
-            100 => state.inventory.has_chainsaw,
-            101 => state.inventory.has_shotgun,
-            102 => state.inventory.has_super_shotgun,
-            103 => state.inventory.has_chaingun,
-            104 => state.inventory.has_rocket_launcher,
-            105 => state.inventory.has_plasma_gun,
-            106 => state.inventory.has_bfg,
+            100 => inv.has_chainsaw,
+            101 => inv.has_shotgun,
+            102 => inv.has_super_shotgun,
+            103 => inv.has_chaingun,
+            104 => inv.has_rocket_launcher,
+            105 => inv.has_plasma_gun,
+            106 => inv.has_bfg,
             _ => false,
         },
         WeaponNotOwned => !check_weapon_condition(
@@ -99,13 +105,13 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
             state,
         ),
         SlotOwned => match condition.param {
-            1 => state.inventory.has_fist || state.inventory.has_chainsaw,
-            2 => state.inventory.has_pistol,
-            3 => state.inventory.has_shotgun || state.inventory.has_super_shotgun,
-            4 => state.inventory.has_chaingun,
-            5 => state.inventory.has_rocket_launcher,
-            6 => state.inventory.has_plasma_gun,
-            7 => state.inventory.has_bfg,
+            1 => inv.has_fist || inv.has_chainsaw,
+            2 => inv.has_pistol,
+            3 => inv.has_shotgun || inv.has_super_shotgun,
+            4 => inv.has_chaingun,
+            5 => inv.has_rocket_launcher,
+            6 => inv.has_plasma_gun,
+            7 => inv.has_bfg,
             _ => false,
         },
         SlotNotOwned => !check_weapon_condition(
@@ -134,32 +140,35 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
             },
             state,
         ),
-        WeaponHasAmmo => state.get_weapon_ammo_type(condition.param).is_some(),
-        SelectedWeaponHasAmmo => state.get_selected_ammo_type() != -1,
-        AmmoMatch => state.get_selected_ammo_type() == condition.param,
+        WeaponHasAmmo => inv.get_weapon_ammo_type(condition.param).is_some(),
+        SelectedWeaponHasAmmo => inv.get_selected_ammo_type(state.selected_weapon_slot) != -1,
+        AmmoMatch => inv.get_selected_ammo_type(state.selected_weapon_slot) == condition.param,
         _ => true,
     }
 }
 
+/// Evaluation for conditions involving general inventory items and keycards.
 fn check_item_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
+    let inv = &state.inventory;
+
     match condition.condition {
         ItemOwned => match condition.param {
-            1 => state.inventory.has_blue_card,
-            2 => state.inventory.has_yellow_card,
-            3 => state.inventory.has_red_card,
-            4 => state.inventory.has_blue_skull,
-            5 => state.inventory.has_yellow_skull,
-            6 => state.inventory.has_red_skull,
-            7 => state.inventory.has_backpack,
+            1 => inv.has_blue_card,
+            2 => inv.has_yellow_card,
+            3 => inv.has_red_card,
+            4 => inv.has_blue_skull,
+            5 => inv.has_yellow_skull,
+            6 => inv.has_red_skull,
+            7 => inv.has_backpack,
             14 => state.player.armor_max == 100,
             15 => state.player.armor_max == 200,
-            16 => state.inventory.has_automap,
-            17 => state.inventory.has_liteamp,
-            18 => state.inventory.has_berserk,
-            19 => state.inventory.has_invisibility,
-            20 => state.inventory.has_radsuit,
-            21 => state.inventory.has_invulnerability,
+            16 => inv.has_automap,
+            17 => inv.has_liteamp,
+            18 => inv.has_berserk,
+            19 => inv.has_invisibility,
+            20 => inv.has_radsuit,
+            21 => inv.has_invulnerability,
             _ => false,
         },
         ItemNotOwned => !check_item_condition(
@@ -173,81 +182,87 @@ fn check_item_condition(condition: &ConditionDef, state: &PreviewState) -> bool 
     }
 }
 
+/// Evaluation for conditions involving Player vitals and precise ammo counts.
 fn check_vitals_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
     let param = condition.param;
     let param2 = condition.param2;
+    let p = &state.player;
+    let inv = &state.inventory;
+
     match condition.condition {
-        HealthGe => state.player.health >= param,
-        HealthLt => state.player.health < param,
-        HealthPercentGe => state.player.health >= param,
-        HealthPercentLt => state.player.health < param,
-        ArmorGe => state.player.armor >= param,
-        ArmorLt => state.player.armor < param,
-        ArmorPercentGe => {
-            state.get_stat_percent(state.player.armor, state.player.armor_max) >= param
-        }
-        ArmorPercentLt => {
-            state.get_stat_percent(state.player.armor, state.player.armor_max) < param
-        }
+        HealthGe => p.health >= param,
+        HealthLt => p.health < param,
+        HealthPercentGe => p.health >= param,
+        HealthPercentLt => p.health < param,
+        ArmorGe => p.armor >= param,
+        ArmorLt => p.armor < param,
+        ArmorPercentGe => state.get_stat_percent(p.armor, p.armor_max) >= param,
+        ArmorPercentLt => state.get_stat_percent(p.armor, p.armor_max) < param,
         SelectedAmmoGe => {
-            let idx = state.get_selected_ammo_type();
+            let idx = inv.get_selected_ammo_type(state.selected_weapon_slot);
             if idx == -1 {
                 false
             } else {
-                state.get_ammo(idx) >= param
+                inv.get_ammo(idx) >= param
             }
         }
         SelectedAmmoLt => {
-            let idx = state.get_selected_ammo_type();
+            let idx = inv.get_selected_ammo_type(state.selected_weapon_slot);
             if idx == -1 {
                 false
             } else {
-                state.get_ammo(idx) < param
+                inv.get_ammo(idx) < param
             }
         }
         SelectedAmmoPercentGe => {
-            let idx = state.get_selected_ammo_type();
+            let idx = inv.get_selected_ammo_type(state.selected_weapon_slot);
             if idx == -1 {
                 false
             } else {
-                state.get_stat_percent(state.get_ammo(idx), state.get_max_ammo(idx)) >= param
+                state.get_stat_percent(inv.get_ammo(idx), inv.get_max_ammo(idx)) >= param
             }
         }
         SelectedAmmoPercentLt => {
-            let idx = state.get_selected_ammo_type();
+            let idx = inv.get_selected_ammo_type(state.selected_weapon_slot);
             if idx == -1 {
                 false
             } else {
-                state.get_stat_percent(state.get_ammo(idx), state.get_max_ammo(idx)) < param
+                state.get_stat_percent(inv.get_ammo(idx), inv.get_max_ammo(idx)) < param
             }
         }
-        AmmoGe => state.get_ammo(param2) >= param,
-        AmmoLt => state.get_ammo(param2) < param,
+        AmmoGe => inv.get_ammo(param2) >= param,
+        AmmoLt => inv.get_ammo(param2) < param,
         AmmoPercentGe => {
-            state.get_stat_percent(state.get_ammo(param2), state.get_max_ammo(param2)) >= param
+            state.get_stat_percent(inv.get_ammo(param2), inv.get_max_ammo(param2)) >= param
         }
         AmmoPercentLt => {
-            state.get_stat_percent(state.get_ammo(param2), state.get_max_ammo(param2)) < param
+            state.get_stat_percent(inv.get_ammo(param2), inv.get_max_ammo(param2)) < param
         }
         _ => true,
     }
 }
 
+/// Evaluation for conditions involving global engine status and HUD configuration.
 fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
     let param = condition.param;
+    let world = &state.world;
+    let engine = &state.engine;
+
     match condition.condition {
-        GameVersionGe => (state.world.game_version as i32) >= param,
-        GameVersionLt => (state.world.game_version as i32) < param,
-        SessionTypeEq => state.world.session_type == param,
-        SessionTypeNeq => state.world.session_type != param,
-        GameModeEq => true,
-        GameModeNeq => false,
-        HudModeEq => state.engine.hud_mode == param,
+        GameVersionGe => (world.game_version as i32) >= param,
+        GameVersionLt => (world.game_version as i32) < param,
+        SessionTypeEq => world.session_type == param,
+        SessionTypeNeq => world.session_type != param,
+
+        GameModeEq => (world.game_version as i32) == param,
+        GameModeNeq => (world.game_version as i32) != param,
+
+        HudModeEq => engine.hud_mode == param,
         AutomapModeEq => {
-            let enabled = state.engine.automap_active;
-            let overlay = state.engine.automap_active && state.engine.automap_overlay;
+            let enabled = engine.automap_active;
+            let overlay = engine.automap_active && engine.automap_overlay;
             let req_enabled = (param & 1) != 0;
             let req_overlay = (param & 2) != 0;
             let req_disabled = (param & 4) != 0;
@@ -264,23 +279,24 @@ fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) ->
         }
         WidgetEnabled => {
             if let Some(name) = &condition.param_string {
-                !state.engine.disabled_components.contains(name)
+                !engine.disabled_components.contains(name)
             } else {
-                !state.engine.disabled_widgets.contains(&param)
+                !engine.disabled_widgets.contains(&param)
             }
         }
         WidgetDisabled => {
             if let Some(name) = &condition.param_string {
-                state.engine.disabled_components.contains(name)
+                engine.disabled_components.contains(name)
             } else {
-                state.engine.disabled_widgets.contains(&param)
+                engine.disabled_widgets.contains(&param)
             }
         }
-        WidescreenModeEq => state.engine.widescreen_mode == (param != 0),
+        WidescreenModeEq => engine.widescreen_mode == (param != 0),
         _ => true,
     }
 }
 
+/// Evaluation for conditions involving map indices.
 fn check_map_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
     match condition.condition {
@@ -291,30 +307,29 @@ fn check_map_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     }
 }
 
+/// Evaluation for conditions involving cumulative level statistics.
 fn check_stats_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
-    let p = condition.param;
+    let p = &state.player;
+    let param = condition.param;
     match condition.condition {
-        KillsLt => state.player.kills < p,
-        KillsGe => state.player.kills >= p,
-        ItemsLt => state.player.items < p,
-        ItemsGe => state.player.items >= p,
-        SecretsLt => state.player.secrets < p,
-        SecretsGe => state.player.secrets >= p,
-        KillsPercentLt => state.get_stat_percent(state.player.kills, state.player.max_kills) < p,
-        KillsPercentGe => state.get_stat_percent(state.player.kills, state.player.max_kills) >= p,
-        ItemsPercentLt => state.get_stat_percent(state.player.items, state.player.max_items) < p,
-        ItemsPercentGe => state.get_stat_percent(state.player.items, state.player.max_items) >= p,
-        SecretsPercentLt => {
-            state.get_stat_percent(state.player.secrets, state.player.max_secrets) < p
-        }
-        SecretsPercentGe => {
-            state.get_stat_percent(state.player.secrets, state.player.max_secrets) >= p
-        }
+        KillsLt => p.kills < param,
+        KillsGe => p.kills >= param,
+        ItemsLt => p.items < param,
+        ItemsGe => p.items >= param,
+        SecretsLt => p.secrets < param,
+        SecretsGe => p.secrets >= param,
+        KillsPercentLt => state.get_stat_percent(p.kills, p.max_kills) < param,
+        KillsPercentGe => state.get_stat_percent(p.kills, p.max_kills) >= param,
+        ItemsPercentLt => state.get_stat_percent(p.items, p.max_items) < param,
+        ItemsPercentGe => state.get_stat_percent(p.items, p.max_items) >= param,
+        SecretsPercentLt => state.get_stat_percent(p.secrets, p.max_secrets) < param,
+        SecretsPercentGe => state.get_stat_percent(p.secrets, p.max_secrets) >= param,
         _ => true,
     }
 }
 
+/// Evaluation for conditions involving powerup duration countdowns.
 fn check_powerup_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
     let duration = state

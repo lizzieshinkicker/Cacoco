@@ -4,6 +4,10 @@ use crate::ui::properties::common;
 use crate::ui::properties::font_cache::FontCache;
 use eframe::egui;
 
+/// Rebuilds the children of a "Text String" element based on its helper metadata.
+///
+/// This logic essentially 'explodes' a string into individual Graphic patches,
+/// correctly handling character positioning and font lookup.
 pub fn rebake_text(element: &mut ElementWrapper, assets: &AssetStore, fonts: &FontCache) {
     let (text, font_name, spacing) = if let Some(helper) = &element._cacoco_text {
         (helper.text.clone(), helper.font.clone(), helper.spacing)
@@ -29,9 +33,9 @@ pub fn rebake_text(element: &mut ElementWrapper, assets: &AssetStore, fonts: &Fo
             continue;
         }
 
-        let patch_name = assets.resolve_patch_name(&stem, c, is_number_font);
+        let id = assets.resolve_patch_id(&stem, c, is_number_font);
 
-        let width = if let Some(tex) = assets.textures.get(&patch_name) {
+        let width = if let Some(tex) = assets.textures.get(&id) {
             tex.size()[0] as i32
         } else {
             8
@@ -44,7 +48,7 @@ pub fn rebake_text(element: &mut ElementWrapper, assets: &AssetStore, fonts: &Fo
                     y: 0,
                     ..Default::default()
                 },
-                patch: patch_name,
+                patch: assets.names.get(&id).cloned().unwrap_or_default(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -55,6 +59,7 @@ pub fn rebake_text(element: &mut ElementWrapper, assets: &AssetStore, fonts: &Fo
     }
 }
 
+/// Renders the specialized editor for the Cacoco Text String helper.
 pub fn draw_text_helper_editor(
     ui: &mut egui::Ui,
     element: &mut ElementWrapper,

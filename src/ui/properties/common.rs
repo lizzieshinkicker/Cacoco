@@ -5,6 +5,7 @@ use crate::ui::context_menu::ContextMenu;
 use crate::ui::layers::thumbnails;
 use eframe::egui;
 
+/// Renders the transformation widgets (X, Y, Alignment) shared by all SBARDEF elements.
 pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) -> bool {
     let mut changed = false;
     let common = element.get_common_mut();
@@ -33,6 +34,7 @@ pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) ->
     changed
 }
 
+/// Renders the grid-based anchor selector for element alignment.
 fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
     let mut changed = false;
     let pos_mask = Alignment::H_CENTER | Alignment::RIGHT | Alignment::V_CENTER | Alignment::BOTTOM;
@@ -43,6 +45,7 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
     ui.horizontal(|ui| {
         ui.add_space((ui.available_width() - 210.0).max(0.0) / 2.0);
         ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 0.0);
+
         egui::Grid::new("align_matrix")
             .spacing(egui::vec2(2.0, 2.0))
             .min_col_width(0.0)
@@ -69,6 +72,7 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
                     ui.painter()
                         .rect(rect, 2.0, bg_color, stroke, egui::StrokeKind::Middle);
                 };
+
                 toggle(ui, Alignment::LEFT | Alignment::TOP);
                 toggle(ui, Alignment::H_CENTER | Alignment::TOP);
                 toggle(ui, Alignment::RIGHT | Alignment::TOP);
@@ -84,6 +88,7 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
                 toggle(ui, Alignment::RIGHT | Alignment::BOTTOM);
                 ui.end_row();
             });
+
         ui.add_space(8.0);
         ui.vertical(|ui| {
             ui.style_mut().spacing.item_spacing.y = 4.0;
@@ -113,37 +118,7 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
     changed
 }
 
-pub(super) fn paint_thumb_content(
-    ui: &mut egui::Ui,
-    rect: egui::Rect,
-    tex: Option<&egui::TextureHandle>,
-    fallback_text: Option<&str>,
-) {
-    let content_size = rect.width().min(rect.height()) - 4.0;
-    if let Some(t) = tex {
-        let sz = t.size_vec2();
-        if sz.x > 0.0 && sz.y > 0.0 {
-            let scale = (content_size / sz.x).min(content_size / sz.y).min(4.0);
-            let final_size = sz * if scale >= 1.0 { scale.floor() } else { scale };
-            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
-            ui.painter().image(
-                t.id(),
-                draw_rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                egui::Color32::WHITE,
-            );
-        }
-    } else if let Some(text) = fallback_text {
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            text,
-            egui::FontId::proportional(14.0),
-            egui::Color32::from_gray(160),
-        );
-    }
-}
-
+/// Renders the root-level Status Bar configuration fields.
 pub fn draw_root_statusbar_fields(
     ui: &mut egui::Ui,
     bar: &mut crate::model::StatusBarLayout,
@@ -207,6 +182,37 @@ pub fn draw_root_statusbar_fields(
     changed
 }
 
+/// Renders a list of HUD fonts for selection within a dropdown.
+pub fn draw_hud_font_selectors(
+    ui: &mut egui::Ui,
+    current_font: &mut String,
+    fonts: &super::font_cache::FontCache,
+    assets: &AssetStore,
+) -> bool {
+    let mut changed = false;
+    for (i, name) in fonts.hud_font_names.iter().enumerate() {
+        let stem = fonts.get_hud_stem(name);
+        changed |= draw_font_selection_row(ui, current_font, name, stem.as_ref(), assets, false, i);
+    }
+    changed
+}
+
+/// Renders a list of number fonts for selection within a dropdown.
+pub fn draw_number_font_selectors(
+    ui: &mut egui::Ui,
+    current_font: &mut String,
+    fonts: &super::font_cache::FontCache,
+    assets: &AssetStore,
+) -> bool {
+    let mut changed = false;
+    for (i, name) in fonts.number_font_names.iter().enumerate() {
+        let stem = fonts.get_number_stem(name);
+        changed |= draw_font_selection_row(ui, current_font, name, stem.as_ref(), assets, true, i);
+    }
+    changed
+}
+
+/// Renders a single row in a font selection dropdown, including a live character preview.
 pub fn draw_font_selection_row(
     ui: &mut egui::Ui,
     current_val: &mut String,
@@ -217,13 +223,16 @@ pub fn draw_font_selection_row(
     index: usize,
 ) -> bool {
     let mut changed = false;
+
     let preview_char = if is_number_font {
         std::char::from_digit((index % 10) as u32, 10).unwrap_or('0')
     } else {
         (b'A' + (index % 26) as u8) as char
     };
-    let patch_name = stem.map(|s| assets.resolve_patch_name(s, preview_char, is_number_font));
-    let texture = patch_name.and_then(|n| assets.textures.get(&n));
+
+    let patch_id = stem.map(|s| assets.resolve_patch_id(s, preview_char, is_number_font));
+    let texture = patch_id.and_then(|id| assets.textures.get(&id));
+
     let response = thumbnails::ListRow::new(target_name)
         .subtitle(format!("({})", stem.unwrap_or(&"???".to_string())))
         .texture(texture)
@@ -239,6 +248,7 @@ pub fn draw_font_selection_row(
     changed
 }
 
+/// Helper to render a specialized dropdown menu based on a lookup table.
 pub fn draw_lookup_param_dd(
     ui: &mut egui::Ui,
     salt: &str,
@@ -275,39 +285,13 @@ pub fn draw_lookup_param_dd(
     changed
 }
 
-pub fn draw_hud_font_selectors(
-    ui: &mut egui::Ui,
-    current_font: &mut String,
-    fonts: &super::font_cache::FontCache,
-    assets: &AssetStore,
-) -> bool {
-    let mut changed = false;
-    for (i, name) in fonts.hud_font_names.iter().enumerate() {
-        let stem = fonts.get_hud_stem(name);
-        changed |= draw_font_selection_row(ui, current_font, name, stem.as_ref(), assets, false, i);
-    }
-    changed
-}
-
-pub fn draw_number_font_selectors(
-    ui: &mut egui::Ui,
-    current_font: &mut String,
-    fonts: &super::font_cache::FontCache,
-    assets: &AssetStore,
-) -> bool {
-    let mut changed = false;
-    for (i, name) in fonts.number_font_names.iter().enumerate() {
-        let stem = fonts.get_number_stem(name);
-        changed |= draw_font_selection_row(ui, current_font, name, stem.as_ref(), assets, true, i);
-    }
-    changed
-}
-
+/// Helper to draw a selectable list item for use in properties dropdowns.
 pub fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width().max(100.0), 20.0),
         egui::Sense::click(),
     );
+
     if response.hovered() || selected {
         ui.painter().rect_filled(
             rect,
@@ -319,6 +303,7 @@ pub fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
             },
         );
     }
+
     ui.painter().text(
         rect.left_center() + egui::vec2(8.0, 0.0),
         egui::Align2::LEFT_CENTER,
@@ -330,5 +315,38 @@ pub fn custom_menu_item(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
             egui::Color32::from_gray(240)
         },
     );
+
     response.clicked()
+}
+
+/// Specialized helper for painting static thumbnails into a rect.
+pub fn paint_thumb_content(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    tex: Option<&egui::TextureHandle>,
+    fallback_text: Option<&str>,
+) {
+    let content_size = rect.width().min(rect.height()) - 4.0;
+    if let Some(t) = tex {
+        let sz = t.size_vec2();
+        if sz.x > 0.0 && sz.y > 0.0 {
+            let scale = (content_size / sz.x).min(content_size / sz.y).min(4.0);
+            let final_size = sz * if scale >= 1.0 { scale.floor() } else { scale };
+            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
+            ui.painter().image(
+                t.id(),
+                draw_rect,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                egui::Color32::WHITE,
+            );
+        }
+    } else if let Some(text) = fallback_text {
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            text,
+            egui::FontId::proportional(14.0),
+            egui::Color32::from_gray(160),
+        );
+    }
 }

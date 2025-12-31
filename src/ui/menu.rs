@@ -1,14 +1,15 @@
 use crate::app::PendingAction;
 use crate::assets::AssetStore;
 use crate::config::AppConfig;
+use crate::document::SBarDocument;
 use crate::io::{self, LoadedProject};
 use crate::library;
-use crate::model::SBarDefFile;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
 use eframe::egui;
 use std::path::Path;
 
+/// Result of a menu interaction that requires application-level handling.
 pub enum MenuAction {
     None,
     LoadProject(LoadedProject, String),
@@ -21,15 +22,14 @@ pub enum MenuAction {
     PickPortAndRun,
 }
 
+/// Draws the primary application menu bar (File, Run).
 pub fn draw_menu_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
-    current_file: &mut Option<SBarDefFile>,
-    opened_file_path: Option<String>,
+    doc: &mut Option<SBarDocument>,
     config: &mut AppConfig,
     assets: &mut AssetStore,
     settings_open: &mut bool,
-    dirty: bool,
 ) -> MenuAction {
     let mut action = MenuAction::None;
 
@@ -41,6 +41,8 @@ pub fn draw_menu_bar(
 
     let mut open_file = false;
     let mut open_run = false;
+
+    let dirty = doc.as_ref().map_or(false, |d| d.dirty);
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
@@ -102,21 +104,21 @@ pub fn draw_menu_bar(
             }
 
             ui.separator();
-            if ContextMenu::button(ui, "Save", true) {
+            if ContextMenu::button(ui, "Save", doc.is_some()) {
                 action = MenuAction::SaveDone("SILENT".to_string());
                 ContextMenu::close(ui);
             }
-            if ContextMenu::button(ui, "Save As...", true) {
-                if let Some(f) = current_file {
-                    if let Some(path) = io::save_pk3_dialog(f, assets, opened_file_path.clone()) {
+            if ContextMenu::button(ui, "Save As...", doc.is_some()) {
+                if let Some(d) = doc {
+                    if let Some(path) = io::save_pk3_dialog(&d.file, assets, d.path.clone()) {
                         action = MenuAction::SaveDone(path);
                     }
                 }
                 ContextMenu::close(ui);
             }
-            if ContextMenu::button(ui, "Export JSON...", true) {
-                if let Some(f) = current_file {
-                    if let Some(path) = io::save_json_dialog(f, opened_file_path.clone()) {
+            if ContextMenu::button(ui, "Export JSON...", doc.is_some()) {
+                if let Some(d) = doc {
+                    if let Some(path) = io::save_json_dialog(&d.file, d.path.clone()) {
                         action = MenuAction::ExportDone(path);
                     }
                 }
@@ -142,7 +144,7 @@ pub fn draw_menu_bar(
 
     if let Some(menu) = ContextMenu::get(ui, run_id) {
         ContextMenu::show(ui, menu, open_run, |ui| {
-            let has_file = current_file.is_some();
+            let has_file = doc.is_some();
             if config.source_ports.is_empty() {
                 if ContextMenu::button(ui, "Add New Port...", has_file) {
                     action = MenuAction::PickPortAndRun;
@@ -152,10 +154,9 @@ pub fn draw_menu_bar(
                 for path_str in &config.source_ports {
                     let name = get_port_name(path_str);
                     if ContextMenu::button(ui, &format!("Launch in {name}"), has_file) {
-                        if let (Some(f), Some(iwad)) =
-                            (current_file.as_ref(), config.base_wad_path.as_ref())
+                        if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
-                            io::launch_game(f, assets, path_str, iwad);
+                            io::launch_game(&d.file, assets, path_str, iwad);
                         }
                         ContextMenu::close(ui);
                     }
@@ -233,6 +234,7 @@ pub fn draw_menu_bar(
     action
 }
 
+/// Renders the specialized "Settings" modal window.
 pub fn draw_settings_window(
     ctx: &egui::Context,
     settings_open: &mut bool,
@@ -330,6 +332,7 @@ pub fn draw_settings_window(
     }
 }
 
+/// Renders a large clickable card used for template and settings lists.
 pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     let width = ui.available_width();
     let height = 54.0;
@@ -371,6 +374,7 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     response.clicked()
 }
 
+/// Renders a small red trash icon card for deleting settings entries.
 pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     let height = 54.0;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
@@ -410,6 +414,7 @@ pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     response.clicked()
 }
 
+/// Helper to extract a friendly name from a source port binary path.
 pub fn get_port_name(path_str: &str) -> String {
     let stem = Path::new(path_str)
         .file_stem()
@@ -427,7 +432,6 @@ pub fn get_port_name(path_str: &str) -> String {
     }
 }
 
-/// Consolidated helper to trigger the custom ContextMenu state.
 fn trigger_menu(ui: &mut egui::Ui, id: egui::Id, pos: egui::Pos2) {
     ui.data_mut(|d| {
         d.insert_temp(egui::Id::new("cacoco_context_menu_id"), id);

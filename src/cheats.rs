@@ -1,11 +1,13 @@
 use crate::state::PreviewState;
 use eframe::egui;
 
+/// Represents a secret console command that modifies the preview state.
 struct Cheat {
     code: &'static str,
     action: fn(&mut PreviewState),
 }
 
+/// The registry of supported cheat codes.
 static CHEATS: &[Cheat] = &[
     Cheat {
         code: "iddqd",
@@ -45,14 +47,20 @@ static CHEATS: &[Cheat] = &[
     Cheat {
         code: "idbeholdv",
         action: |s| {
-            s.inventory.has_invulnerability = !s.inventory.has_invulnerability;
+            let dur = if s.inventory.has_invulnerability {
+                0.0
+            } else {
+                30.0
+            };
+            s.player.powerup_durations.insert(0, dur);
             s.push_message("Invulnerability On/Off");
         },
     },
     Cheat {
         code: "idbeholds",
         action: |s| {
-            s.inventory.has_berserk = !s.inventory.has_berserk;
+            let dur = if s.inventory.has_berserk { 0.0 } else { 1.0 };
+            s.player.powerup_durations.insert(1, dur);
             s.player.health = 100;
             s.push_message("Berserk On/Off");
         },
@@ -60,33 +68,42 @@ static CHEATS: &[Cheat] = &[
     Cheat {
         code: "idbeholdi",
         action: |s| {
-            s.inventory.has_invisibility = !s.inventory.has_invisibility;
+            let dur = if s.inventory.has_invisibility {
+                0.0
+            } else {
+                60.0
+            };
+            s.player.powerup_durations.insert(2, dur);
             s.push_message("Invisibility On/Off");
         },
     },
     Cheat {
         code: "idbeholdr",
         action: |s| {
-            s.inventory.has_radsuit = !s.inventory.has_radsuit;
+            let dur = if s.inventory.has_radsuit { 0.0 } else { 60.0 };
+            s.player.powerup_durations.insert(3, dur);
             s.push_message("Radiation Suit On/Off");
         },
     },
     Cheat {
         code: "idbeholda",
         action: |s| {
-            s.inventory.has_automap = !s.inventory.has_automap;
+            let dur = if s.inventory.has_automap { 0.0 } else { 1.0 };
+            s.player.powerup_durations.insert(4, dur);
             s.push_message("Computer Map Added");
         },
     },
     Cheat {
         code: "idbeholdl",
         action: |s| {
-            s.inventory.has_liteamp = !s.inventory.has_liteamp;
+            let dur = if s.inventory.has_liteamp { 0.0 } else { 120.0 };
+            s.player.powerup_durations.insert(5, dur);
             s.push_message("Light Amplification On/Off");
         },
     },
 ];
 
+/// Monitors and processes keyboard input for cheat codes and weapon hotkeys.
 pub struct CheatEngine {
     buffer: String,
 }
@@ -100,6 +117,7 @@ impl Default for CheatEngine {
 }
 
 impl CheatEngine {
+    /// Processes current frame input to update cheats and weapon slots.
     pub fn process_input(&mut self, ctx: &egui::Context, state: &mut PreviewState) {
         if ctx.wants_keyboard_input() {
             return;
@@ -151,6 +169,7 @@ impl CheatEngine {
         }
     }
 
+    /// Checks if the current buffer ends with a valid cheat code.
     fn check_cheats(&mut self, state: &mut PreviewState) {
         if self.buffer.ends_with("idbehold") {
             return;
@@ -158,7 +177,6 @@ impl CheatEngine {
 
         for cheat in CHEATS {
             if self.buffer.ends_with(cheat.code) {
-                println!("CHEAT: {}", cheat.code.to_uppercase());
                 (cheat.action)(state);
                 self.buffer.clear();
                 return;
@@ -167,6 +185,7 @@ impl CheatEngine {
     }
 }
 
+/// Helper used by IDFA and IDKFA to refill the player's stock.
 fn give_all(s: &mut PreviewState, give_keys: bool) {
     s.player.armor = 200;
     s.player.armor_max = 200;

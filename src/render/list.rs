@@ -1,7 +1,9 @@
+use crate::assets::AssetId;
 use crate::model::*;
 use crate::render::{RenderContext, draw_element_wrapper, text::measure_text_line};
 use eframe::egui;
 
+/// Renders a SBARDEF List element, stacking children based on its spacing rules.
 pub(super) fn draw_list(
     ctx: &RenderContext,
     def: &ListDef,
@@ -36,10 +38,14 @@ pub(super) fn draw_list(
     }
 }
 
+/// Recursively calculates the visual bounds of an element tree.
+///
+/// Used by the List container to arrange children without overlap.
 fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> egui::Vec2 {
     let mut size = match &element.data {
         Element::Graphic(g) => {
-            if let Some(tex) = ctx.assets.textures.get(&g.patch.to_uppercase()) {
+            let id = AssetId::new(&g.patch);
+            if let Some(tex) = ctx.assets.textures.get(&id) {
                 tex.size_vec2()
             } else {
                 egui::vec2(16.0, 16.0)
@@ -47,7 +53,8 @@ fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> 
         }
         Element::Animation(a) => {
             if let Some(frame) = a.frames.first() {
-                if let Some(tex) = ctx.assets.textures.get(&frame.lump.to_uppercase()) {
+                let id = AssetId::new(&frame.lump);
+                if let Some(tex) = ctx.assets.textures.get(&id) {
                     tex.size_vec2()
                 } else {
                     egui::vec2(16.0, 16.0)

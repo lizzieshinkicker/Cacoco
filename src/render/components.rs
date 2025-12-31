@@ -3,6 +3,7 @@ use super::text::{draw_text_line, measure_text_line};
 use crate::model::*;
 use eframe::egui;
 
+/// Entry point for rendering specialized engine components (Clock, FPS, etc.).
 pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, alpha: f32) {
     match def.type_ {
         ComponentType::StatTotals => {
@@ -34,7 +35,13 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
                 ComponentType::Coordinates => {
                     format!("X: {:.0} Y: {:.0} Z: 0", ctx.mouse_pos.x, ctx.mouse_pos.y)
                 }
-                ComponentType::Message => ctx.state.message_log.last().cloned().unwrap_or_default(),
+                ComponentType::Message => ctx
+                    .state
+                    .editor
+                    .message_log
+                    .last()
+                    .cloned()
+                    .unwrap_or_default(),
                 _ => format!("[{:?}]", def.type_),
             };
             draw_text_line(
@@ -50,6 +57,7 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
     }
 }
 
+/// Renders the Kills/Items/Secrets block, either horizontally or vertically.
 fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, alpha: f32) {
     let p = &ctx.state.player;
     let parts = [

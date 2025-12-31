@@ -1,38 +1,40 @@
 use super::{RenderContext, get_alignment_anchor_offset};
+use crate::assets::AssetId;
 use crate::model::*;
 use eframe::egui;
 
+/// Renders a single static Graphic element into the viewport.
 pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, mut pos: egui::Pos2, alpha: f32) {
     if def.midoffset != 0 {
         pos.x += def.midoffset as f32;
     }
 
-    let patch_name = def.patch.to_uppercase();
-    draw_simple_graphic_patch(
-        ctx,
-        &patch_name,
-        pos,
-        def.common.alignment,
-        alpha,
-        &def.crop,
-    );
+    let patch_id = AssetId::new(&def.patch);
+    draw_simple_graphic_patch(ctx, patch_id, pos, def.common.alignment, alpha, &def.crop);
 }
 
+/// A low-level primitive for drawing a Doom patch or flat by its AssetId.
+///
+/// This handles:
+/// 1. Doom-specific offsets (internal patch coordinates).
+/// 2. SBARDEF image cropping logic.
+/// 3. Virtual-to-physical screen projection.
+/// 4. Alpha tinting and alignment anchoring.
 pub(super) fn draw_simple_graphic_patch(
     ctx: &RenderContext,
-    patch_name: &str,
+    patch_id: AssetId,
     pos: egui::Pos2,
     alignment: Alignment,
     alpha: f32,
     crop: &Option<CropDef>,
 ) {
-    if let Some(tex) = ctx.assets.textures.get(patch_name) {
+    if let Some(tex) = ctx.assets.textures.get(&patch_id) {
         let mut size = tex.size_vec2();
 
         let (mut off_x, mut off_y) = ctx
             .assets
             .offsets
-            .get(patch_name)
+            .get(&patch_id)
             .map(|(x, y)| (*x as f32, *y as f32))
             .unwrap_or((0.0, 0.0));
 
@@ -88,28 +90,45 @@ pub(super) fn draw_simple_graphic_patch(
             tint,
         );
     } else {
-        let size = egui::vec2(16.0, 16.0);
-        let align_offset = get_alignment_anchor_offset(alignment, size.x, size.y);
-        let screen_pos = ctx.to_screen(pos + align_offset);
-
-        let screen_size = egui::vec2(
-            size.x * ctx.proj.final_scale_x,
-            size.y * ctx.proj.final_scale_y,
-        );
-
-        ctx.painter.rect_stroke(
-            egui::Rect::from_min_size(screen_pos, screen_size),
-            0.0,
-            egui::Stroke::new(1.0, egui::Color32::RED),
-            egui::StrokeKind::Middle,
-        );
-
-        ctx.painter.text(
-            screen_pos,
-            egui::Align2::LEFT_TOP,
-            format!("?{}", patch_name),
-            egui::FontId::monospace(8.0 * ctx.proj.final_scale_y),
-            egui::Color32::RED,
-        );
+        draw_missing_patch_placeholder(ctx, patch_id, pos, alignment);
     }
+}
+
+/// Renders a red-stroked box and the asset name for missing textures.
+fn draw_missing_patch_placeholder(
+    ctx: &RenderContext,
+    patch_id: AssetId,
+    pos: egui::Pos2,
+    alignment: Alignment,
+) {
+    let size = egui::vec2(16.0, 16.0);
+    let align_offset = get_alignment_anchor_offset(alignment, size.x, size.y);
+    let screen_pos = ctx.to_screen(pos + align_offset);
+
+    let screen_size = egui::vec2(
+        size.x * ctx.proj.final_scale_x,
+        size.y * ctx.proj.final_scale_y,
+    );
+
+    ctx.painter.rect_stroke(
+        egui::Rect::from_min_size(screen_pos, screen_size),
+        0.0,
+        egui::Stroke::new(1.0, egui::Color32::RED),
+        egui::StrokeKind::Middle,
+    );
+
+    let name = ctx
+        .assets
+        .names
+        .get(&patch_id)
+        .cloned()
+        .unwrap_or_else(|| "UNKNOWN".to_string());
+
+    ctx.painter.text(
+        screen_pos,
+        egui::Align2::LEFT_TOP,
+        format!("?{}", name),
+        egui::FontId::monospace(8.0 * ctx.proj.final_scale_y),
+        egui::Color32::RED,
+    );
 }

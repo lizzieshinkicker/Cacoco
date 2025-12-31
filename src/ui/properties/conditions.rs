@@ -1,11 +1,12 @@
 use super::common;
 use super::common::paint_thumb_content;
 use super::lookups;
-use crate::assets::AssetStore;
+use crate::assets::{AssetId, AssetStore};
 use crate::model::{ConditionDef, ConditionType, Element, ElementWrapper, NumberType};
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
 
+/// Renders the conditions editor for a HUD element, allowing logical visibility rules.
 pub fn draw_conditions_editor(
     ui: &mut egui::Ui,
     element: &mut ElementWrapper,
@@ -22,6 +23,7 @@ pub fn draw_conditions_editor(
             .conditions
             .iter()
             .any(|c| c.condition == ConditionType::SelectedWeaponHasAmmo);
+
         if !has_safety {
             common_ref.conditions.insert(
                 0,
@@ -63,6 +65,7 @@ pub fn draw_conditions_editor(
             }
         });
     });
+
     ui.separator();
     ui.add_space(4.0);
 
@@ -92,6 +95,7 @@ fn is_ammo_selected_type(el: &ElementWrapper) -> bool {
     }
 }
 
+/// Renders a single condition card with its specialized icon and predicate logic.
 fn draw_condition_card(
     ui: &mut egui::Ui,
     cond: &mut ConditionDef,
@@ -120,9 +124,10 @@ fn draw_condition_card(
                     ui.allocate_exact_size(egui::vec2(box_size, box_size), egui::Sense::hover());
                 ui.painter()
                     .rect_filled(rect, 4.0, egui::Color32::from_gray(45));
-                let tex = master_icon_name
-                    .as_ref()
-                    .and_then(|n| assets.textures.get(n));
+
+                let id = master_icon_name.as_ref().map(|n| AssetId::new(n));
+                let tex = id.and_then(|i| assets.textures.get(&i));
+
                 paint_thumb_content(ui, rect, tex, None);
                 if tex.is_none() {
                     ui.painter().text(
@@ -159,7 +164,6 @@ fn draw_condition_card(
                             egui::ComboBox::from_id_salt(id)
                                 .selected_text(group.name)
                                 .width(ui.available_width())
-                                .height(1000.0)
                                 .show_ui(ui, |ui| {
                                     ui.set_min_width(120.0);
                                     for (idx, g) in lookups::GROUPS.iter().enumerate() {

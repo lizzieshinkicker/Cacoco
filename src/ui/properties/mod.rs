@@ -1,24 +1,29 @@
 use crate::assets::AssetStore;
-use crate::model::SBarDefFile;
+use crate::model::{Element, ElementWrapper, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::layers::colors;
+use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
 
+mod animation;
 pub mod common;
+mod components;
 mod conditions;
 mod descriptions;
 pub mod editor;
+mod face;
 pub(crate) mod font_cache;
 mod graphics;
+mod list;
 mod lookups;
 pub(crate) mod preview;
 mod text;
 pub mod text_helper;
 
-use crate::ui::shared;
 use editor::PropertiesUI;
 use font_cache::FontCache;
+use preview::PreviewContent;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PropertyTab {
@@ -28,6 +33,78 @@ enum PropertyTab {
 
 const PROP_TAB_KEY: &str = "cacoco_prop_tab_state";
 
+/// Implementation of the PropertiesUI trait for the ElementWrapper.
+///
+/// This acts as a central router, delegating UI drawing and preview generation
+/// to the specialized implementation for each SBARDEF element type.
+impl PropertiesUI for ElementWrapper {
+    fn draw_specific_fields(
+        &mut self,
+        ui: &mut egui::Ui,
+        fonts: &FontCache,
+        assets: &AssetStore,
+        state: &PreviewState,
+    ) -> bool {
+        match &mut self.data {
+            Element::Canvas(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::List(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Graphic(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Animation(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Face(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::FaceBackground(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Number(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Percent(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::String(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Component(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Carousel(e) => e.draw_specific_fields(ui, fonts, assets, state),
+        }
+    }
+
+    fn get_preview_content(
+        &self,
+        ui: &egui::Ui,
+        fonts: &FontCache,
+        state: &PreviewState,
+    ) -> Option<PreviewContent> {
+        match &self.data {
+            Element::Canvas(e) => e.get_preview_content(ui, fonts, state),
+            Element::List(e) => e.get_preview_content(ui, fonts, state),
+            Element::Graphic(e) => e.get_preview_content(ui, fonts, state),
+            Element::Animation(e) => e.get_preview_content(ui, fonts, state),
+            Element::Face(e) => e.get_preview_content(ui, fonts, state),
+            Element::FaceBackground(_) => Some(PreviewContent::Image("STFB0".to_string())),
+            Element::Number(e) => e.get_preview_content(ui, fonts, state),
+            Element::Percent(e) => {
+                let mut content = e.get_preview_content(ui, fonts, state)?;
+                if let PreviewContent::Text { text, .. } = &mut content {
+                    *text = format!("{}%", text);
+                }
+                Some(content)
+            }
+            Element::String(e) => e.get_preview_content(ui, fonts, state),
+            Element::Component(e) => e.get_preview_content(ui, fonts, state),
+            Element::Carousel(e) => e.get_preview_content(ui, fonts, state),
+        }
+    }
+
+    fn has_specific_fields(&self) -> bool {
+        match &self.data {
+            Element::Canvas(e) => e.has_specific_fields(),
+            Element::List(e) => e.has_specific_fields(),
+            Element::Graphic(e) => e.has_specific_fields(),
+            Element::Animation(e) => e.has_specific_fields(),
+            Element::Face(e) => e.has_specific_fields(),
+            Element::FaceBackground(e) => e.has_specific_fields(),
+            Element::Number(e) => e.has_specific_fields(),
+            Element::Percent(e) => e.has_specific_fields(),
+            Element::String(e) => e.has_specific_fields(),
+            Element::Component(e) => e.has_specific_fields(),
+            Element::Carousel(e) => e.has_specific_fields(),
+        }
+    }
+}
+
+/// Renders the entire properties sidebar panel.
 pub fn draw_properties_panel(
     ui: &mut egui::Ui,
     file: &mut Option<SBarDefFile>,
@@ -79,7 +156,7 @@ pub fn draw_properties_panel(
                 }
             } else {
                 header_title = format!("Layout #{}", path[0]);
-                header_desc = "The root configuration for a HUD layout. Defines height and background behavior.".to_string();
+                header_desc = "Root configuration for a HUD layout.".to_string();
                 is_layout = true;
             }
         } else if selection.len() > 1 {
@@ -91,7 +168,7 @@ pub fn draw_properties_panel(
         }
     } else {
         header_title = "Cacoco Editor".to_string();
-        header_desc = "No project file loaded. Open or create a new SBARDEF to begin!".to_string();
+        header_desc = "No project file loaded. Open or create a new SBARDEF.".to_string();
     }
 
     let mut preview_content = None;

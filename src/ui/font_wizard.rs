@@ -2,12 +2,14 @@ use crate::assets::AssetStore;
 use crate::model::{HudFontDef, NumberFontDef, SBarDefFile};
 use eframe::egui;
 
+/// Internal state for the font registration wizard.
 pub struct FontWizardState {
     pub font_name: String,
     pub font_type: FontTypeWrapper,
     pub detected_stem: String,
 }
 
+/// Wrapper to differentiate between numeric and alphanumeric font types.
 #[derive(PartialEq, Clone, Copy)]
 pub enum FontTypeWrapper {
     Number,
@@ -15,6 +17,7 @@ pub enum FontTypeWrapper {
 }
 
 impl FontWizardState {
+    /// Creates a new wizard state by analyzing a selection of patch names.
     pub fn new(selected: Vec<String>) -> Self {
         let (stem, font_type) = analyze_selection(&selected);
         let name = if stem.is_empty() {
@@ -31,6 +34,7 @@ impl FontWizardState {
     }
 }
 
+/// Renders the font registration wizard modal.
 pub fn draw_font_wizard(
     ctx: &egui::Context,
     state: &mut Option<FontWizardState>,
@@ -157,6 +161,7 @@ pub fn draw_font_wizard(
     changed
 }
 
+/// Analyzes a selection of patches to guess the font stem and type.
 fn analyze_selection(patches: &[String]) -> (String, FontTypeWrapper) {
     if patches.is_empty() {
         return ("".to_string(), FontTypeWrapper::Number);
@@ -206,6 +211,7 @@ fn analyze_selection(patches: &[String]) -> (String, FontTypeWrapper) {
     }
 }
 
+/// Renders a grid of character tiles to show which font glyphs were found.
 fn draw_coverage_tiles(ui: &mut egui::Ui, data: &FontWizardState, assets: &AssetStore) {
     let chars_to_check: Vec<(char, String)> = match data.font_type {
         FontTypeWrapper::Number => {
@@ -244,22 +250,9 @@ fn draw_coverage_tiles(ui: &mut egui::Ui, data: &FontWizardState, assets: &Asset
         for (c, label) in chars_to_check.iter() {
             let is_num = data.font_type == FontTypeWrapper::Number;
 
-            let resolved = assets.resolve_patch_name(&data.detected_stem, *c, is_num);
-            let texture = assets.textures.get(&resolved);
+            let id = assets.resolve_patch_id(&data.detected_stem, *c, is_num);
+            let texture = assets.textures.get(&id);
             let found = texture.is_some();
-
-            let display_name = if found {
-                resolved
-            } else if is_num {
-                match *c {
-                    '0'..='9' => format!("{}NUM{}", data.detected_stem, c),
-                    '%' => format!("{}PRCNT", data.detected_stem),
-                    '-' => format!("{}MINUS", data.detected_stem),
-                    _ => resolved,
-                }
-            } else {
-                resolved
-            };
 
             let (rect, response) =
                 ui.allocate_exact_size(egui::vec2(tile_size, tile_size), egui::Sense::hover());
@@ -323,7 +316,6 @@ fn draw_coverage_tiles(ui: &mut egui::Ui, data: &FontWizardState, assets: &Asset
                                 .strong(),
                         );
                     }
-                    ui.label(format!("Looking for: {}", display_name));
                 });
             }
         }

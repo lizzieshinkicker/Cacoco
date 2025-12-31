@@ -1,8 +1,11 @@
-use crate::assets::AssetStore;
+use crate::assets::{AssetId, AssetStore};
 use eframe::egui;
 
+/// Represents the content data to be visualized in the property preview window.
 pub enum PreviewContent {
+    /// Renders a single static image from a patch name.
     Image(String),
+    /// Renders a line of text using a specific font stem and type.
     Text {
         text: String,
         stem: Option<String>,
@@ -10,6 +13,10 @@ pub enum PreviewContent {
     },
 }
 
+/// Renders a high-resolution preview box for the currently selected element.
+///
+/// This panel handles the automatic scaling and centering of textures
+/// and text samples, using pre-hashed AssetIds for performance.
 pub fn draw_preview_panel(ui: &mut egui::Ui, assets: &AssetStore, content: PreviewContent) {
     let height = 96.0;
     let (rect, _) = ui.allocate_exact_size(
@@ -30,7 +37,8 @@ pub fn draw_preview_panel(ui: &mut egui::Ui, assets: &AssetStore, content: Previ
 
     match content {
         PreviewContent::Image(name) => {
-            if let Some(tex) = assets.textures.get(&name.to_uppercase()) {
+            let id = AssetId::new(&name);
+            if let Some(tex) = assets.textures.get(&id) {
                 textures.push(tex);
             }
         }
@@ -41,8 +49,8 @@ pub fn draw_preview_panel(ui: &mut egui::Ui, assets: &AssetStore, content: Previ
         } => {
             if let Some(s) = stem {
                 for char in text.chars() {
-                    let patch_name = assets.resolve_patch_name(&s, char, is_number_font);
-                    if let Some(tex) = assets.textures.get(&patch_name) {
+                    let id = assets.resolve_patch_id(&s, char, is_number_font);
+                    if let Some(tex) = assets.textures.get(&id) {
                         textures.push(tex);
                     }
                 }
@@ -54,7 +62,7 @@ pub fn draw_preview_panel(ui: &mut egui::Ui, assets: &AssetStore, content: Previ
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
-            "(No Preview)",
+            "(No Preview Available)",
             egui::FontId::proportional(14.0),
             egui::Color32::GRAY,
         );
@@ -72,7 +80,6 @@ pub fn draw_preview_panel(ui: &mut egui::Ui, assets: &AssetStore, content: Previ
     let width_scale = (rect.width() - 16.0) / total_width;
 
     let raw_scale = height_scale.min(width_scale).min(4.0);
-
     let scale = if raw_scale >= 1.0 {
         raw_scale.floor()
     } else {
@@ -80,16 +87,13 @@ pub fn draw_preview_panel(ui: &mut egui::Ui, assets: &AssetStore, content: Previ
     };
 
     let draw_width = total_width * scale;
-
     let start_x = (rect.center().x - (draw_width / 2.0)).floor();
     let center_y = rect.center().y;
 
     let mut current_x = start_x;
     for tex in textures {
         let size = tex.size_vec2() * scale;
-
         let y_pos = (center_y - (size.y / 2.0)).floor();
-
         let dest_rect = egui::Rect::from_min_size(egui::pos2(current_x, y_pos), size);
 
         ui.painter().image(

@@ -4,9 +4,7 @@ use super::editor::PropertiesUI;
 use super::lookups;
 use super::preview::PreviewContent;
 use crate::assets::AssetStore;
-use crate::model::{
-    ComponentDef, ComponentType, Element, ElementWrapper, NumberDef, NumberType, StringDef,
-};
+use crate::model::{Element, ElementWrapper, NumberDef, NumberType, StringDef};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
@@ -14,6 +12,7 @@ use eframe::egui;
 const HEADER_MENU_KEY: &str = "cacoco_prop_header_menu_id";
 
 impl PropertiesUI for NumberDef {
+    /// Renders the font and source parameter editor for numeric elements.
     fn draw_specific_fields(
         &mut self,
         ui: &mut egui::Ui,
@@ -22,6 +21,7 @@ impl PropertiesUI for NumberDef {
         _state: &PreviewState,
     ) -> bool {
         let mut changed = false;
+
         ui.vertical_centered(|ui| {
             ui.horizontal(|ui| {
                 ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
@@ -104,6 +104,7 @@ impl PropertiesUI for NumberDef {
         changed
     }
 
+    /// Pulls current stats from the simulated player to populate the preview string.
     fn get_preview_content(
         &self,
         _ui: &egui::Ui,
@@ -115,15 +116,21 @@ impl PropertiesUI for NumberDef {
             NumberType::Health => state.player.health,
             NumberType::Armor => state.player.armor,
             NumberType::Frags => 0,
-            NumberType::AmmoSelected => state.get_ammo(state.get_selected_ammo_type()),
-            NumberType::Ammo => state.get_ammo(self.param),
-            NumberType::MaxAmmo => state.get_max_ammo(self.param),
+            NumberType::AmmoSelected => {
+                let slot = state.selected_weapon_slot;
+                let idx = state.inventory.get_selected_ammo_type(slot);
+                state.inventory.get_ammo(idx)
+            }
+            NumberType::Ammo => state.inventory.get_ammo(self.param),
+            NumberType::MaxAmmo => state.inventory.get_max_ammo(self.param),
             NumberType::AmmoWeapon => state
+                .inventory
                 .get_weapon_ammo_type(self.param)
-                .map_or(0, |idx| state.get_ammo(idx)),
+                .map_or(0, |idx| state.inventory.get_ammo(idx)),
             NumberType::MaxAmmoWeapon => state
+                .inventory
                 .get_weapon_ammo_type(self.param)
-                .map_or(0, |idx| state.get_max_ammo(idx)),
+                .map_or(0, |idx| state.inventory.get_max_ammo(idx)),
             NumberType::Kills => state.player.kills,
             NumberType::Items => state.player.items,
             NumberType::Secrets => state.player.secrets,
@@ -155,6 +162,7 @@ impl PropertiesUI for NumberDef {
 }
 
 impl PropertiesUI for StringDef {
+    /// Renders the specialized editor for SBARDEF String elements.
     fn draw_specific_fields(
         &mut self,
         ui: &mut egui::Ui,
@@ -221,6 +229,7 @@ impl PropertiesUI for StringDef {
         changed
     }
 
+    /// Generates a preview string based on the current world and level data.
     fn get_preview_content(
         &self,
         _ui: &egui::Ui,
@@ -247,69 +256,10 @@ impl PropertiesUI for StringDef {
     }
 }
 
-impl PropertiesUI for ComponentDef {
-    fn draw_specific_fields(
-        &mut self,
-        ui: &mut egui::Ui,
-        fonts: &FontCache,
-        assets: &AssetStore,
-        _state: &PreviewState,
-    ) -> bool {
-        let mut changed = false;
-        ui.vertical_centered(|ui| {
-            ui.horizontal(|ui| {
-                ui.add_space((ui.available_width() - 190.0).max(0.0) / 2.0);
-                ui.label("Font:");
-
-                let id = ui.make_persistent_id("hud_font_selector");
-                let button_res =
-                    ui.add(egui::Button::new(&self.font).min_size(egui::vec2(140.0, 18.0)));
-
-                if button_res.clicked() {
-                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
-                }
-
-                if let Some(menu) = ContextMenu::get(ui, id) {
-                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
-                        let h = (fonts.hud_font_names.len() as f32 * 42.0).min(1000.0);
-                        ui.set_min_height(h);
-                        ui.set_width(200.0);
-                        changed |=
-                            common::draw_hud_font_selectors(ui, &mut self.font, fonts, assets);
-                    });
-                }
-            });
-        });
-        changed
-    }
-
-    fn get_preview_content(
-        &self,
-        ui: &egui::Ui,
-        fonts: &FontCache,
-        state: &PreviewState,
-    ) -> Option<PreviewContent> {
-        let stem = fonts.get_hud_stem(&self.font);
-        let text_val = match self.type_ {
-            ComponentType::Time => {
-                let total_seconds = ui.input(|i| i.time) as u64;
-                format!(":{:02}", total_seconds % 60)
-            }
-            ComponentType::LevelTitle => "MAP01: ENTRYWAY".to_string(),
-            ComponentType::FpsCounter => format!("{:.0}", state.display_fps),
-            ComponentType::Coordinates => "X: ### Y: ###".to_string(),
-            ComponentType::StatTotals => "K:0/0".to_string(),
-            ComponentType::Message => "You got the Shotgun!".to_string(),
-            _ => format!("[{:?}]", self.type_),
-        };
-        Some(PreviewContent::Text {
-            text: text_val,
-            stem,
-            is_number_font: false,
-        })
-    }
-}
-
+/// Renders the interactive property panel header.
+///
+/// For interactive types (Number, Component, String), clicking the header
+/// opens a popup to change the specific subtype.
 pub fn draw_interactive_header(
     ui: &mut egui::Ui,
     element: &mut ElementWrapper,
@@ -332,7 +282,7 @@ pub fn draw_interactive_header(
                     match &element.data {
                         Element::Number(n) => number_type_name(n.type_).to_string(),
                         Element::Percent(p) => number_type_name(p.type_).to_string(),
-                        Element::Component(c) => component_type_name(c.type_),
+                        Element::Component(c) => format!("{:?}", c.type_),
                         Element::String(s) => {
                             format!("String: {}", lookups::STRING_TYPES[s.type_ as usize].name)
                         }
@@ -373,7 +323,8 @@ pub fn draw_interactive_header(
 
         let header_id = response.id;
         let is_open =
-            ui.data(|d| d.get_temp::<egui::Id>(egui::Id::new(HEADER_MENU_KEY))) == Some(header_id);
+            ui.data(|d| d.get_temp::<egui::Id>(egui::Id::new(HEADER_MENU_KEY)) == Some(header_id));
+
         if interact.clicked() {
             if is_open {
                 ui.data_mut(|d| d.remove::<egui::Id>(egui::Id::new(HEADER_MENU_KEY)));
@@ -390,10 +341,12 @@ pub fn draw_interactive_header(
                     let frame = egui::Frame::popup(ui.style())
                         .inner_margin(4.0)
                         .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(60)));
+
                     frame.show(ui, |ui| {
                         ui.set_min_width(response.rect.width().max(100.0));
                         ui.set_max_width(200.0);
                         let mut close = false;
+
                         match &mut element.data {
                             Element::Number(n) => {
                                 if draw_number_options(ui, &mut n.type_, &mut n.param) {
@@ -408,7 +361,7 @@ pub fn draw_interactive_header(
                                 }
                             }
                             Element::Component(c) => {
-                                if draw_component_options(ui, &mut c.type_) {
+                                if super::components::draw_component_options(ui, &mut c.type_) {
                                     close = true;
                                     changed = true;
                                 }
@@ -434,6 +387,7 @@ pub fn draw_interactive_header(
                     });
                 })
                 .response;
+
             if ui.input(|i| i.pointer.any_click())
                 && !area_response.hovered()
                 && !response.hovered()
@@ -455,6 +409,7 @@ pub fn draw_interactive_header(
                     egui::Stroke::new(2.0, egui::Color32::YELLOW),
                     egui::StrokeKind::Inside,
                 );
+
                 ui.painter().text(
                     response.rect.center(),
                     egui::Align2::CENTER_CENTER,
@@ -462,6 +417,7 @@ pub fn draw_interactive_header(
                     egui::FontId::proportional(16.0),
                     egui::Color32::WHITE,
                 );
+
                 if ui.input(|i| i.pointer.any_released()) {
                     if let Some(key) = asset_keys.get(0) {
                         g.patch = key.clone();
@@ -475,6 +431,7 @@ pub fn draw_interactive_header(
     changed
 }
 
+/// Helper to get the human-readable label for a numeric statistic type.
 pub fn number_type_name(t: NumberType) -> &'static str {
     match t {
         NumberType::Health => "Health",
@@ -496,10 +453,6 @@ pub fn number_type_name(t: NumberType) -> &'static str {
         NumberType::MaxSecrets => "Max Secrets",
         NumberType::PowerupDuration => "Powerup Time",
     }
-}
-
-fn component_type_name(t: ComponentType) -> String {
-    format!("{:?}", t)
 }
 
 fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i32) -> bool {
@@ -567,28 +520,6 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
             *param = 101;
         }
         changed = true;
-    }
-    changed
-}
-
-fn draw_component_options(ui: &mut egui::Ui, type_: &mut ComponentType) -> bool {
-    use crate::model::ComponentType::*;
-    let mut changed = false;
-    let items = [
-        ("Time", Time),
-        ("Level Title", LevelTitle),
-        ("Announce Level Title", AnnounceLevelTitle),
-        ("Message", Message),
-        ("Coordinates", Coordinates),
-        ("FPS Counter", FpsCounter),
-        ("Stat Totals", StatTotals),
-    ];
-
-    for (label, target) in items {
-        if common::custom_menu_item(ui, label, *type_ == target) {
-            *type_ = target;
-            changed = true;
-        }
     }
     changed
 }

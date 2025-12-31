@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 
+/// List of common Doom lump name prefixes that indicate graphical data.
 static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     let prefixes = [
         "ST", "WI", "M_", "BRDR", "DGT", "NUM", "PRCN", "MINUS", "PUNG", "SAWG", "PISG", "SHTG",
@@ -16,6 +17,8 @@ static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     ];
     prefixes.into_iter().collect()
 });
+
+/// Scans a Doom WAD file and loads all compatible graphical lumps into the store.
 pub fn load_wad_into_store(
     ctx: &egui::Context,
     file: &mut fs::File,
@@ -37,7 +40,6 @@ pub fn load_wad_into_store(
     file.read_exact(&mut dir_buffer)?;
 
     let mut palette = DoomPalette::default();
-    let mut found_pal = false;
 
     for i in 0..num_lumps {
         let entry = &dir_buffer[i * 16..(i + 1) * 16];
@@ -48,13 +50,8 @@ pub fn load_wad_into_store(
             let mut pal_bytes = vec![0u8; 768];
             file.read_exact(&mut pal_bytes)?;
             palette = DoomPalette::from_raw(&pal_bytes);
-            found_pal = true;
             break;
         }
-    }
-
-    if found_pal {
-        println!("WAD: Found PLAYPAL.");
     }
 
     for i in 0..num_lumps {

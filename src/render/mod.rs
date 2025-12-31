@@ -16,32 +16,44 @@ pub mod patch;
 pub mod projection;
 pub mod text;
 
+/// Defines whether an element is being drawn in the standard background pass
+/// or the specialized foreground pass (used for selection highlighting).
 #[derive(Clone, Copy, PartialEq)]
 pub enum RenderPass {
     Background,
     Foreground,
 }
 
+/// The state container passed through the rendering tree.
+/// Contains references to all project data and rendering projection.
 pub struct RenderContext<'a> {
     pub painter: &'a egui::Painter,
     pub assets: &'a AssetStore,
     pub file: &'a SBarDefFile,
     pub state: &'a PreviewState,
+    /// Absolute application time in seconds.
     pub time: f64,
+    /// Current smoothed rendering framerate.
     pub fps: f32,
+    /// Mouse position in virtual Doom coordinates (0-320 or 0-428).
     pub mouse_pos: egui::Pos2,
+    /// The set of paths currently selected in the editor.
     pub selection: &'a HashSet<Vec<usize>>,
     pub pass: RenderPass,
     pub proj: &'a projection::ViewportProjection,
+    /// True if the user is currently performing a drag operation in the viewport.
     pub is_dragging: bool,
+    /// True if the primary mouse button is currently held down over the viewport.
     pub is_viewport_clicked: bool,
 }
 
 impl<'a> RenderContext<'a> {
+    /// Maps a virtual coordinate (Doom space) to a physical screen pixel.
     pub fn to_screen(&self, pos: egui::Pos2) -> egui::Pos2 {
         self.proj.to_screen(pos)
     }
 
+    /// Helper to retrieve a Number Font definition by name from the current file.
     pub fn get_number_font(&self, name: &str) -> Option<&NumberFontDef> {
         self.file
             .data
@@ -51,6 +63,7 @@ impl<'a> RenderContext<'a> {
     }
 }
 
+/// The main recursive entry point for drawing an SBARDEF element and its children.
 pub fn draw_element_wrapper(
     ctx: &RenderContext,
     element: &ElementWrapper,
@@ -61,7 +74,8 @@ pub fn draw_element_wrapper(
 
     let is_selected_branch = ctx.selection.contains(current_path)
         || ctx.selection.iter().any(|s| current_path.starts_with(s));
-    let is_strobing = ctx.state.strobe_timer > 0.0;
+
+    let is_strobing = ctx.state.editor.strobe_timer > 0.0;
 
     match ctx.pass {
         RenderPass::Background => {
@@ -94,7 +108,7 @@ pub fn draw_element_wrapper(
 
     if is_selected_branch && is_strobing {
         let dur = 0.5;
-        let prog = (dur - ctx.state.strobe_timer) / dur;
+        let prog = (dur - ctx.state.editor.strobe_timer) / dur;
         let wave = (prog * std::f32::consts::PI * 4.0).cos();
         alpha *= 0.70 + (wave * 0.30);
     }
@@ -126,6 +140,7 @@ pub fn draw_element_wrapper(
     }
 }
 
+/// Internal helper to iterate and draw child elements.
 fn recurse_children(
     ctx: &RenderContext,
     children: &[ElementWrapper],
@@ -139,6 +154,8 @@ fn recurse_children(
     }
 }
 
+/// Calculates the final virtual position of an element based on its local X/Y,
+/// alignment, and widescreen configuration.
 pub(super) fn resolve_position(
     ctx: &RenderContext,
     common: &CommonAttrs,
@@ -162,6 +179,7 @@ pub(super) fn resolve_position(
     pos
 }
 
+/// Returns a pixel offset vector based on the alignment flags and provided dimensions.
 pub fn get_alignment_anchor_offset(align: Alignment, w: f32, h: f32) -> egui::Vec2 {
     let calc = |size: f32, max_bit: Alignment, mid_bit: Alignment| {
         if align.contains(max_bit) {

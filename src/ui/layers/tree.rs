@@ -18,6 +18,7 @@ enum DropTarget {
     Child,
 }
 
+/// The root entry point for rendering the hierarchical layer tree in the sidebar.
 pub fn draw_layer_tree_root(
     ui: &mut egui::Ui,
     file: &SBarDefFile,
@@ -51,6 +52,7 @@ pub fn draw_layer_tree_root(
     }
 }
 
+/// Recursively iterates through elements to draw the tree structure.
 pub fn draw_layer_tree_recursive(
     ui: &mut egui::Ui,
     elements: &[ElementWrapper],
@@ -120,6 +122,7 @@ pub fn draw_layer_tree_recursive(
     }
 }
 
+/// Renders a single row in the layer tree, handling selection and drag-and-drop.
 fn draw_layer_row(
     ui: &mut egui::Ui,
     element: &ElementWrapper,
@@ -387,7 +390,6 @@ fn render_row_visuals(
     } else {
         base_bg
     };
-
     let stroke = if is_selected {
         ui.visuals().selection.stroke
     } else {
@@ -493,7 +495,6 @@ fn handle_context_menu(
                 ContextMenu::close(ui);
             }
             ui.separator();
-
             if ContextMenu::button(ui, "Duplicate", true) {
                 actions.push(LayerAction::UndoSnapshot);
                 actions.push(LayerAction::DuplicateSelection(
@@ -568,11 +569,9 @@ fn handle_auto_scroll(ui: &mut egui::Ui) {
     if has_payload {
         if let Some(pos) = ui.ctx().input(|i| i.pointer.latest_pos()) {
             let clip = ui.clip_rect();
-
             if clip.contains(pos) {
                 let scroll_margin = 30.0;
                 let scroll_speed = 8.0;
-
                 if pos.y < clip.min.y + scroll_margin {
                     ui.scroll_with_delta(egui::vec2(0.0, scroll_speed));
                 } else if pos.y > clip.max.y - scroll_margin {
@@ -621,12 +620,10 @@ fn calculate_drop_target(
     if !is_container {
         if pos.y < rect.center().y {
             Some(DropTarget::Sibling(my_idx, rect.top() - off))
+        } else if is_last {
+            None
         } else {
-            if is_last {
-                None
-            } else {
-                Some(DropTarget::Sibling(my_idx + 1, rect.bottom() + off))
-            }
+            Some(DropTarget::Sibling(my_idx + 1, rect.bottom() + off))
         }
     } else {
         let h = rect.height();
@@ -645,7 +642,6 @@ fn calculate_drop_target(
     }
 }
 
-/// Helper to check if any part of the selection contains children, requiring deletion confirmation.
 pub fn deletion_needs_confirmation(file: &SBarDefFile, selection: &HashSet<Vec<usize>>) -> bool {
     for path in selection {
         if path.len() < 2 {
@@ -660,8 +656,6 @@ pub fn deletion_needs_confirmation(file: &SBarDefFile, selection: &HashSet<Vec<u
     false
 }
 
-/// Draws an invisible drop zone at the end of a list to make it easier to drop items
-/// outside of open containers (siblings after).
 fn draw_terminal_drop_zone(
     ui: &mut egui::Ui,
     parent_path: Vec<usize>,

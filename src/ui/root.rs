@@ -2,47 +2,31 @@ use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::ui::font_wizard;
 use crate::{document, ui};
 use eframe::egui;
+use std::collections::HashSet;
 use std::path::Path;
 
+/// The main application UI composition function.
+///
+/// This orchestrates the side panels, the central viewport, and modal windows.
 pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     if !app.iwad_verified {
-        draw_onboarding_screen(ctx, app);
+        ui::modals::draw_onboarding_screen(ctx, app);
         return;
     }
 
     if ctx.input(|i| i.viewport().close_requested()) {
-        if app.dirty {
+        let is_dirty = app.doc.as_ref().map_or(false, |d| d.dirty);
+        if is_dirty {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(PendingAction::Quit));
         }
     }
 
-    let dirty_indicator = if app.dirty { "*" } else { "" };
-    let file_display = if app.current_file.is_some() {
-        if let Some(path_str) = &app.opened_file_path {
-            let name = Path::new(path_str)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(path_str);
-            format!("[{}{}] ", dirty_indicator, name)
-        } else {
-            format!("[{}New Project] ", dirty_indicator)
-        }
-    } else {
-        "".to_string()
-    };
-
-    let flavor_title = ctx.data(|d| d.get_temp::<String>(egui::Id::new("random_title")));
-    if let Some(flavor) = flavor_title {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
-            "{file_display}Cacoco - {flavor}"
-        )));
-    }
+    update_window_title(ctx, app);
 
     if let Some(action) = app.hotkeys.check(ctx) {
         handle_action(app, action, ctx);
     }
-
     app.cheat_engine.process_input(ctx, &mut app.preview_state);
     app.preview_state.update(ctx.input(|i| i.stable_dt));
 
@@ -55,141 +39,43 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             let menu_action = ui::draw_menu_bar(
                 ui,
                 ctx,
-                &mut app.current_file,
-                app.opened_file_path.clone(),
+                &mut app.doc,
                 &mut app.config,
                 &mut app.assets,
                 &mut app.settings_open,
-                app.dirty,
             );
             handle_menu_action(app, menu_action, ctx);
 
             ui.add_space(2.0);
             ui.separator();
 
-            let tab_id = ui.make_persistent_id("sidebar_tab_idx");
-            let last_tab_id = ui.make_persistent_id("sidebar_last_tab_idx");
-            let heights_id = ui.make_persistent_id("sidebar_tab_heights");
-
-            let mut tab_idx: Option<usize> = ui.data(|d| d.get_temp(tab_id).unwrap_or(Some(0)));
-            let mut last_tab: usize = ui.data(|d| d.get_temp(last_tab_id).unwrap_or(0));
-
-            let mut heights: [f32; 2] =
-                ui.data(|d| d.get_temp(heights_id).unwrap_or([428.0, 428.0]));
-
-            if let Some(current) = tab_idx {
-                last_tab = current;
-            }
-
-            let header_h = 38.0;
-            let content_h = if let Some(idx) = tab_idx {
-                heights[idx]
-            } else {
-                0.0
-            };
-
-            let target_h = if tab_idx.is_some() {
-                header_h + content_h
-            } else {
-                header_h
-            };
-
-            let anim_h = ui.ctx().animate_value_with_time(
-                ui.make_persistent_id("sidebar_drawer_anim"),
-                target_h,
-                0.1,
-            );
-
-            egui::TopBottomPanel::bottom("left_sidebar_footer")
-                .frame(egui::Frame::NONE)
-                .resizable(false)
-                .exact_height(anim_h)
-                .show_inside(ui, |ui| {
-                    ui.add_space(7.0);
-
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 4.0;
-                        let btn_w = (ui.available_width() - 4.0) / 2.0;
-
-                        if ui
-                            .add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
-                                ui::shared::section_header_button(
-                                    ui,
-                                    "Held Items",
-                                    None,
-                                    tab_idx == Some(0),
-                                )
-                            })
-                            .clicked()
-                        {
-                            tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
-                        }
-
-                        if ui
-                            .add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
-                                ui::shared::section_header_button(
-                                    ui,
-                                    "Game Context",
-                                    None,
-                                    tab_idx == Some(1),
-                                )
-                            })
-                            .clicked()
-                        {
-                            tab_idx = if tab_idx == Some(1) { None } else { Some(1) };
-                        }
-                    });
-
-                    ui.separator();
-
-                    if anim_h > header_h + 1.0 {
-                        let content_rect = ui.available_rect_before_wrap();
-                        ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
-                            let inner_response = ui.vertical(|ui| {
-                                ui.add_space(3.0);
-                                if last_tab == 0 {
-                                    ui::draw_gamestate_panel(
-                                        ui,
-                                        &mut app.preview_state,
-                                        &app.assets,
-                                    );
-                                } else {
-                                    ui::gamestate::draw_context_panel(
-                                        ui,
-                                        &mut app.preview_state,
-                                        &app.assets,
-                                    );
-                                }
-                                ui.add_space(10.0);
-                            });
-
-                            if tab_idx.is_some() || anim_h > header_h + 10.0 {
-                                let measured = inner_response.response.rect.height();
-                                if measured > 10.0 {
-                                    heights[last_tab] = measured;
-                                }
-                            }
-                        });
-                    }
-                });
-
-            ui.data_mut(|d| {
-                d.insert_temp(tab_id, tab_idx);
-                d.insert_temp(last_tab_id, last_tab);
-                d.insert_temp(heights_id, heights);
-            });
+            draw_left_sidebar_drawer(ui, app);
 
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE)
                 .show_inside(ui, |ui| {
-                    if ui::draw_properties_panel(
-                        ui,
-                        &mut app.current_file,
-                        &app.selection,
-                        &app.assets,
-                        &app.preview_state,
-                    ) {
-                        app.dirty = true;
+                    if let Some(doc) = &mut app.doc {
+                        let mut file_clone = Some(doc.file.clone());
+                        if ui::draw_properties_panel(
+                            ui,
+                            &mut file_clone,
+                            &doc.selection,
+                            &app.assets,
+                            &app.preview_state,
+                        ) {
+                            if let Some(updated) = file_clone {
+                                doc.file = updated;
+                                doc.dirty = true;
+                            }
+                        }
+                    } else {
+                        ui::draw_properties_panel(
+                            ui,
+                            &mut None,
+                            &Default::default(),
+                            &app.assets,
+                            &app.preview_state,
+                        );
                     }
                 });
         });
@@ -198,35 +84,56 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         .resizable(false)
         .exact_width(320.0)
         .show(ctx, |ui| {
-            let (actions, layers_changed) = ui::draw_layers_panel(
-                ui,
-                &mut app.current_file,
-                &mut app.selection,
-                &mut app.selection_pivot,
-                &mut app.assets,
-                &mut app.current_statusbar_idx,
-                &mut app.preview_state,
-                &mut app.font_wizard,
-                &mut app.confirmation_modal,
-            );
+            if let Some(doc) = &mut app.doc {
+                let mut file_clone = Some(doc.file.clone());
+                let (actions, layers_changed) = ui::draw_layers_panel(
+                    ui,
+                    &mut file_clone,
+                    &mut doc.selection,
+                    &mut doc.selection_pivot,
+                    &mut app.assets,
+                    &mut app.current_statusbar_idx,
+                    &mut app.preview_state,
+                    &mut app.font_wizard,
+                    &mut app.confirmation_modal,
+                );
 
-            if layers_changed {
-                app.dirty = true;
+                if let Some(updated) = file_clone {
+                    doc.file = updated;
+                }
+                if layers_changed {
+                    doc.dirty = true;
+                }
+                app.execute_actions(actions);
+            } else {
+                ui::draw_layers_panel(
+                    ui,
+                    &mut None,
+                    &mut Default::default(),
+                    &mut None,
+                    &mut app.assets,
+                    &mut app.current_statusbar_idx,
+                    &mut app.preview_state,
+                    &mut app.font_wizard,
+                    &mut app.confirmation_modal,
+                );
             }
-
-            app.execute_actions(actions);
         });
 
     egui::CentralPanel::default().show(ctx, |ui| {
+        let file_opt = app.doc.as_ref().map(|d| d.file.clone());
+        let empty_selection = HashSet::new();
+        let selection = app.doc.as_ref().map_or(&empty_selection, |d| &d.selection);
+
         let actions = ui::draw_viewport(
             ui,
-            &app.current_file,
+            &file_opt,
             &app.assets,
             &mut app.preview_state,
-            &app.selection,
+            &mut app.viewport_ctrl,
+            selection,
             app.current_statusbar_idx,
         );
-
         app.execute_actions(actions);
     });
 
@@ -239,250 +146,169 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         );
     }
 
-    if let Some(f) = &mut app.current_file {
-        if font_wizard::draw_font_wizard(ctx, &mut app.font_wizard, f, &app.assets) {
-            app.dirty = true;
+    if let Some(doc) = &mut app.doc {
+        if font_wizard::draw_font_wizard(ctx, &mut app.font_wizard, &mut doc.file, &app.assets) {
+            doc.dirty = true;
         }
     }
 
     if let Some(request) = app.confirmation_modal.clone() {
-        draw_confirmation_modal(ctx, app, &request);
+        ui::modals::draw_confirmation_modal(ctx, app, &request);
     }
 }
 
-fn draw_onboarding_screen(ctx: &egui::Context, app: &mut CacocoApp) {
-    egui::CentralPanel::default().show(ctx, |ui| {
-        if let Some(tex) = app.assets.textures.get("HICACOCO") {
-            let size = tex.size_vec2() * 2.0;
-            let rect = egui::Rect::from_center_size(
-                ui.max_rect().center() - egui::vec2(0.0, 150.0),
-                size,
-            );
-            ui.painter().image(
-                tex.id(),
-                rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                egui::Color32::WHITE,
-            );
+/// Helper to update the OS window title based on current document state.
+fn update_window_title(ctx: &egui::Context, app: &CacocoApp) {
+    let (is_dirty, path_opt) = app
+        .doc
+        .as_ref()
+        .map_or((false, None), |d| (d.dirty, d.path.clone()));
+
+    let indicator = if is_dirty { "*" } else { "" };
+    let display = if app.doc.is_some() {
+        if let Some(p) = path_opt {
+            let name = Path::new(&p)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(&p);
+            format!("[{}{}] ", indicator, name)
+        } else {
+            format!("[{}New Project] ", indicator)
         }
+    } else {
+        "".to_string()
+    };
 
-        egui::Window::new("Initial Setup")
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 50.0))
-            .show(ctx, |ui| {
-                ui.set_width(400.0);
+    let flavor = ctx.data(|d| d.get_temp::<String>(egui::Id::new("random_title")));
+    if let Some(text) = flavor {
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
+            "{display}Cacoco - {text}"
+        )));
+    }
+}
 
-                ui.vertical_centered(|ui| {
-                    ui.add_space(8.0);
-                    ui.heading("Welcome to Cacoco!");
-                    ui.add_space(12.0);
+/// Renders the simulation drawer (Held Items / Context) in the left panel.
+fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
+    let tab_id = ui.make_persistent_id("sidebar_tab_idx");
+    let last_tab_id = ui.make_persistent_id("sidebar_last_tab_idx");
+    let heights_id = ui.make_persistent_id("sidebar_tab_heights");
 
-                    let desc = app
-                        .config
-                        .base_wad_path
-                        .as_deref()
-                        .unwrap_or("Click to browse for DOOM2.WAD...");
+    let mut tab_idx: Option<usize> = ui.data(|d| d.get_temp(tab_id).unwrap_or(Some(0)));
+    let mut last_tab: usize = ui.data(|d| d.get_temp(last_tab_id).unwrap_or(0));
+    let mut heights: [f32; 2] = ui.data(|d| d.get_temp(heights_id).unwrap_or([428.0, 428.0]));
 
-                    if ui::menu::draw_menu_card(ui, "Select Base DOOM II IWAD", desc) {
-                        if let Some(path) = crate::io::load_iwad_dialog(ctx, &mut app.assets) {
-                            app.config.base_wad_path = Some(path);
-                            app.config.save();
-                            app.iwad_verified = true;
+    if let Some(current) = tab_idx {
+        last_tab = current;
+    }
+
+    let header_h = 38.0;
+    let target_h = if let Some(idx) = tab_idx {
+        header_h + heights[idx]
+    } else {
+        header_h
+    };
+
+    let anim_h = ui.ctx().animate_value_with_time(
+        ui.make_persistent_id("sidebar_drawer_anim"),
+        target_h,
+        0.1,
+    );
+
+    egui::TopBottomPanel::bottom("left_sidebar_footer")
+        .frame(egui::Frame::NONE)
+        .resizable(false)
+        .exact_height(anim_h)
+        .show_inside(ui, |ui| {
+            ui.add_space(7.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                let btn_w = (ui.available_width() - 4.0) / 2.0;
+
+                let items_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+                    ui::shared::section_header_button(ui, "Held Items", None, tab_idx == Some(0))
+                });
+                if items_res.clicked() {
+                    tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
+                }
+
+                let ctx_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+                    ui::shared::section_header_button(ui, "Game Context", None, tab_idx == Some(1))
+                });
+                if ctx_res.clicked() {
+                    tab_idx = if tab_idx == Some(1) { None } else { Some(1) };
+                }
+            });
+
+            ui.separator();
+            if anim_h > header_h + 1.0 {
+                let rect = ui.available_rect_before_wrap();
+                ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                    let inner_response = ui.vertical(|ui| {
+                        ui.add_space(3.0);
+                        if last_tab == 0 {
+                            ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
+                        } else {
+                            ui::draw_context_panel(ui, &mut app.preview_state, &app.assets);
+                        }
+                        ui.add_space(10.0);
+                    });
+
+                    if tab_idx.is_some() || anim_h > header_h + 10.0 {
+                        let h = inner_response.response.rect.height();
+                        if h > 10.0 {
+                            heights[last_tab] = h;
                         }
                     }
-
-                    ui.add_space(16.0);
-                    ui.label(
-                        egui::RichText::new(
-                            "To render graphics and fonts correctly, you must select a base Doom II IWAD.",
-                        )
-                            .weak()
-                            .size(11.0),
-                    );
-                    ui.label(
-                        egui::RichText::new("(...It's usually named DOOM2.WAD!)")
-                            .weak()
-                            .size(11.0),
-                    );
-                    ui.add_space(8.0);
                 });
-            });
+            }
+        });
+
+    ui.data_mut(|d| {
+        d.insert_temp(tab_id, tab_idx);
+        d.insert_temp(last_tab_id, last_tab);
+        d.insert_temp(heights_id, heights);
     });
 }
 
+/// Helper to prompt for a source port and launch the current project.
 fn handle_pick_port_and_run(app: &mut CacocoApp) {
     if let Some(path) = rfd::FileDialog::new()
         .add_filter("Executable", &["exe"])
-        .set_title("Select Source Port to Launch")
+        .set_title("Select Source Port")
         .pick_file()
     {
         let path_str = path.to_string_lossy().into_owned();
-
         if !app.config.source_ports.contains(&path_str) {
             app.config.source_ports.push(path_str.clone());
             app.config.save();
         }
-
-        if let (Some(f), Some(iwad)) = (&app.current_file, &app.config.base_wad_path) {
-            crate::io::launch_game(f, &app.assets, &path_str, iwad);
+        if let Some(doc) = &app.doc {
+            if let Some(iwad) = &app.config.base_wad_path {
+                crate::io::launch_game(&doc.file, &app.assets, &path_str, iwad);
+            }
         }
     }
 }
 
-fn draw_confirmation_modal(
-    ctx: &egui::Context,
-    app: &mut CacocoApp,
-    request: &ConfirmationRequest,
-) {
-    let mut close_modal = false;
-    let mut confirmed = false;
-
-    let window_title = if matches!(request, ConfirmationRequest::DiscardChanges(_)) {
-        "Unsaved Changes"
-    } else {
-        "Confirm Deletion"
-    };
-
-    egui::Window::new(window_title)
-        .collapsible(false)
-        .resizable(false)
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-        .show(ctx, |ui| {
-            ui.set_width(280.0);
-
-            ui.vertical_centered(|ui| match request {
-                ConfirmationRequest::DeleteStatusBar(_) => {
-                    ui.label("Are you sure you want to delete this status bar?");
-                    ui.label(
-                        egui::RichText::new("All layers and components inside this layout will be permanently removed.")
-                            .weak().size(11.0),
-                    );
-                }
-                ConfirmationRequest::DeleteLayers(paths) => {
-                    let count = paths.len();
-                    let msg = if count == 1 {
-                        "Are you sure you want to delete this layer?".to_string()
-                    } else {
-                        format!("Are you sure you want to delete {} layers?", count)
-                    };
-                    ui.label(msg);
-                    ui.label(
-                        egui::RichText::new("This will also delete all children nested inside the selection.")
-                            .weak().size(11.0),
-                    );
-                }
-                ConfirmationRequest::DeleteAssets(items) => {
-                    let count = items.len();
-                    let main_msg = if count == 1 {
-                        "Are you sure you want to delete this asset?".to_string()
-                    } else {
-                        format!("Are you sure you want to delete {} assets?", count)
-                    };
-
-                    ui.label(main_msg);
-                    ui.label(
-                        egui::RichText::new(
-                            "This action is permanent. Any layers using these assets will show a missing graphic placeholder.",
-                        )
-                            .weak()
-                            .size(11.0),
-                    );
-                }
-                ConfirmationRequest::DiscardChanges(_) => {
-                    ui.label("You have unsaved changes. Do you want to discard them and continue?");
-                }
-            });
-
-            ui.add_space(12.0);
-
-            ui.horizontal(|ui| {
-                if ui.button("  Cancel  ").clicked() {
-                    close_modal = true;
-                }
-
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let btn_text = if matches!(request, ConfirmationRequest::DiscardChanges(_)) {
-                        "Discard & Continue"
-                    } else {
-                        "Confirm Deletion"
-                    };
-
-                    let btn = egui::Button::new(btn_text)
-                        .fill(egui::Color32::from_rgb(110, 40, 40));
-
-                    if ui.add(btn).clicked() {
-                        confirmed = true;
-                        close_modal = true;
-                    }
-                });
-            });
-        });
-
-    if confirmed {
-        match request {
-            ConfirmationRequest::DeleteStatusBar(idx) => {
-                app.execute_actions(vec![document::LayerAction::DeleteStatusBar(*idx)]);
-                app.preview_state.push_message("Layout deleted.");
-            }
-            ConfirmationRequest::DeleteLayers(paths) => {
-                app.execute_actions(vec![document::LayerAction::DeleteSelection(paths.clone())]);
-                app.preview_state.push_message("Layers deleted.");
-            }
-            ConfirmationRequest::DeleteAssets(items) => {
-                for key in items {
-                    app.assets.textures.remove(key);
-                    app.assets.raw_files.remove(key);
-                    app.assets.offsets.remove(key);
-                }
-                app.dirty = true;
-                app.preview_state
-                    .push_message("Deleted assets from project.");
-            }
-            ConfirmationRequest::DiscardChanges(pending) => {
-                app.dirty = false;
-                match pending {
-                    PendingAction::New => app.new_project(ctx),
-                    PendingAction::Load(path) => {
-                        if path.is_empty() {
-                            app.open_project_ui(ctx);
-                        } else if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                            app.load_project(ctx, loaded, &path);
-                        }
-                    }
-                    PendingAction::Template(t) => app.apply_template(ctx, t),
-                    PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
-                }
-            }
-        }
-    }
-
-    if close_modal {
-        app.confirmation_modal = None;
-    }
-}
-
+/// Dispatches keyboard shortcuts to application actions.
 fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui::Context) {
     use crate::document::LayerAction;
     use crate::hotkeys::Action;
 
     match action {
         Action::Undo => {
-            if let Some(f) = &mut app.current_file {
-                app.history.undo(f, &mut app.selection);
-                app.dirty = true;
-                app.preview_state.push_message("Undo performed.");
+            if let Some(doc) = &mut app.doc {
+                doc.undo();
             }
         }
         Action::Redo => {
-            if let Some(f) = &mut app.current_file {
-                app.history.redo(f, &mut app.selection);
-                app.dirty = true;
-                app.preview_state.push_message("Redo performed.");
+            if let Some(doc) = &mut app.doc {
+                doc.redo();
             }
         }
         Action::Open => {
-            if app.dirty {
+            let is_dirty = app.doc.as_ref().map_or(false, |d| d.dirty);
+            if is_dirty {
                 app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(
                     PendingAction::Load("".to_string()),
                 ));
@@ -491,168 +317,125 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
             }
         }
         Action::Save => {
-            if let Some(f) = &app.current_file {
-                let needs_dialog = match &app.opened_file_path {
+            if let Some(doc) = &mut app.doc {
+                let needs_dialog = match &doc.path {
                     Some(p) => !Path::new(p).is_absolute(),
                     None => true,
                 };
-
                 if needs_dialog {
-                    if let Some(path) =
-                        crate::io::save_pk3_dialog(f, &app.assets, app.opened_file_path.clone())
+                    if let Some(p) =
+                        crate::io::save_pk3_dialog(&doc.file, &app.assets, doc.path.clone())
                     {
-                        app.opened_file_path = Some(path.clone());
-                        app.add_to_recent(&path);
-                        app.dirty = false;
-                        app.preview_state.push_message(format!("Saved: {}", path));
+                        doc.path = Some(p.clone());
+                        doc.dirty = false;
+                        app.add_to_recent(&p);
                     }
                 } else {
-                    let path = app.opened_file_path.as_ref().unwrap();
-                    if let Err(e) = crate::io::save_pk3_silent(f, &app.assets, path) {
-                        app.preview_state
-                            .push_message(format!("Save Failed: {}", e));
-                    } else {
-                        app.dirty = false;
-                        app.preview_state.push_message(format!("Saved: {}", path));
+                    let p = doc.path.as_ref().unwrap();
+                    if crate::io::save_pk3_silent(&doc.file, &app.assets, p).is_ok() {
+                        doc.dirty = false;
                     }
                 }
             }
         }
         Action::ExportJSON => {
-            if let Some(f) = &app.current_file {
-                let name = app.opened_file_path.clone();
-                if let Some(path) = crate::io::save_json_dialog(f, name) {
-                    app.add_to_recent(&path);
-                    app.preview_state
-                        .push_message(format!("Exported: {}", path));
+            if let Some(doc) = &app.doc {
+                if let Some(p) = crate::io::save_json_dialog(&doc.file, doc.path.clone()) {
+                    app.add_to_recent(&p);
                 }
             }
         }
         Action::Copy => {
-            if let Some(f) = &mut app.current_file {
-                app.history.clipboard.clear();
-                app.history.bar_clipboard.clear();
-
-                let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
-                let mut filtered_paths: Vec<Vec<usize>> = paths
+            if let Some(doc) = &mut app.doc {
+                doc.history.clipboard.clear();
+                doc.history.bar_clipboard.clear();
+                let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
+                let mut roots: Vec<Vec<usize>> = paths
                     .iter()
-                    .filter(|p| {
-                        !paths
-                            .iter()
-                            .any(|other| p.len() > other.len() && p.starts_with(other))
-                    })
+                    .filter(|p| !paths.iter().any(|o| p.len() > o.len() && p.starts_with(o)))
                     .cloned()
                     .collect();
-                filtered_paths.sort();
+                roots.sort();
 
-                for path in filtered_paths {
+                for path in roots {
                     if path.len() == 1 {
-                        if let Some(bar) = f.data.status_bars.get(path[0]) {
-                            app.history.bar_clipboard.push(bar.clone());
+                        if let Some(bar) = doc.file.data.status_bars.get(path[0]) {
+                            doc.history.bar_clipboard.push(bar.clone());
                         }
-                    } else if let Some(el) = f.get_element_mut(&path) {
-                        app.history.clipboard.push(el.clone());
+                    } else if let Some(el) = doc.file.get_element_mut(&path) {
+                        doc.history.clipboard.push(el.clone());
                     }
                 }
-
-                let msg = if !app.history.bar_clipboard.is_empty() {
-                    format!(
-                        "Clipboard: Copied {} layouts.",
-                        app.history.bar_clipboard.len()
-                    )
-                } else {
-                    format!(
-                        "Clipboard: Copied {} elements.",
-                        app.history.clipboard.len()
-                    )
-                };
-                app.preview_state.push_message(msg);
             }
         }
         Action::Paste => {
-            if let Some(f) = &mut app.current_file {
-                if !app.history.bar_clipboard.is_empty() {
-                    app.history.take_snapshot(f, &app.selection);
-                    let pasted = app.history.prepare_bar_clipboard_for_paste();
-                    app.preview_state
-                        .push_message(format!("Clipboard: Pasted {} layouts.", pasted.len()));
-                    app.execute_actions(vec![LayerAction::PasteStatusBars(pasted)]);
-                } else if !app.history.clipboard.is_empty() {
-                    app.history.take_snapshot(f, &app.selection);
-                    let pasted_elements = app.history.prepare_clipboard_for_paste();
-                    let (parent_path, insert_idx) = document::determine_insertion_point(
-                        &app.selection,
+            if let Some(doc) = &mut app.doc {
+                if !doc.history.bar_clipboard.is_empty() {
+                    let pasted = doc.history.prepare_bar_clipboard_for_paste();
+                    doc.execute_actions(vec![LayerAction::PasteStatusBars(pasted)]);
+                } else if !doc.history.clipboard.is_empty() {
+                    let pasted = doc.history.prepare_clipboard_for_paste();
+                    let (p, i) = document::determine_insertion_point(
+                        &doc.selection,
                         app.current_statusbar_idx,
                     );
-                    app.preview_state.push_message(format!(
-                        "Clipboard: Pasted {} elements.",
-                        pasted_elements.len()
-                    ));
-                    app.execute_actions(vec![LayerAction::Paste {
-                        parent_path,
-                        insert_idx,
-                        elements: pasted_elements,
+                    doc.execute_actions(vec![LayerAction::Paste {
+                        parent_path: p,
+                        insert_idx: i,
+                        elements: pasted,
                     }]);
                 }
             }
         }
         Action::Duplicate => {
-            if !app.selection.is_empty() {
-                if let Some(f) = &mut app.current_file {
-                    app.history.take_snapshot(f, &app.selection);
-                    let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
-
-                    let mut bar_actions = Vec::new();
-                    let mut layer_paths = Vec::new();
-
+            if let Some(doc) = &mut app.doc {
+                if !doc.selection.is_empty() {
+                    doc.history.take_snapshot(&doc.file, &doc.selection);
+                    let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
+                    let mut bars = Vec::new();
+                    let mut layers = Vec::new();
                     for path in paths {
                         if path.len() == 1 {
-                            bar_actions.push(LayerAction::DuplicateStatusBar(path[0]));
+                            bars.push(LayerAction::DuplicateStatusBar(path[0]));
                         } else {
-                            layer_paths.push(path);
+                            layers.push(path);
                         }
                     }
-
-                    if !bar_actions.is_empty() {
-                        app.execute_actions(bar_actions);
+                    if !bars.is_empty() {
+                        doc.execute_actions(bars);
                     }
-                    if !layer_paths.is_empty() {
-                        app.execute_actions(vec![LayerAction::DuplicateSelection(layer_paths)]);
+                    if !layers.is_empty() {
+                        doc.execute_actions(vec![LayerAction::DuplicateSelection(layers)]);
                     }
-                    app.preview_state.push_message("Duplicate performed.");
                 }
             }
         }
         Action::Delete => {
-            if !app.selection.is_empty() {
-                if let Some(f) = &mut app.current_file {
-                    let paths: Vec<Vec<usize>> = app.selection.iter().cloned().collect();
-
-                    let mut bar_to_delete = None;
-                    let mut needs_layer_confirm = false;
-
+            if let Some(doc) = &mut app.doc {
+                if !doc.selection.is_empty() {
+                    let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
+                    let mut bar_del = None;
+                    let mut needs_conf = false;
                     for path in &paths {
                         if path.len() == 1 {
-                            bar_to_delete = Some(path[0]);
-                        } else if let Some(el) = f.get_element(path) {
+                            bar_del = Some(path[0]);
+                        } else if let Some(el) = doc.file.get_element(path) {
                             if !el.children().is_empty() {
-                                needs_layer_confirm = true;
+                                needs_conf = true;
                             }
                         }
                     }
-
-                    if let Some(idx) = bar_to_delete {
-                        let bar = &f.data.status_bars[idx];
-                        if !bar.children.is_empty() {
+                    if let Some(idx) = bar_del {
+                        if !doc.file.data.status_bars[idx].children.is_empty() {
                             app.confirmation_modal =
                                 Some(ConfirmationRequest::DeleteStatusBar(idx));
-                        } else if f.data.status_bars.len() > 1 {
-                            app.execute_actions(vec![LayerAction::DeleteStatusBar(idx)]);
+                        } else if doc.file.data.status_bars.len() > 1 {
+                            doc.execute_actions(vec![LayerAction::DeleteStatusBar(idx)]);
                         }
-                    } else if needs_layer_confirm {
+                    } else if needs_conf {
                         app.confirmation_modal = Some(ConfirmationRequest::DeleteLayers(paths));
                     } else {
-                        app.execute_actions(vec![LayerAction::DeleteSelection(paths)]);
+                        doc.execute_actions(vec![LayerAction::DeleteSelection(paths)]);
                     }
                 }
             }
@@ -660,6 +443,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
     }
 }
 
+/// Dispatches menu actions to application logic.
 fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::Context) {
     match action {
         ui::MenuAction::LoadProject(loaded, path) => app.load_project(ctx, loaded, &path),
@@ -667,21 +451,19 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
         ui::MenuAction::NewEmpty => app.new_project(ctx),
         ui::MenuAction::Open => app.open_project_ui(ctx),
         ui::MenuAction::RequestDiscard(pending) => {
-            app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending))
+            app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
         }
         ui::MenuAction::SaveDone(path) => {
             if path == "SILENT" {
                 handle_action(app, crate::hotkeys::Action::Save, ctx);
-            } else {
-                app.opened_file_path = Some(path.clone());
+            } else if let Some(doc) = &mut app.doc {
+                doc.path = Some(path.clone());
+                doc.dirty = false;
                 app.add_to_recent(&path);
-                app.dirty = false;
-                app.preview_state.push_message(format!("Saved: {path}"));
             }
         }
         ui::MenuAction::ExportDone(path) => {
             app.add_to_recent(&path);
-            app.preview_state.push_message(format!("Exported: {path}"));
         }
         ui::MenuAction::PickPortAndRun => {
             handle_pick_port_and_run(app);

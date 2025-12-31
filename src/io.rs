@@ -11,11 +11,13 @@ use std::process::Command;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
+/// Container for a successfully loaded SBARDEF project and its assets.
 pub struct LoadedProject {
     pub file: SBarDefFile,
     pub assets: AssetStore,
 }
 
+/// Opens the system file dialog to pick a SBARDEF project file.
 pub fn open_project_dialog() -> Option<String> {
     if let Some(path) = FileDialog::new()
         .add_filter("SBARDEF Projects", &["pk3", "zip", "json", "txt"])
@@ -27,6 +29,7 @@ pub fn open_project_dialog() -> Option<String> {
     None
 }
 
+/// Entry point for loading project data from any supported file format.
 pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<LoadedProject> {
     let path = PathBuf::from(path_str);
     if !path.exists() {
@@ -119,6 +122,10 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
     })
 }
 
+/// Internal helper to compress project data into a PK3 structure.
+///
+/// This function ensures all project assets are placed in the 'graphics/'
+/// subfolder and assigned a valid extension, satisfying SBARDEF requirements.
 fn build_pk3<W: Write + Seek>(
     writer: W,
     file: &SBarDefFile,
@@ -134,8 +141,24 @@ fn build_pk3<W: Write + Seek>(
         zip.write_all(json.as_bytes())?;
     }
 
-    for (name, bytes) in &assets.raw_files {
-        zip.start_file(name, options)?;
+    for (id, bytes) in &assets.raw_files {
+        let original_name = assets
+            .names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| format!("{}.png", id));
+
+        let mut final_path = original_name;
+
+        if Path::new(&final_path).extension().is_none() {
+            final_path.push_str(".png");
+        }
+
+        if !final_path.to_lowercase().starts_with("graphics/") {
+            final_path = format!("graphics/{}", final_path);
+        }
+
+        zip.start_file(final_path, options)?;
         zip.write_all(bytes)?;
     }
 
@@ -245,7 +268,6 @@ pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut Asse
             eprintln!("Failed to auto-load WAD at {:?}: {}", path, e);
             false
         } else {
-            println!("Auto-loaded Base WAD: {:?}", path);
             true
         }
     } else {
@@ -342,5 +364,50 @@ fn visit_dirs_for_images(dir: &Path, paths: &mut Vec<PathBuf>) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::assets::AssetId;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_pk3_structure_preservation() {
+        let file = SBarDefFile {
+            type_: "statusbar".to_string(),
+            version: "1.0.0".to_string(),
+            data: Default::default(),
+        };
+
+        let mut assets = AssetStore::default();
+        let dummy_bytes = vec![0u8; 10];
+
+        let id_wad = AssetId::new("STBAR");
+        assets.raw_files.insert(id_wad, dummy_bytes.clone());
+        assets.names.insert(id_wad, "STBAR".to_string());
+
+        let id_path = AssetId::new("graphics/patch.png");
+        assets.raw_files.insert(id_path, dummy_bytes.clone());
+        assets
+            .names
+            .insert(id_path, "graphics/patch.png".to_string());
+
+        let mut buffer = Cursor::new(Vec::new());
+        build_pk3(&mut buffer, &file, &assets).expect("Failed to build PK3");
+
+        let mut zip = zip::ZipArchive::new(buffer).expect("Failed to open built ZIP");
+
+        assert!(zip.by_name("SBARDEF").is_ok(), "SBARDEF missing from root");
+
+        assert!(
+            zip.by_name("graphics/STBAR.png").is_ok(),
+            "Loose lump failed to move to graphics/ or gain extension"
+        );
+        assert!(
+            zip.by_name("graphics/patch.png").is_ok(),
+            "Explicit path failed to preserve correctly"
+        );
     }
 }
