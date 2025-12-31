@@ -20,6 +20,9 @@ serde_repr = "0.1.20"
 zip = "7.0.0"
 directories = "6.0.0"
 
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55.0"
+
 [profile.release]
 opt-level = 3
 lto = true
