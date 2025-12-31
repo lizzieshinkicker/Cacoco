@@ -293,7 +293,22 @@ pub fn launch_game(file: &SBarDefFile, assets: &AssetStore, source_port: &str, i
         }
     };
 
-    let _ = Command::new(source_port)
+    let program;
+    let mut args = Vec::new();
+
+    if Path::new(source_port).is_file() {
+        program = source_port.to_string();
+    } else {
+        let mut words = shlex::split(source_port).unwrap_or_default();
+        if words.is_empty() {
+            return;
+        }
+        program = words.remove(0);
+        args = words;
+    }
+
+    let _ = Command::new(&program)
+        .args(args)
         .arg("-iwad")
         .arg(iwad)
         .arg("-file")

@@ -267,11 +267,13 @@ pub fn draw_settings_window(
                 ui.heading("Source Ports");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("+ Add Port").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("Executable", &["exe"])
-                            .set_title("Select Source Port")
-                            .pick_file()
-                        {
+                        let mut dialog = rfd::FileDialog::new().set_title("Select Source Port");
+
+                        if cfg!(windows) {
+                            dialog = dialog.add_filter("Executable", &["exe"]);
+                        }
+
+                        if let Some(path) = dialog.pick_file() {
                             let path_str = path.to_string_lossy().into_owned();
                             if !config.source_ports.contains(&path_str) {
                                 config.source_ports.push(path_str);
@@ -290,8 +292,8 @@ pub fn draw_settings_window(
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
 
-                    for (idx, path_str) in config.source_ports.iter().enumerate() {
-                        let name = get_port_name(path_str);
+                    for (idx, command_str) in config.source_ports.iter_mut().enumerate() {
+                        let name = get_port_name(command_str);
 
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 4.0;
@@ -300,7 +302,21 @@ pub fn draw_settings_window(
                             let card_w = total_w - delete_w - 4.0;
 
                             ui.allocate_ui(egui::vec2(card_w, 54.0), |ui| {
-                                draw_menu_card(ui, &name, path_str);
+                                let frame = egui::Frame::NONE
+                                    .inner_margin(8.0)
+                                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                                    .corner_radius(4.0);
+
+                                frame.show(ui, |ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(egui::RichText::new(&name).strong());
+                                        ui.add(
+                                            egui::TextEdit::singleline(command_str)
+                                                .hint_text("e.g. flatpak run ...")
+                                                .desired_width(f32::INFINITY),
+                                        );
+                                    });
+                                });
                             });
 
                             if draw_delete_card(ui, delete_w) {
@@ -415,19 +431,29 @@ pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
 }
 
 /// Helper to extract a friendly name from a source port binary path.
-pub fn get_port_name(path_str: &str) -> String {
-    let stem = Path::new(path_str)
+pub fn get_port_name(command_str: &str) -> String {
+    let program_part = if Path::new(command_str).is_file() {
+        command_str.to_string()
+    } else {
+        shlex::split(command_str)
+            .unwrap_or_default()
+            .get(0)
+            .cloned()
+            .unwrap_or_else(|| command_str.to_string())
+    };
+
+    let final_stem = Path::new(&program_part)
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("Unknown Port");
+        .unwrap_or(&program_part);
 
-    if stem.is_empty() {
+    if final_stem.is_empty() {
         return "Unknown Port".to_string();
     }
 
-    let mut chars = stem.chars();
+    let mut chars = final_stem.chars();
     match chars.next() {
-        None => String::new(),
+        None => "Unknown Port".to_string(),
         Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
     }
 }
