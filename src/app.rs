@@ -90,6 +90,15 @@ impl CacocoApp {
         let mut app = Self::default();
         app.load_system_assets(&cc.egui_ctx);
 
+        if app.config.base_wad_path.is_none() {
+            if let Some(auto_path) = crate::discovery::find_iwad() {
+                let path_str = auto_path.to_string_lossy().to_string();
+                app.config.base_wad_path = Some(path_str.clone());
+                app.config.save();
+                println!("Auto-discovered IWAD at: {}", path_str);
+            }
+        }
+
         if let Some(path) = &app.config.base_wad_path {
             app.iwad_verified = io::load_wad_from_path(&cc.egui_ctx, path, &mut app.assets);
         }

@@ -6,6 +6,7 @@ mod cheats;
 mod conditions;
 mod config;
 mod constants;
+mod discovery;
 mod document;
 mod history;
 mod hotkeys;
