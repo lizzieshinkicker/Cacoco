@@ -137,15 +137,11 @@ pub fn draw_properties_panel(
                         "Text String".to_string()
                     } else {
                         match &el.data {
-                            crate::model::Element::Number(n) => {
-                                text::number_type_name(n.type_).to_string()
-                            }
-                            crate::model::Element::Percent(p) => {
-                                text::number_type_name(p.type_).to_string()
-                            }
-                            crate::model::Element::Component(c) => format!("{:?}", c.type_),
-                            crate::model::Element::List(_) => "List Container".to_string(),
-                            crate::model::Element::String(_) => "Dynamic String".to_string(),
+                            Element::Number(n) => text::number_type_name(n.type_).to_string(),
+                            Element::Percent(p) => text::number_type_name(p.type_).to_string(),
+                            Element::Component(c) => format!("{:?}", c.type_),
+                            Element::List(_) => "List Container".to_string(),
+                            Element::String(_) => "Dynamic String".to_string(),
                             _ => el.display_name(),
                         }
                     };
