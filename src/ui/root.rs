@@ -272,11 +272,13 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
 
 /// Helper to prompt for a source port and launch the current project.
 fn handle_pick_port_and_run(app: &mut CacocoApp) {
-    if let Some(path) = rfd::FileDialog::new()
-        .add_filter("Executable", &["exe"])
-        .set_title("Select Source Port")
-        .pick_file()
-    {
+    let mut dialog = rfd::FileDialog::new().set_title("Select Source Port");
+
+    if cfg!(windows) {
+        dialog = dialog.add_filter("Executable", &["exe"]);
+    }
+
+    if let Some(path) = dialog.pick_file() {
         let path_str = path.to_string_lossy().into_owned();
         if !app.config.source_ports.contains(&path_str) {
             app.config.source_ports.push(path_str.clone());
