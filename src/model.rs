@@ -570,6 +570,19 @@ pub struct CarouselDef {
 }
 
 impl ElementWrapper {
+    /// Returns true if the SBARDEF spec allows this element to have children.
+    pub fn is_spec_container(&self) -> bool {
+        self._cacoco_text.is_none()
+    }
+
+    /// Returns true if this is a logical organizational folder (Canvas, List, etc.).
+    pub fn is_natural_container(&self) -> bool {
+        matches!(
+            self.data,
+            Element::Canvas(_) | Element::List(_) | Element::Carousel(_)
+        )
+    }
+
     /// Returns a human-friendly name for use in the layer tree.
     pub fn display_name(&self) -> String {
         if let Some(t) = &self._cacoco_text {

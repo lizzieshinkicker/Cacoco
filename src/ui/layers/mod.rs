@@ -409,7 +409,7 @@ pub fn draw_layers_panel(
 
                     if let Some(element) = new_element {
                         let (parent_path, insert_idx) =
-                            document::determine_insertion_point(selection, *current_bar_idx);
+                            document::determine_insertion_point(f, selection, *current_bar_idx);
                         actions.push(LayerAction::UndoSnapshot);
                         actions.push(LayerAction::Add {
                             parent_path,

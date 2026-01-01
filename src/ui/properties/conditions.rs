@@ -4,6 +4,7 @@ use super::lookups;
 use crate::assets::{AssetId, AssetStore};
 use crate::model::{ConditionDef, ConditionType, Element, ElementWrapper, NumberType};
 use crate::ui::context_menu::ContextMenu;
+use crate::ui::shared;
 use eframe::egui;
 
 /// Renders the conditions editor for a HUD element, allowing logical visibility rules.
@@ -161,10 +162,16 @@ fn draw_condition_card(
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             let id =
                                 ui.make_persistent_id(format!("group_dd_{}_{}", g_idx, my_idx));
-                            egui::ComboBox::from_id_salt(id)
-                                .selected_text(group.name)
-                                .width(ui.available_width())
-                                .show_ui(ui, |ui| {
+
+                            let button_res =
+                                shared::combobox_button(ui, group.name, ui.available_width());
+
+                            if button_res.clicked() {
+                                ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                            }
+
+                            if let Some(menu) = ContextMenu::get(ui, id) {
+                                ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
                                     ui.set_min_width(120.0);
                                     for (idx, g) in lookups::GROUPS.iter().enumerate() {
                                         if common::custom_menu_item(ui, g.name, g_idx == idx) {
@@ -175,10 +182,12 @@ fn draw_condition_card(
                                                 cond.param2 = 0;
                                                 cond.param_string = None;
                                                 changed = true;
+                                                ContextMenu::close(ui);
                                             }
                                         }
                                     }
                                 });
+                            }
                         });
                     });
                 });

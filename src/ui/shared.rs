@@ -190,6 +190,51 @@ fn section_header_button_impl(
     response
 }
 
+/// Draws a button styled exactly like a standard egui::ComboBox button.
+pub fn combobox_button(ui: &mut egui::Ui, text: &str, width: f32) -> egui::Response {
+    let height = ui.spacing().interact_size.y;
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+
+        ui.painter().rect(
+            rect,
+            visuals.corner_radius,
+            visuals.bg_fill,
+            visuals.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+
+        let text_rect = rect.shrink(ui.spacing().button_padding.x);
+        let font_id = egui::TextStyle::Button.resolve(ui.style());
+        ui.painter().text(
+            text_rect.left_center(),
+            egui::Align2::LEFT_CENTER,
+            text,
+            font_id,
+            visuals.text_color(),
+        );
+
+        let arrow_size = 4.0;
+        let arrow_pos = rect.right_center() - egui::vec2(ui.spacing().item_spacing.x + 4.0, 0.0);
+
+        let points = vec![
+            arrow_pos + egui::vec2(-arrow_size, -arrow_size * 0.6),
+            arrow_pos + egui::vec2(arrow_size, -arrow_size * 0.6),
+            arrow_pos + egui::vec2(0.0, arrow_size * 0.6),
+        ];
+
+        ui.painter().add(egui::Shape::convex_polygon(
+            points,
+            visuals.fg_stroke.color,
+            egui::Stroke::NONE,
+        ));
+    }
+
+    response
+}
+
 pub fn truncate_path(path: &str, max_chars: usize) -> String {
     if path.len() <= max_chars {
         return path.to_string();

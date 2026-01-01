@@ -97,11 +97,14 @@ pub fn draw_layer_tree_recursive(
         let is_text_helper = element._cacoco_text.is_some();
         let has_real_children = !element.children().is_empty();
 
-        if response.double_clicked() && has_real_children && !is_text_helper {
+        let show_expansion =
+            !is_text_helper && (element.is_natural_container() || has_real_children);
+
+        if response.double_clicked() && show_expansion {
             folder_state.toggle(ui);
         }
 
-        if has_real_children && !is_text_helper {
+        if show_expansion {
             folder_state.show_body_indented(&response, ui, |ui| {
                 draw_layer_tree_recursive(
                     ui,
@@ -143,7 +146,6 @@ fn draw_layer_row(
     let is_selected = selection.contains(my_path);
     let common = element.get_common();
     let is_visible = conditions::resolve(&common.conditions, state, assets);
-    let is_container = matches!(element.data, Element::Canvas(_) | Element::Carousel(_));
 
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width() - 8.0, ROW_HEIGHT),
@@ -168,7 +170,6 @@ fn draw_layer_row(
         my_path,
         parent_path,
         my_idx,
-        is_container,
         is_last,
         selection,
         element,
@@ -263,18 +264,21 @@ fn handle_drop_logic(
     my_path: &[usize],
     parent_path: &[usize],
     my_idx: usize,
-    is_container: bool,
     is_last: bool,
     selection: &HashSet<Vec<usize>>,
     element: &ElementWrapper,
     actions: &mut Vec<LayerAction>,
 ) {
+    let nesting_mode = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
+
     if let Some(dragged) = egui::DragAndDrop::payload::<Vec<usize>>(ui.ctx()) {
         let is_self = &*dragged == my_path;
         let is_parent = my_path.starts_with(&*dragged) && my_path.len() > dragged.len();
 
         if !is_self && !is_parent && ui.rect_contains_pointer(rect) {
-            if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container, is_last) {
+            if let Some(target) =
+                calculate_drop_target(ui, rect, my_idx, element, is_last, nesting_mode)
+            {
                 match target {
                     DropTarget::Sibling(insert_idx, line_y) => {
                         let is_noop = if parent_path == &dragged[0..dragged.len() - 1] {
@@ -321,7 +325,9 @@ fn handle_drop_logic(
 
     if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
         if ui.rect_contains_pointer(rect) {
-            if let Some(target) = calculate_drop_target(ui, rect, my_idx, is_container, is_last) {
+            if let Some(target) =
+                calculate_drop_target(ui, rect, my_idx, element, is_last, nesting_mode)
+            {
                 match target {
                     DropTarget::Sibling(mut insert_idx, line_y) => {
                         shared::draw_yellow_line(ui, rect, line_y);
@@ -611,13 +617,22 @@ fn calculate_drop_target(
     ui: &egui::Ui,
     rect: egui::Rect,
     my_idx: usize,
-    is_container: bool,
+    element: &ElementWrapper,
     is_last: bool,
+    nesting_mode: bool,
 ) -> Option<DropTarget> {
     let pos = ui.ctx().input(|i| i.pointer.latest_pos())?;
     let off = ui.spacing().item_spacing.y * 0.5;
 
-    if !is_container {
+    if nesting_mode {
+        return if element.is_spec_container() {
+            Some(DropTarget::Child)
+        } else {
+            None
+        };
+    }
+
+    if !element.is_natural_container() {
         if pos.y < rect.center().y {
             Some(DropTarget::Sibling(my_idx, rect.top() - off))
         } else if is_last {
@@ -663,6 +678,10 @@ fn draw_terminal_drop_zone(
     selection: &HashSet<Vec<usize>>,
     actions: &mut Vec<LayerAction>,
 ) {
+    if ui.input(|i| i.modifiers.command || i.modifiers.ctrl) {
+        return;
+    }
+
     let height = 2.0;
     let (rect, _) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), height),

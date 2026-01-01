@@ -273,7 +273,7 @@ pub fn draw_lookup_param_dd(
     if let Some(menu) = ContextMenu::get(ui, id) {
         ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
             for item in items {
-                if ContextMenu::button(ui, item.name, true) {
+                if custom_menu_item(ui, item.name, *param == item.id) {
                     *param = item.id;
                     changed = true;
                     ContextMenu::close(ui);

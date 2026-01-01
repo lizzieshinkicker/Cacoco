@@ -377,10 +377,13 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     doc.execute_actions(vec![LayerAction::PasteStatusBars(pasted)]);
                 } else if !doc.history.clipboard.is_empty() {
                     let pasted = doc.history.prepare_clipboard_for_paste();
+
                     let (p, i) = document::determine_insertion_point(
+                        &doc.file,
                         &doc.selection,
                         app.current_statusbar_idx,
                     );
+
                     doc.execute_actions(vec![LayerAction::Paste {
                         parent_path: p,
                         insert_idx: i,

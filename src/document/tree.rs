@@ -274,15 +274,22 @@ fn execute_move_selection(
 
 /// Helper to determine the best place to insert a new element based on the current selection.
 pub fn determine_insertion_point(
+    file: &SBarDefFile,
     selection: &HashSet<Vec<usize>>,
     current_bar_idx: usize,
 ) -> (Vec<usize>, usize) {
     if selection.len() == 1 {
         let path = selection.iter().next().unwrap();
         if path.len() > 1 {
-            let parent_path = path[0..path.len() - 1].to_vec();
-            let selected_idx = *path.last().unwrap();
-            return (parent_path, selected_idx + 1);
+            if let Some(el) = file.get_element(path) {
+                return if el.is_natural_container() {
+                    (path.clone(), 0)
+                } else {
+                    let parent_path = path[0..path.len() - 1].to_vec();
+                    let selected_idx = *path.last().unwrap();
+                    (parent_path, selected_idx + 1)
+                };
+            }
         }
     }
     (vec![current_bar_idx], 0)

@@ -254,7 +254,7 @@ pub fn draw_viewport(
 
                     if ui.input(|i| i.pointer.any_released()) {
                         let (parent_path, mut insert_idx) =
-                            determine_insertion_point(selection, bar_idx);
+                            determine_insertion_point(file_ref, selection, bar_idx);
                         for key in asset_keys.iter() {
                             let new_element = ElementWrapper {
                                 data: Element::Graphic(GraphicDef {
