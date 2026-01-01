@@ -29,8 +29,13 @@ impl ViewportController {
         proj: &ViewportProjection,
         selection: &HashSet<Vec<usize>>,
         viewport_res: &egui::Response,
+        is_panning: bool,
     ) -> Vec<LayerAction> {
         let mut actions = Vec::new();
+
+        if is_panning {
+            return actions;
+        }
 
         if viewport_res.dragged_by(egui::PointerButton::Primary) && !selection.is_empty() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::None);

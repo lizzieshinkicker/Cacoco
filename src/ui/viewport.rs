@@ -21,55 +21,231 @@ pub fn draw_viewport(
 ) -> Vec<LayerAction> {
     let mut actions = Vec::new();
 
-    let mut predict_rect = ui.available_rect_before_wrap();
-    predict_rect.min.y += 32.0;
-
-    let proj = ViewportProjection::new(
-        predict_rect,
-        preview_state.engine.widescreen_mode,
-        preview_state.engine.aspect_correction,
-    );
-
-    ui.add_space(-6.0);
-    ui.horizontal(|ui| {
-        ui.heading(format!("Viewport ({}x Scale)", proj.final_scale_x));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.checkbox(
-                &mut preview_state.engine.widescreen_mode,
-                "Widescreen (16:9)",
+    ui.vertical(|ui| {
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            let temp_proj = ViewportProjection::new(
+                ui.available_rect_before_wrap(),
+                preview_state.engine.widescreen_mode,
+                preview_state.engine.aspect_correction,
+                if preview_state.engine.auto_zoom {
+                    None
+                } else {
+                    Some(preview_state.engine.zoom_level)
+                },
+                preview_state.engine.pan_offset,
             );
-            ui.checkbox(
-                &mut preview_state.engine.aspect_correction,
-                "Aspect Correct (4:3)",
-            );
+
+            ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.checkbox(
+                    &mut preview_state.engine.widescreen_mode,
+                    "Widescreen (16:9)",
+                );
+                ui.checkbox(
+                    &mut preview_state.engine.aspect_correction,
+                    "Aspect Correct (4:3)",
+                );
+
+                ui.separator();
+
+                if ui
+                    .checkbox(&mut preview_state.engine.auto_zoom, "Auto Fit")
+                    .changed()
+                {
+                    if preview_state.engine.auto_zoom {
+                        preview_state.engine.pan_offset = egui::Vec2::ZERO;
+                    }
+                }
+
+                if !preview_state.engine.auto_zoom {
+                    ui.label(
+                        egui::RichText::new(format!("{}x", preview_state.engine.zoom_level))
+                            .strong(),
+                    );
+
+                    let btn_size = egui::vec2(20.0, 20.0);
+                    if ui.add_sized(btn_size, egui::Button::new("-")).clicked() {
+                        preview_state.engine.zoom_level =
+                            (preview_state.engine.zoom_level - 1).max(1);
+                    }
+                    if ui.add_sized(btn_size, egui::Button::new("+")).clicked() {
+                        preview_state.engine.zoom_level =
+                            (preview_state.engine.zoom_level + 1).min(8);
+                    }
+                }
+            });
         });
+        ui.add_space(4.0);
     });
 
     let background_rect = ui.available_rect_before_wrap();
+
+    ui.data_mut(|d| {
+        d.insert_temp(egui::Id::new(VIEWPORT_RECT_ID), background_rect);
+    });
+
     ui.painter()
         .rect_filled(background_rect, 0.0, egui::Color32::from_rgb(15, 15, 15));
-    ui.data_mut(|d| d.insert_temp(egui::Id::new(VIEWPORT_RECT_ID), background_rect));
 
     let file_ref = match file {
         Some(f) => f,
         None => {
             ui.scope_builder(egui::UiBuilder::new().max_rect(background_rect), |ui| {
-                ui.centered_and_justified(|ui| ui.label("No file loaded."));
+                ui.centered_and_justified(|ui| {
+                    ui.label("No file loaded.");
+                });
             });
             return actions;
         }
     };
 
-    let sense = egui::Sense::click_and_drag();
     let viewport_res = ui.interact(
         background_rect,
         ui.make_persistent_id("viewport_interact"),
-        sense,
+        egui::Sense::click_and_drag(),
     );
 
-    actions.extend(controller.handle_selection_drag(ui, &proj, selection, &viewport_res));
+    let is_panning = ui.input(|i| i.key_down(egui::Key::Space));
 
-    ui.painter()
+    if !preview_state.engine.auto_zoom && viewport_res.hovered() {
+        ui.input(|i| {
+            for event in &i.events {
+                if let egui::Event::MouseWheel { delta, .. } = event {
+                    let old_zoom = preview_state.engine.zoom_level;
+                    let new_zoom = if delta.y > 0.0 {
+                        (old_zoom + 1).min(8)
+                    } else if delta.y < 0.0 {
+                        (old_zoom - 1).max(1)
+                    } else {
+                        old_zoom
+                    };
+
+                    if new_zoom != old_zoom {
+                        if let Some(mouse_pos) = i.pointer.latest_pos() {
+                            let calc_visual_pan = |z: i32, raw_pan: egui::Vec2| {
+                                let correction = if preview_state.engine.aspect_correction {
+                                    1.2
+                                } else {
+                                    1.0
+                                };
+                                let base_w = if preview_state.engine.widescreen_mode {
+                                    428.0
+                                } else {
+                                    320.0
+                                };
+                                let scaled_w = base_w * (z as f32);
+                                let scaled_h = 200.0 * (z as f32 * correction);
+
+                                let mut visual = raw_pan;
+                                if scaled_w <= background_rect.width() {
+                                    visual.x = 0.0;
+                                }
+                                if scaled_h <= background_rect.height() {
+                                    visual.y = 0.0;
+                                }
+                                visual
+                            };
+
+                            let current_visual_pan =
+                                calc_visual_pan(old_zoom, preview_state.engine.pan_offset);
+
+                            let old_proj = ViewportProjection::new(
+                                background_rect,
+                                preview_state.engine.widescreen_mode,
+                                preview_state.engine.aspect_correction,
+                                Some(old_zoom),
+                                current_visual_pan,
+                            );
+                            let virt_anchor = old_proj.to_virtual(mouse_pos);
+
+                            preview_state.engine.zoom_level = new_zoom;
+
+                            let new_proj_temp = ViewportProjection::new(
+                                background_rect,
+                                preview_state.engine.widescreen_mode,
+                                preview_state.engine.aspect_correction,
+                                Some(new_zoom),
+                                current_visual_pan,
+                            );
+
+                            let new_screen_pos = new_proj_temp.to_screen(virt_anchor);
+                            let pan_adjustment = mouse_pos - new_screen_pos;
+
+                            preview_state.engine.pan_offset = current_visual_pan + pan_adjustment;
+                        } else {
+                            preview_state.engine.zoom_level = new_zoom;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    let mut effective_pan = preview_state.engine.pan_offset;
+
+    if !preview_state.engine.auto_zoom {
+        let correction = if preview_state.engine.aspect_correction {
+            1.2
+        } else {
+            1.0
+        };
+        let base_w = if preview_state.engine.widescreen_mode {
+            crate::constants::DOOM_W_WIDE
+        } else {
+            crate::constants::DOOM_W
+        };
+        let base_h = crate::constants::DOOM_H;
+
+        let scaled_w = base_w * (preview_state.engine.zoom_level as f32);
+        let scaled_h = base_h * (preview_state.engine.zoom_level as f32 * correction);
+
+        if scaled_w <= background_rect.width() {
+            effective_pan.x = 0.0;
+        }
+        if scaled_h <= background_rect.height() {
+            effective_pan.y = 0.0;
+        }
+    }
+
+    let zoom_override = if preview_state.engine.auto_zoom {
+        None
+    } else {
+        Some(preview_state.engine.zoom_level)
+    };
+
+    let proj = ViewportProjection::new(
+        background_rect,
+        preview_state.engine.widescreen_mode,
+        preview_state.engine.aspect_correction,
+        zoom_override,
+        effective_pan,
+    );
+
+    if is_panning {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+        if viewport_res.dragged() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+            preview_state.engine.pan_offset += ui.input(|i| i.pointer.delta());
+        }
+    }
+
+    actions.extend(controller.handle_selection_drag(
+        ui,
+        &proj,
+        selection,
+        &viewport_res,
+        is_panning,
+    ));
+
+    let final_clip_rect = proj.screen_rect.intersect(background_rect);
+
+    let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(background_rect));
+    screen_ui.set_clip_rect(final_clip_rect);
+
+    screen_ui
+        .painter()
         .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
 
     let bar_idx = if current_bar_idx < file_ref.data.status_bars.len() {
@@ -81,6 +257,7 @@ pub fn draw_viewport(
     let mut bar_height = 0.0;
     let mut is_fullscreen = true;
     let mut fill_flat_name = None;
+
     if let Some(bar) = file_ref.data.status_bars.get(bar_idx) {
         bar_height = bar.height as f32;
         is_fullscreen = bar.fullscreen_render;
@@ -95,9 +272,6 @@ pub fn draw_viewport(
     let y_center = h_view / 2.0;
     let y_offset_from_top = y_center - 100.0;
 
-    let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(proj.screen_rect));
-    screen_ui.set_clip_rect(proj.screen_rect);
-
     if let Some(tex) = assets
         .textures
         .get(&crate::assets::AssetId::new("_BG_MASTER"))
@@ -109,10 +283,8 @@ pub fn draw_viewport(
             egui::Rect::from_min_max(egui::pos2(margin, 0.0), egui::pos2(1.0 - margin, 1.0))
         };
 
-        let uv_top_crop = (-y_offset_from_top) / 200.0;
-        let uv_bottom_crop = (y_center + 100.0 - h_view) / 200.0;
-        uv_rect.min.y += uv_top_crop;
-        uv_rect.max.y -= uv_bottom_crop;
+        uv_rect.min.y += (-y_offset_from_top) / 200.0;
+        uv_rect.max.y -= (y_center + 100.0 - h_view) / 200.0;
 
         let mut draw_rect = proj.screen_rect;
         draw_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
@@ -125,6 +297,7 @@ pub fn draw_viewport(
     if !is_fullscreen && bar_height > 0.0 {
         let flat_key = fill_flat_name.unwrap_or_else(|| "GRNROCK".to_string());
         let id = crate::assets::AssetId::new(&flat_key);
+
         if let Some(tex) = assets.textures.get(&id) {
             let tile_size_px = 64.0 * proj.final_scale_x;
             let bar_area_rect = egui::Rect::from_min_max(
@@ -141,12 +314,14 @@ pub fn draw_viewport(
                 while x < bar_area_rect.max.x {
                     let draw_w = (bar_area_rect.max.x - x).min(tile_size_px);
                     let draw_h = (bar_area_rect.max.y - y).min(tile_size_px);
-                    let uv_w = draw_w / tile_size_px;
-                    let uv_h = draw_h / tile_size_px;
+
                     screen_ui.painter().image(
                         tex.id(),
                         egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(draw_w, draw_h)),
-                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(uv_w, uv_h)),
+                        egui::Rect::from_min_max(
+                            egui::pos2(0.0, 0.0),
+                            egui::pos2(draw_w / tile_size_px, draw_h / tile_size_px),
+                        ),
                         egui::Color32::WHITE,
                     );
                     x += tile_size_px;
@@ -156,11 +331,12 @@ pub fn draw_viewport(
         }
     }
 
-    let mut world_clip_rect = proj.screen_rect;
-    world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
     {
+        let mut world_clip_rect = proj.screen_rect;
+        world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
+
         let mut weapon_ui = screen_ui.new_child(egui::UiBuilder::new());
-        weapon_ui.set_clip_rect(world_clip_rect.intersect(proj.screen_rect));
+        weapon_ui.set_clip_rect(world_clip_rect.intersect(final_clip_rect));
         render_player_weapon(&weapon_ui, preview_state, assets, &proj, y_offset_from_top);
     }
 
@@ -216,8 +392,7 @@ pub fn draw_viewport(
         }
 
         if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
-            let is_over = viewport_res.contains_pointer();
-            if is_over {
+            if viewport_res.contains_pointer() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::None);
                 screen_ui.painter().rect_stroke(
                     proj.screen_rect,
@@ -327,6 +502,7 @@ fn render_player_weapon(
             let total_offset_y =
                 (state.editor.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
             let draw_y = (proj.screen_rect.max.y - scaled_size.y) + total_offset_y;
+
             ui.painter().image(
                 tex.id(),
                 egui::Rect::from_min_size(egui::pos2(draw_x, draw_y), scaled_size),

@@ -3,6 +3,13 @@ use crate::model::FeatureLevel;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+fn default_true() -> bool {
+    true
+}
+fn default_one() -> i32 {
+    1
+}
+
 /// Represents the physical state of the player character.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerStats {
@@ -180,6 +187,13 @@ pub struct EngineContext {
     pub automap_overlay: bool,
     pub disabled_widgets: HashSet<i32>,
     pub disabled_components: HashSet<String>,
+
+    #[serde(default = "default_true")]
+    pub auto_zoom: bool,
+    #[serde(default = "default_one")]
+    pub zoom_level: i32,
+    #[serde(skip)]
+    pub pan_offset: eframe::egui::Vec2,
 }
 
 impl Default for EngineContext {
@@ -192,6 +206,9 @@ impl Default for EngineContext {
             automap_overlay: false,
             disabled_widgets: HashSet::new(),
             disabled_components: HashSet::new(),
+            auto_zoom: true,
+            zoom_level: 1,
+            pan_offset: eframe::egui::Vec2::ZERO,
         }
     }
 }

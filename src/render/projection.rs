@@ -9,27 +9,36 @@ pub struct ViewportProjection {
 }
 
 impl ViewportProjection {
-    pub fn new(avail_rect: egui::Rect, widescreen: bool, aspect_correct: bool) -> Self {
+    pub fn new(
+        avail_rect: egui::Rect,
+        widescreen: bool,
+        aspect_correct: bool,
+        zoom_override: Option<i32>,
+        pan_offset: egui::Vec2,
+    ) -> Self {
         let correction = if aspect_correct { 1.2 } else { 1.0 };
         let base_h = DOOM_H;
         let base_w = if widescreen { DOOM_W_WIDE } else { DOOM_W };
 
-        let scale_x = avail_rect.width() / base_w;
-        let scale_y = avail_rect.height() / (base_h * correction);
+        let final_scale_x;
+        let final_scale_y;
 
-        let base_scale = scale_x.min(scale_y).floor().max(1.0);
-
-        let final_scale_x = base_scale;
-        let final_scale_y = base_scale * correction;
+        if let Some(zoom) = zoom_override {
+            final_scale_x = zoom as f32;
+            final_scale_y = (zoom as f32) * correction;
+        } else {
+            let scale_x = avail_rect.width() / base_w;
+            let scale_y = avail_rect.height() / (base_h * correction);
+            let base_scale = scale_x.min(scale_y).floor().max(1.0);
+            final_scale_x = base_scale;
+            final_scale_y = base_scale * correction;
+        }
 
         let virtual_w = base_w * final_scale_x;
         let virtual_h = base_h * final_scale_y;
 
-        let center_offset_x = ((avail_rect.width() - virtual_w) / 2.0).max(0.0);
-        let center_offset_y = ((avail_rect.height() - virtual_h) / 2.0).max(0.0);
-
-        let offset_x = (avail_rect.min.x + center_offset_x).round();
-        let offset_y = (avail_rect.min.y + center_offset_y).round();
+        let offset_x = (avail_rect.center().x - (virtual_w / 2.0) + pan_offset.x).round();
+        let offset_y = (avail_rect.center().y - (virtual_h / 2.0) + pan_offset.y).round();
 
         Self {
             screen_rect: egui::Rect::from_min_size(
