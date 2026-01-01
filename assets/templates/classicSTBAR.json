@@ -34,9 +34,9 @@
         "children": [
           {
             "graphic": {
-              "x": 0,
+              "x": 160,
               "y": 0,
-              "alignment": 0,
+              "alignment": 49,
               "translucency": false,
               "patch": "STBAR",
               "width": 0,
