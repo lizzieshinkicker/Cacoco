@@ -1,4 +1,5 @@
 use crate::assets::AssetId;
+use crate::conditions;
 use crate::model::*;
 use crate::render::{RenderContext, draw_element_wrapper, text::measure_text_line};
 use eframe::egui;
@@ -15,13 +16,28 @@ pub(super) fn draw_list(
         return;
     }
 
-    let mut child_sizes = Vec::with_capacity(def.common.children.len());
+    let mut layout_children = Vec::new();
+    for (idx, child) in def.common.children.iter().enumerate() {
+        current_path.push(idx);
+
+        let conditions_met =
+            conditions::resolve(&child.get_common().conditions, ctx.state, ctx.assets);
+        let is_selected = ctx.selection.contains(current_path)
+            || ctx.selection.iter().any(|s| current_path.starts_with(s));
+
+        if conditions_met || is_selected {
+            layout_children.push((idx, child, estimate_element_tree_size(ctx, child)));
+        }
+
+        current_path.pop();
+    }
+
+    if layout_children.is_empty() {
+        return;
+    }
+
     let mut total_size = egui::Vec2::ZERO;
-
-    for child in &def.common.children {
-        let sz = estimate_element_tree_size(ctx, child);
-        child_sizes.push(sz);
-
+    for (_, _, sz) in &layout_children {
         if def.horizontal {
             total_size.x += sz.x;
             total_size.y = total_size.y.max(sz.y);
@@ -33,9 +49,9 @@ pub(super) fn draw_list(
 
     let spacing = def.spacing as f32;
     if def.horizontal {
-        total_size.x += spacing * (def.common.children.len() as f32 - 1.0);
+        total_size.x += spacing * (layout_children.len() as f32 - 1.0);
     } else {
-        total_size.y += spacing * (def.common.children.len() as f32 - 1.0);
+        total_size.y += spacing * (layout_children.len() as f32 - 1.0);
     }
 
     let mut global_block_offset = egui::Vec2::ZERO;
@@ -54,9 +70,8 @@ pub(super) fn draw_list(
 
     let mut current_stack_pos = 0.0;
 
-    for (idx, child) in def.common.children.iter().enumerate() {
+    for (idx, child, child_size) in layout_children {
         current_path.push(idx);
-        let child_size = child_sizes[idx];
 
         let mut child_draw_pos = pos + global_block_offset;
 
@@ -136,11 +151,11 @@ fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> 
                 "100"
             };
             let w = measure_text_line(ctx, sample_text, &n.font, true);
-            egui::vec2(w, 12.0)
+            egui::Vec2::new(w, 12.0)
         }
         Element::String(s) => {
             let w = measure_text_line(ctx, "Sample Text", &s.font, false);
-            egui::vec2(w, 12.0)
+            egui::Vec2::new(w, 12.0)
         }
         Element::Face(_) | Element::FaceBackground(_) => egui::vec2(24.0, 29.0),
         Element::Component(_) => egui::vec2(64.0, 12.0),
