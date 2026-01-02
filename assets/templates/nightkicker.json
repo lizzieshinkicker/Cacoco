@@ -59,6 +59,11 @@
         "name": "Classic HUD",
         "type": 0,
         "stem": "STCFN"
+      },
+      {
+        "name": "Boom HUD",
+        "type": 0,
+        "stem": "DIG"
       }
     ],
     "statusbars": [
@@ -114,7 +119,7 @@
                           "alignment": 16,
                           "translucency": false,
                           "type": "stat_totals",
-                          "font": "PRBoom+ HUD",
+                          "font": "Boom HUD",
                           "vertical": true,
                           "duration": 0.0
                         }
@@ -126,7 +131,7 @@
                           "alignment": 16,
                           "translucency": false,
                           "type": "time",
-                          "font": "PRBoom+ HUD",
+                          "font": "Boom HUD",
                           "vertical": false,
                           "duration": 0.0
                         }
@@ -156,7 +161,7 @@
                             }
                           ],
                           "type": "time",
-                          "font": "PRBoom+ HUD",
+                          "font": "Boom HUD",
                           "vertical": false,
                           "duration": 0.0
                         }
@@ -175,7 +180,7 @@
                             }
                           ],
                           "type": "stat_totals",
-                          "font": "PRBoom+ HUD",
+                          "font": "Boom HUD",
                           "vertical": false,
                           "duration": 0.0
                         }
