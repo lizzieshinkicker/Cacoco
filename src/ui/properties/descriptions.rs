@@ -16,7 +16,7 @@ pub fn get_helper_text(element: &ElementWrapper) -> &'static str {
         }
         Element::Canvas(_) => "A container for grouping and offsetting other elements.",
         Element::List(_) => {
-            "A smart container that arranges its children sequentially. Children ignore their internal X/Y in favor of the list's spacing."
+            "A smart container that arranges its children sequentially based on the List's alignment. If anchored Bottom or Right, the list grows backwards from that point."
         }
         Element::String(s) => match s.type_ {
             0 => "Renders a custom, hardcoded text string using a HUD font.",
