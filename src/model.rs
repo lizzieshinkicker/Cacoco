@@ -428,8 +428,6 @@ pub struct ListDef {
     pub common: CommonAttrs,
     #[serde(default)]
     pub horizontal: bool,
-    #[serde(default)]
-    pub reverse: bool,
     /// Spacing between children in virtual pixels.
     #[serde(default)]
     pub spacing: i32,

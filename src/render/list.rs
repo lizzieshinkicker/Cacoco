@@ -3,7 +3,7 @@ use crate::model::*;
 use crate::render::{RenderContext, draw_element_wrapper, text::measure_text_line};
 use eframe::egui;
 
-/// Renders a SBARDEF List element, stacking children based on its spacing rules.
+/// Renders a SBARDEF List element, stacking children based on alignment and spacing.
 pub(super) fn draw_list(
     ctx: &RenderContext,
     def: &ListDef,
@@ -11,36 +11,102 @@ pub(super) fn draw_list(
     _alpha: f32,
     current_path: &mut Vec<usize>,
 ) {
-    let mut current_offset = 0.0;
-
-    let mut children_indices: Vec<usize> = (0..def.common.children.len()).collect();
-    if def.reverse {
-        children_indices.reverse();
+    if def.common.children.is_empty() {
+        return;
     }
 
-    for &idx in &children_indices {
-        let child = &def.common.children[idx];
-        current_path.push(idx);
+    let mut child_sizes = Vec::with_capacity(def.common.children.len());
+    let mut total_size = egui::Vec2::ZERO;
 
-        let child_size = estimate_element_tree_size(ctx, child);
+    for child in &def.common.children {
+        let sz = estimate_element_tree_size(ctx, child);
+        child_sizes.push(sz);
 
-        let mut child_pos = pos;
         if def.horizontal {
-            child_pos.x += current_offset;
-            current_offset += child_size.x + def.spacing as f32;
+            total_size.x += sz.x;
+            total_size.y = total_size.y.max(sz.y);
         } else {
-            child_pos.y += current_offset;
-            current_offset += child_size.y + def.spacing as f32;
+            total_size.y += sz.y;
+            total_size.x = total_size.x.max(sz.x);
+        }
+    }
+
+    let spacing = def.spacing as f32;
+    if def.horizontal {
+        total_size.x += spacing * (def.common.children.len() as f32 - 1.0);
+    } else {
+        total_size.y += spacing * (def.common.children.len() as f32 - 1.0);
+    }
+
+    let mut global_block_offset = egui::Vec2::ZERO;
+
+    if def.common.alignment.contains(Alignment::RIGHT) {
+        global_block_offset.x = -total_size.x;
+    } else if def.common.alignment.contains(Alignment::H_CENTER) {
+        global_block_offset.x = -total_size.x / 2.0;
+    }
+
+    if def.common.alignment.contains(Alignment::BOTTOM) {
+        global_block_offset.y = -total_size.y;
+    } else if def.common.alignment.contains(Alignment::V_CENTER) {
+        global_block_offset.y = -total_size.y / 2.0;
+    }
+
+    let mut current_stack_pos = 0.0;
+
+    for (idx, child) in def.common.children.iter().enumerate() {
+        current_path.push(idx);
+        let child_size = child_sizes[idx];
+
+        let mut child_draw_pos = pos + global_block_offset;
+
+        if def.horizontal {
+            child_draw_pos.x += current_stack_pos;
+
+            if def.common.alignment.contains(Alignment::BOTTOM) {
+                child_draw_pos.y += total_size.y - child_size.y;
+            } else if def.common.alignment.contains(Alignment::V_CENTER) {
+                child_draw_pos.y += (total_size.y - child_size.y) / 2.0;
+            }
+
+            current_stack_pos += child_size.x + spacing;
+        } else {
+            child_draw_pos.y += current_stack_pos;
+
+            if def.common.alignment.contains(Alignment::RIGHT) {
+                child_draw_pos.x += total_size.x - child_size.x;
+            } else if def.common.alignment.contains(Alignment::H_CENTER) {
+                child_draw_pos.x += (total_size.x - child_size.x) / 2.0;
+            }
+
+            current_stack_pos += child_size.y + spacing;
         }
 
-        draw_element_wrapper(ctx, child, child_pos, current_path);
+        let mut local_child = child.clone();
+        let current_align = local_child.get_common().alignment;
+        let mut forced_align = Alignment::TOP | Alignment::LEFT;
+
+        if current_align.contains(Alignment::WIDESCREEN_LEFT) {
+            forced_align |= Alignment::WIDESCREEN_LEFT;
+        }
+        if current_align.contains(Alignment::WIDESCREEN_RIGHT) {
+            forced_align |= Alignment::WIDESCREEN_RIGHT;
+        }
+        if current_align.contains(Alignment::NO_LEFT_OFFSET) {
+            forced_align |= Alignment::NO_LEFT_OFFSET;
+        }
+        if current_align.contains(Alignment::NO_TOP_OFFSET) {
+            forced_align |= Alignment::NO_TOP_OFFSET;
+        }
+
+        local_child.get_common_mut().alignment = forced_align;
+
+        draw_element_wrapper(ctx, &local_child, child_draw_pos, current_path);
         current_path.pop();
     }
 }
 
 /// Recursively calculates the visual bounds of an element tree.
-///
-/// Used by the List container to arrange children without overlap.
 fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> egui::Vec2 {
     let mut size = match &element.data {
         Element::Graphic(g) => {
