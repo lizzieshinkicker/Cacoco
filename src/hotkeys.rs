@@ -48,20 +48,6 @@ impl Default for HotkeyRegistry {
 
 impl HotkeyRegistry {
     pub fn check(&self, ctx: &egui::Context) -> Option<Action> {
-        if ctx.input_mut(|i| i.consume_shortcut(&self.save)) {
-            return Some(Action::Save);
-        }
-        if ctx.input_mut(|i| i.consume_shortcut(&self.open)) {
-            return Some(Action::Open);
-        }
-        if ctx.input_mut(|i| i.consume_shortcut(&self.export_json)) {
-            return Some(Action::ExportJSON);
-        }
-
-        if ctx.wants_keyboard_input() {
-            return None;
-        }
-
         let mut event_action = None;
         ctx.input(|i| {
             for event in &i.events {
@@ -78,6 +64,20 @@ impl HotkeyRegistry {
             return Some(action);
         }
 
+        if ctx.wants_keyboard_input() && !ctx.input(|i| i.modifiers.any()) {
+            return None;
+        }
+
+        if ctx.input_mut(|i| i.consume_shortcut(&self.save)) {
+            return Some(Action::Save);
+        }
+        if ctx.input_mut(|i| i.consume_shortcut(&self.open)) {
+            return Some(Action::Open);
+        }
+        if ctx.input_mut(|i| i.consume_shortcut(&self.export_json)) {
+            return Some(Action::ExportJSON);
+        }
+
         if ctx.input_mut(|i| i.consume_shortcut(&self.redo) || i.consume_shortcut(&self.redo_alt)) {
             return Some(Action::Redo);
         }
@@ -91,7 +91,6 @@ impl HotkeyRegistry {
         if ctx.input_mut(|i| i.consume_shortcut(&self.paste)) {
             return Some(Action::Paste);
         }
-
         if ctx.input_mut(|i| i.consume_shortcut(&self.duplicate)) {
             return Some(Action::Duplicate);
         }
@@ -190,5 +189,29 @@ mod tests {
         });
 
         assert_eq!(action, Some(Action::Copy));
+    }
+
+    #[test]
+    fn test_hotkey_copy_with_persistent_modifiers() {
+        let registry = HotkeyRegistry::default();
+        let ctx = Context::default();
+        let mut input = RawInput::default();
+
+        input.modifiers = Modifiers::COMMAND;
+        input.events.push(Event::Key {
+            key: Key::C,
+            physical_key: Some(Key::C),
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        });
+
+        let mut action = None;
+        let _ = ctx.run(input, |ctx| {
+            action = registry.check(ctx);
+        });
+
+        assert_eq!(action, Some(Action::Copy));
+        ctx.input(|i| assert!(i.key_pressed(Key::C) == false || action.is_some()));
     }
 }
