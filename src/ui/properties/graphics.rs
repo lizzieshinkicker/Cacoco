@@ -26,7 +26,10 @@ impl PropertiesUI for GraphicDef {
             ui.add_space((ui.available_width() - total_w).max(0.0) / 2.0);
             ui.add_sized([label_w, 18.0], egui::Label::new("Patch:"));
             let edit = egui::TextEdit::singleline(&mut self.patch).desired_width(field_w);
-            changed |= ui.add(edit).changed();
+            if ui.add(edit).changed() {
+                self.patch = AssetStore::stem(&self.patch);
+                changed = true;
+            }
         });
 
         ui.add_space(4.0);

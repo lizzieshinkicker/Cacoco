@@ -374,7 +374,7 @@ fn handle_drop_logic(
 fn wrap_graphic(patch: &str) -> ElementWrapper {
     ElementWrapper {
         data: Element::Graphic(GraphicDef {
-            patch: patch.to_string(),
+            patch: AssetStore::stem(patch),
             ..Default::default()
         }),
         ..Default::default()
