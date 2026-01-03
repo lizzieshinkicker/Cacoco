@@ -48,7 +48,11 @@ pub fn rebake_text(element: &mut ElementWrapper, assets: &AssetStore, fonts: &Fo
                     y: 0,
                     ..Default::default()
                 },
-                patch: assets.names.get(&id).cloned().unwrap_or_default(),
+                patch: assets
+                    .names
+                    .get(&id)
+                    .map(|n| AssetStore::stem(n))
+                    .unwrap_or_default(),
                 ..Default::default()
             }),
             ..Default::default()

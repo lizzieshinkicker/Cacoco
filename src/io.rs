@@ -53,10 +53,13 @@ pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<Loa
 fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
     match fs::read_to_string(path) {
         Ok(json_content) => match serde_json::from_str::<SBarDefFile>(&json_content) {
-            Ok(parsed_file) => Some(LoadedProject {
-                file: parsed_file,
-                assets: AssetStore::default(),
-            }),
+            Ok(mut parsed_file) => {
+                parsed_file.normalize_paths();
+                Some(LoadedProject {
+                    file: parsed_file,
+                    assets: AssetStore::default(),
+                })
+            }
             Err(e) => {
                 eprintln!("Failed to parse JSON: {}", e);
                 None
@@ -96,7 +99,10 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
     }
 
     let parsed_file = match serde_json::from_str::<SBarDefFile>(&sbardef_content) {
-        Ok(f) => f,
+        Ok(mut f) => {
+            f.normalize_paths();
+            f
+        }
         Err(e) => {
             eprintln!("PK3 Parse Error: {}", e);
             return None;

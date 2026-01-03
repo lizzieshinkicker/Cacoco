@@ -414,7 +414,7 @@ pub fn draw_viewport(
                                     y: final_y + (i as i32 * 4),
                                     ..Default::default()
                                 },
-                                patch: key.clone(),
+                                patch: AssetStore::stem(key),
                                 ..Default::default()
                             }),
                             ..Default::default()
@@ -438,7 +438,7 @@ pub fn draw_viewport(
                                         y: final_y,
                                         ..Default::default()
                                     },
-                                    patch: key.clone(),
+                                    patch: AssetStore::stem(key),
                                     ..Default::default()
                                 }),
                                 ..Default::default()

@@ -179,7 +179,8 @@ impl CacocoApp {
     /// Applies a library template as the current project.
     pub fn apply_template(&mut self, ctx: &egui::Context, template: &Template) {
         match serde_json::from_str::<SBarDefFile>(template.json_content) {
-            Ok(parsed_file) => {
+            Ok(mut parsed_file) => {
+                parsed_file.normalize_paths();
                 self.doc = Some(SBarDocument::new(parsed_file, None));
                 self.assets = AssetStore::default();
                 self.preview_state = PreviewState::default();

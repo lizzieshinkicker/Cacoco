@@ -274,6 +274,12 @@ impl StatusBarLayout {
             child.reassign_uids();
         }
     }
+
+    pub fn normalize(&mut self) {
+        for child in &mut self.children {
+            child.normalize();
+        }
+    }
 }
 
 /// Generates a new random unique identifier for editor tracking.
@@ -663,6 +669,24 @@ impl ElementWrapper {
             child.reassign_uids();
         }
     }
+
+    pub fn normalize(&mut self) {
+        match &mut self.data {
+            Element::Graphic(g) => {
+                g.patch = crate::assets::AssetStore::stem(&g.patch);
+            }
+            Element::Animation(a) => {
+                for frame in &mut a.frames {
+                    frame.lump = crate::assets::AssetStore::stem(&frame.lump);
+                }
+            }
+            _ => {}
+        }
+
+        for child in &mut self.get_common_mut().children {
+            child.normalize();
+        }
+    }
 }
 
 impl SBarDefFile {
@@ -710,5 +734,12 @@ impl SBarDefFile {
         }
 
         Some(current_element)
+    }
+
+    /// Recursively scrubs all patch and lump names to ensure they are clean Doom lump names.
+    pub fn normalize_paths(&mut self) {
+        for bar in &mut self.data.status_bars {
+            bar.normalize();
+        }
     }
 }
