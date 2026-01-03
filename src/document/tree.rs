@@ -280,19 +280,20 @@ pub fn determine_insertion_point(
 ) -> (Vec<usize>, usize) {
     if selection.len() == 1 {
         let path = selection.iter().next().unwrap();
+
         if path.len() > 1 {
-            if let Some(el) = file.get_element(path) {
-                return if el.is_natural_container() {
-                    (path.clone(), 0)
-                } else {
-                    let parent_path = path[0..path.len() - 1].to_vec();
-                    let selected_idx = *path.last().unwrap();
-                    (parent_path, selected_idx + 1)
-                };
-            }
+            let parent_path = path[0..path.len() - 1].to_vec();
+            let selected_idx = *path.last().unwrap();
+
+            return (parent_path, selected_idx);
         }
     }
-    (vec![current_bar_idx], 0)
+
+    if let Some(bar) = file.data.status_bars.get(current_bar_idx) {
+        (vec![current_bar_idx], bar.children.len())
+    } else {
+        (vec![current_bar_idx], 0)
+    }
 }
 
 fn sort_paths_for_removal(paths: &mut Vec<Vec<usize>>) {

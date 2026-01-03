@@ -227,14 +227,17 @@ fn handle_selection(
     file: &SBarDefFile,
 ) {
     let modifiers = ui.input(|i| i.modifiers);
-    if modifiers.ctrl || modifiers.command {
+
+    let is_pure_modifier = ui.input(|i| i.keys_down.is_empty());
+
+    if (modifiers.ctrl || modifiers.command) && is_pure_modifier {
         if selection.contains(my_path) {
             selection.remove(my_path);
         } else {
             selection.insert(my_path.to_vec());
             *pivot = Some(my_path.to_vec());
         }
-    } else if modifiers.shift {
+    } else if modifiers.shift && is_pure_modifier {
         if let Some(p) = pivot {
             let bar_idx = my_path[0];
             if let Some(bar) = file.data.status_bars.get(bar_idx) {
@@ -269,7 +272,8 @@ fn handle_drop_logic(
     element: &ElementWrapper,
     actions: &mut Vec<LayerAction>,
 ) {
-    let nesting_mode = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
+    let nesting_mode =
+        ui.input(|i| (i.modifiers.command || i.modifiers.ctrl) && i.keys_down.is_empty());
 
     if let Some(dragged) = egui::DragAndDrop::payload::<Vec<usize>>(ui.ctx()) {
         let is_self = &*dragged == my_path;
