@@ -1,6 +1,6 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::constants::{DOOM_W, DOOM_W_WIDE};
-use crate::model::FaceDef;
+use crate::model::{ExportTarget, FaceDef};
 use crate::state::PreviewState;
 use crate::ui::shared::VIEWPORT_RECT_ID;
 use eframe::egui;
@@ -19,6 +19,11 @@ impl PropertiesUI for FaceDef {
         assets: &AssetStore,
         _: &PreviewState,
     ) -> bool {
+        let target = ui.data(|d| {
+            d.get_temp::<ExportTarget>(egui::Id::new("cacoco_current_target"))
+                .unwrap_or_default()
+        });
+
         let id = AssetId::new("STFST01");
         let (dw, dh) = assets
             .textures
@@ -26,7 +31,7 @@ impl PropertiesUI for FaceDef {
             .map(|t| (t.size()[0] as i32, t.size()[1] as i32))
             .unwrap_or((24, 29));
 
-        draw_crop_editor(ui, &mut self.crop, dw, dh)
+        draw_crop_editor(ui, &mut self.crop, dw, dh, target)
     }
 
     /// Simulates the STF behavior in the preview panel based on mouse position.

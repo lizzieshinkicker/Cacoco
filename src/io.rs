@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::SBarDefFile;
+use crate::model::{ExportTarget, SBarDefFile};
 use crate::wad;
 use eframe::egui;
 use rfd::FileDialog;
@@ -55,6 +55,10 @@ fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
         Ok(json_content) => match serde_json::from_str::<SBarDefFile>(&json_content) {
             Ok(mut parsed_file) => {
                 parsed_file.normalize_paths();
+
+                parsed_file.target = parsed_file.determine_target();
+                parsed_file.normalize_for_target();
+
                 Some(LoadedProject {
                     file: parsed_file,
                     assets: AssetStore::default(),
@@ -101,6 +105,10 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
     let parsed_file = match serde_json::from_str::<SBarDefFile>(&sbardef_content) {
         Ok(mut f) => {
             f.normalize_paths();
+
+            f.target = f.determine_target();
+            f.normalize_for_target();
+
             f
         }
         Err(e) => {
@@ -129,9 +137,6 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
 }
 
 /// Internal helper to compress project data into a PK3 structure.
-///
-/// This function ensures all project assets are placed in the 'graphics/'
-/// subfolder and assigned a valid extension, satisfying SBARDEF requirements.
 fn build_pk3<W: Write + Seek>(
     writer: W,
     file: &SBarDefFile,
@@ -172,7 +177,7 @@ fn build_pk3<W: Write + Seek>(
     Ok(())
 }
 
-pub fn save_json_dialog(file: &SBarDefFile, opened_path: Option<String>) -> Option<String> {
+pub fn save_json_dialog(json_content: &str, opened_path: Option<String>) -> Option<String> {
     let mut dialog = FileDialog::new()
         .add_filter("SBARDEF JSON", &["json", "txt", "JSON", "TXT"])
         .set_title("Export SBARDEF JSON");
@@ -189,10 +194,8 @@ pub fn save_json_dialog(file: &SBarDefFile, opened_path: Option<String>) -> Opti
     }
 
     if let Some(path) = dialog.save_file() {
-        if let Ok(json) = serde_json::to_string_pretty(file) {
-            if fs::write(&path, json).is_ok() {
-                return Some(path.to_string_lossy().into_owned());
-            }
+        if fs::write(&path, json_content).is_ok() {
+            return Some(path.to_string_lossy().into_owned());
         }
     }
     None
@@ -241,6 +244,36 @@ pub fn save_pk3_dialog(
     None
 }
 
+pub fn save_wad_dialog(
+    sbardef_content: &str,
+    assets: &AssetStore,
+    opened_path: Option<String>,
+) -> Option<String> {
+    let mut dialog = FileDialog::new()
+        .add_filter("Doom WAD", &["wad", "WAD"])
+        .set_title("Export as WAD (KEX Compatible)");
+
+    if let Some(p_str) = opened_path {
+        let p = Path::new(&p_str);
+        let stem = p
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("status_bar");
+        dialog = dialog.set_file_name(format!("{}.wad", stem));
+    } else {
+        dialog = dialog.set_file_name("status_bar.wad");
+    }
+
+    if let Some(path) = dialog.save_file() {
+        if let Ok(mut f) = fs::File::create(&path) {
+            if wad::write_wad_to_file(&mut f, sbardef_content.as_bytes(), assets).is_ok() {
+                return Some(path.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
+}
+
 pub fn save_pk3_silent(
     file: &SBarDefFile,
     assets: &AssetStore,
@@ -281,16 +314,55 @@ pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut Asse
     }
 }
 
-pub fn launch_game(file: &SBarDefFile, assets: &AssetStore, source_port: &str, iwad: &str) {
+/// Launches the game with the current project data.
+///
+/// If targeting 'Basic', it produces a temporary .WAD for KEX compatibility.
+/// Otherwise, it produces a temporary .PK3.
+pub fn launch_game(
+    sbardef_content: &str,
+    assets: &AssetStore,
+    source_port: &str,
+    iwad: &str,
+    target: ExportTarget,
+) {
     let mut temp_path = env::temp_dir();
-    temp_path.push("cacotest.pk3");
+    let extension = if target == ExportTarget::Basic {
+        "wad"
+    } else {
+        "pk3"
+    };
+    temp_path.push(format!("cacotest.{}", extension));
     let temp_path_str = temp_path.to_string_lossy().into_owned();
 
     match fs::File::create(&temp_path) {
-        Ok(fs_file) => {
-            if let Err(e) = build_pk3(fs_file, file, assets) {
-                eprintln!("Failed to build temporary PK3: {}", e);
-                return;
+        Ok(mut fs_file) => {
+            if target == ExportTarget::Basic {
+                let _ = wad::write_wad_to_file(&mut fs_file, sbardef_content.as_bytes(), assets);
+            } else {
+                let mut zip = ZipWriter::new(fs_file);
+                let options =
+                    SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+
+                let _ = zip.start_file("SBARDEF", options);
+                let _ = zip.write_all(sbardef_content.as_bytes());
+
+                for (id, bytes) in &assets.raw_files {
+                    let name = assets
+                        .names
+                        .get(id)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}.png", id));
+                    let mut final_path = name;
+                    if !final_path.to_lowercase().starts_with("graphics/") {
+                        final_path = format!("graphics/{}", final_path);
+                    }
+                    if Path::new(&final_path).extension().is_none() {
+                        final_path.push_str(".png");
+                    }
+                    let _ = zip.start_file(final_path, options);
+                    let _ = zip.write_all(bytes);
+                }
+                let _ = zip.finish();
             }
         }
         Err(e) => {
@@ -399,6 +471,7 @@ mod tests {
         let file = SBarDefFile {
             type_: "statusbar".to_string(),
             version: "1.0.0".to_string(),
+            target: ExportTarget::Basic,
             data: Default::default(),
         };
 

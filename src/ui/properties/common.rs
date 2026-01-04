@@ -1,12 +1,16 @@
 use super::lookups;
 use crate::assets::AssetStore;
-use crate::model::{Alignment, ElementWrapper};
+use crate::model::{Alignment, ElementWrapper, ExportTarget};
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::layers::thumbnails;
 use eframe::egui;
 
 /// Renders the transformation widgets (X, Y, Alignment) shared by all SBARDEF elements.
-pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) -> bool {
+pub fn draw_transform_editor(
+    ui: &mut egui::Ui,
+    element: &mut ElementWrapper,
+    target: ExportTarget,
+) -> bool {
     let mut changed = false;
     let common = element.get_common_mut();
 
@@ -25,10 +29,12 @@ pub fn draw_transform_editor(ui: &mut egui::Ui, element: &mut ElementWrapper) ->
         ui.label("Alignment:");
         changed |= draw_alignment_selector(ui, &mut common.alignment);
 
-        ui.add_space(4.0);
-        changed |= ui
-            .checkbox(&mut common.translucency, "Translucent (Boom Style)")
-            .changed();
+        if target == ExportTarget::Extended {
+            ui.add_space(4.0);
+            changed |= ui
+                .checkbox(&mut common.translucency, "Translucent (Boom Style)")
+                .changed();
+        }
     });
 
     changed
@@ -147,17 +153,36 @@ pub fn draw_root_statusbar_fields(
         ui.horizontal(|ui| {
             ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
             ui.label("Bar Height:");
-            changed |= ui
-                .add_enabled(
-                    !bar.fullscreen_render,
-                    egui::DragValue::new(&mut bar.height)
-                        .range(0..=200)
-                        .speed(1),
-                )
-                .changed();
+
+            if bar.fullscreen_render {
+                let mut h = 200;
+                ui.add_enabled(false, egui::DragValue::new(&mut h));
+                if bar.height != 200 {
+                    bar.height = 200;
+                    changed = true;
+                }
+            } else {
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut bar.height)
+                            .range(0..=200)
+                            .speed(1),
+                    )
+                    .changed();
+            }
         });
 
-        ui.checkbox(&mut bar.fullscreen_render, "Fullscreen Render");
+        if ui
+            .checkbox(&mut bar.fullscreen_render, "Fullscreen Render")
+            .changed()
+        {
+            if bar.fullscreen_render {
+                bar.height = 200;
+            } else {
+                bar.height = 32;
+            }
+            changed = true;
+        }
 
         ui.add_space(8.0);
 

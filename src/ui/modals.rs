@@ -66,10 +66,10 @@ pub fn draw_confirmation_modal(
     let mut close_modal = false;
     let mut confirmed = false;
 
-    let title = if matches!(request, ConfirmationRequest::DiscardChanges(_)) {
-        "Unsaved Changes"
-    } else {
-        "Confirm Deletion"
+    let title = match request {
+        ConfirmationRequest::DiscardChanges(_) => "Unsaved Changes",
+        ConfirmationRequest::DowngradeTarget(_) => "Confirm Downgrade",
+        _ => "Confirm Deletion",
     };
 
     egui::Window::new(title)
@@ -77,7 +77,7 @@ pub fn draw_confirmation_modal(
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
-            ui.set_width(280.0);
+            ui.set_width(320.0);
             ui.vertical_centered(|ui| match request {
                 ConfirmationRequest::DeleteStatusBar(_) => {
                     ui.label("Delete this status bar layout?");
@@ -91,6 +91,13 @@ pub fn draw_confirmation_modal(
                 ConfirmationRequest::DiscardChanges(_) => {
                     ui.label("Discard unsaved changes and continue?");
                 }
+                ConfirmationRequest::DowngradeTarget(_) => {
+                    ui.label(egui::RichText::new("Warning: Extended Features Detected").color(egui::Color32::from_rgb(200, 100, 100)).strong());
+                    ui.add_space(8.0);
+                    ui.label("Switching to Basic (KEX) target will strip extended features (Components, Lists, Conditionals) and enforce mandatory layout slots.");
+                    ui.add_space(4.0);
+                    ui.label("This action is permanent for the current session state.");
+                }
             });
 
             ui.add_space(12.0);
@@ -99,12 +106,13 @@ pub fn draw_confirmation_modal(
                     close_modal = true;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let text = if matches!(request, ConfirmationRequest::DiscardChanges(_)) {
-                        "Discard"
-                    } else {
-                        "Delete"
+                    let (text, color) = match request {
+                        ConfirmationRequest::DiscardChanges(_) => ("Discard", egui::Color32::from_rgb(110, 40, 40)),
+                        ConfirmationRequest::DowngradeTarget(_) => ("Downgrade", egui::Color32::from_rgb(110, 40, 40)),
+                        _ => ("Delete", egui::Color32::from_rgb(110, 40, 40)),
                     };
-                    let btn = egui::Button::new(text).fill(egui::Color32::from_rgb(110, 40, 40));
+
+                    let btn = egui::Button::new(text).fill(color);
                     if ui.add(btn).clicked() {
                         confirmed = true;
                         close_modal = true;
@@ -148,6 +156,13 @@ pub fn draw_confirmation_modal(
                     }
                     PendingAction::Template(t) => app.apply_template(ctx, t),
                     PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                }
+            }
+            ConfirmationRequest::DowngradeTarget(t) => {
+                if let Some(doc) = &mut app.doc {
+                    doc.file.target = *t;
+                    doc.file.normalize_for_target();
+                    doc.dirty = true;
                 }
             }
         }

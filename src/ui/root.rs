@@ -286,7 +286,8 @@ fn handle_pick_port_and_run(app: &mut CacocoApp) {
         }
         if let Some(doc) = &app.doc {
             if let Some(iwad) = &app.config.base_wad_path {
-                crate::io::launch_game(&doc.file, &app.assets, &path_str, iwad);
+                let sanitized = doc.file.to_sanitized_json(&app.assets);
+                crate::io::launch_game(&sanitized, &app.assets, &path_str, iwad, doc.file.target);
             }
         }
     }
@@ -342,7 +343,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::ExportJSON => {
             if let Some(doc) = &app.doc {
-                if let Some(p) = crate::io::save_json_dialog(&doc.file, doc.path.clone()) {
+                let sanitized = doc.file.to_sanitized_json(&app.assets);
+                if let Some(p) = crate::io::save_json_dialog(&sanitized, doc.path.clone()) {
                     app.add_to_recent(&p);
                 }
             }
@@ -457,6 +459,22 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
         ui::MenuAction::Open => app.open_project_ui(ctx),
         ui::MenuAction::RequestDiscard(pending) => {
             app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
+        }
+        ui::MenuAction::SetTarget(t) => {
+            if let Some(doc) = &mut app.doc {
+                use crate::model::ExportTarget::*;
+
+                if doc.file.target == Extended && t == Basic {
+                    if doc.file.determine_target() == Extended {
+                        app.confirmation_modal = Some(ConfirmationRequest::DowngradeTarget(t));
+                        return;
+                    }
+                }
+
+                doc.file.target = t;
+                doc.file.normalize_for_target();
+                doc.dirty = true;
+            }
         }
         ui::MenuAction::SaveDone(path) => {
             if path == "SILENT" {

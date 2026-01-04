@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::{Element, ElementWrapper, SBarDefFile};
+use crate::model::{Element, ElementWrapper, ExportTarget, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::layers::colors;
 use crate::ui::shared;
@@ -8,6 +8,7 @@ use std::collections::HashSet;
 
 mod animation;
 pub mod common;
+pub mod compatibility;
 mod components;
 mod conditions;
 mod descriptions;
@@ -33,10 +34,6 @@ enum PropertyTab {
 
 const PROP_TAB_KEY: &str = "cacoco_prop_tab_state";
 
-/// Implementation of the PropertiesUI trait for the ElementWrapper.
-///
-/// This acts as a central router, delegating UI drawing and preview generation
-/// to the specialized implementation for each SBARDEF element type.
 impl PropertiesUI for ElementWrapper {
     fn draw_specific_fields(
         &mut self,
@@ -91,10 +88,10 @@ impl PropertiesUI for ElementWrapper {
         match &self.data {
             Element::Canvas(e) => e.has_specific_fields(),
             Element::List(e) => e.has_specific_fields(),
-            Element::Graphic(e) => e.has_specific_fields(),
+            Element::Graphic(e) => e.has_specific_fields() || e.crop.is_some(),
             Element::Animation(e) => e.has_specific_fields(),
-            Element::Face(e) => e.has_specific_fields(),
-            Element::FaceBackground(e) => e.has_specific_fields(),
+            Element::Face(e) => e.has_specific_fields() || e.crop.is_some(),
+            Element::FaceBackground(e) => e.has_specific_fields() || e.crop.is_some(),
             Element::Number(e) => e.has_specific_fields(),
             Element::Percent(e) => e.has_specific_fields(),
             Element::String(e) => e.has_specific_fields(),
@@ -113,6 +110,9 @@ pub fn draw_properties_panel(
     state: &PreviewState,
 ) -> bool {
     let mut changed = false;
+    let target = file.as_ref().map_or(ExportTarget::Basic, |f| f.target);
+
+    ui.data_mut(|d| d.insert_temp(egui::Id::new("cacoco_current_target"), target));
 
     ui.add_space(5.0);
 
@@ -168,12 +168,14 @@ pub fn draw_properties_panel(
     }
 
     let mut preview_content = None;
+    let mut is_incompatible = false;
     if let Some(f) = file {
         if let Some(path) = selection.iter().next() {
             if path.len() > 1 {
                 let font_cache = FontCache::new(f);
                 if let Some(el) = f.get_element(path) {
                     preview_content = el.get_preview_content(ui, &font_cache, state);
+                    is_incompatible = !compatibility::is_compatible(el, f.target);
                 }
             }
         }
@@ -181,6 +183,28 @@ pub fn draw_properties_panel(
 
     if let Some(content) = preview_content {
         preview::draw_preview_panel(ui, assets, content);
+        ui.add_space(4.0);
+    }
+
+    if is_incompatible {
+        let warn_frame = egui::Frame::default()
+            .inner_margin(6.0)
+            .fill(egui::Color32::from_rgb(80, 30, 30))
+            .stroke(egui::Stroke::new(
+                1.0,
+                egui::Color32::from_rgb(200, 100, 100),
+            ))
+            .corner_radius(4.0);
+
+        warn_frame.show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("⚠");
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("Target Incompatibility").strong());
+                    ui.label(egui::RichText::new("This element uses Extended features not supported by the Basic target.").size(10.0));
+                });
+            });
+        });
         ui.add_space(4.0);
     }
 
@@ -265,7 +289,7 @@ pub fn draw_properties_panel(
                                             });
                                             ui.add_space(4.0);
                                         }
-                                        changed |= common::draw_transform_editor(ui, el);
+                                        changed |= common::draw_transform_editor(ui, el, target);
                                         ui.add_space(4.0);
                                         if el._cacoco_text.is_some() || el.has_specific_fields() {
                                             if el._cacoco_text.is_some() {
@@ -293,8 +317,32 @@ pub fn draw_properties_panel(
                             }
                         }
                     } else if is_layout {
-                        if let Some(bar) = f.data.status_bars.get_mut(path[0]) {
-                            changed |= common::draw_root_statusbar_fields(ui, bar);
+                        let bar_idx = path[0];
+
+                        if let Some(bar) = f.data.status_bars.get_mut(bar_idx) {
+                            if let Some(reason) = &bar._cacoco_system_locked {
+                                ui.vertical_centered(|ui| {
+                                    ui.add_space(20.0);
+                                    ui.label(egui::RichText::new("Managed Slot.").color(egui::Color32::from_rgb(200, 100, 100)).strong());
+                                    ui.add_space(4.0);
+                                    ui.label(egui::RichText::new(reason).weak());
+                                    ui.add_space(8.0);
+
+                                    if bar_idx == 0 {
+                                        ui.horizontal(|ui| {
+                                            ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
+                                            ui.label("Bar Height:");
+                                            changed |= ui.add(egui::DragValue::new(&mut bar.height).range(0..=200)).changed();
+                                        });
+                                        ui.add_space(8.0);
+                                        ui.label(egui::RichText::new("You can adjust the height, but this slot must remain Non-Fullscreen for KEX compatibility.").italics().weak());
+                                    } else {
+                                        ui.label(egui::RichText::new("This specific slot must remain blank and fullscreen for KEX demo compatibility.").italics().weak());
+                                    }
+                                });
+                            } else {
+                                changed |= common::draw_root_statusbar_fields(ui, bar);
+                            }
                         }
                     }
                 } else {

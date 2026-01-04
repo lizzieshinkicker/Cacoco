@@ -5,7 +5,7 @@ use eframe::egui;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::fs;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 /// List of common Doom lump name prefixes that indicate graphical data.
 static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
@@ -97,4 +97,68 @@ fn is_graphic_lump(name: &str) -> bool {
     GRAPHIC_PREFIXES
         .iter()
         .any(|prefix| name.starts_with(prefix))
+}
+
+pub fn write_wad_to_file<W: Write + Seek>(
+    writer: &mut W,
+    sbardef_json: &[u8],
+    assets: &AssetStore,
+) -> anyhow::Result<()> {
+    writer.write_all(b"PWAD")?;
+
+    let num_lumps = 1 + assets.raw_files.len();
+    writer.write_all(&(num_lumps as i32).to_le_bytes())?;
+
+    let directory_offset_marker = writer.stream_position()?;
+    writer.write_all(&0i32.to_le_bytes())?;
+
+    struct LumpRecord {
+        pos: u32,
+        size: u32,
+        name: String,
+    }
+    let mut records = Vec::new();
+
+    let pos = writer.stream_position()? as u32;
+    writer.write_all(sbardef_json)?;
+    records.push(LumpRecord {
+        pos,
+        size: sbardef_json.len() as u32,
+        name: "SBARDEF".to_string(),
+    });
+
+    for (id, bytes) in &assets.raw_files {
+        let original_name = assets
+            .names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| format!("{}", id));
+        let mut stem = AssetStore::stem(&original_name);
+        stem.truncate(8);
+
+        let pos = writer.stream_position()? as u32;
+        writer.write_all(bytes)?;
+        records.push(LumpRecord {
+            pos,
+            size: bytes.len() as u32,
+            name: stem,
+        });
+    }
+
+    let directory_pos = writer.stream_position()? as u32;
+    for rec in records {
+        writer.write_all(&rec.pos.to_le_bytes())?;
+        writer.write_all(&rec.size.to_le_bytes())?;
+
+        let mut name_bytes = [0u8; 8];
+        let b = rec.name.as_bytes();
+        let len = b.len().min(8);
+        name_bytes[..len].copy_from_slice(&b[..len]);
+        writer.write_all(&name_bytes)?;
+    }
+
+    writer.seek(SeekFrom::Start(directory_offset_marker))?;
+    writer.write_all(&(directory_pos as i32).to_le_bytes())?;
+
+    Ok(())
 }

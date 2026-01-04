@@ -36,10 +36,15 @@ pub fn draw_layouts_browser(
             let is_selected = selection.contains(&vec![i]);
             let bar = &file.data.status_bars[i];
 
-            let label = bar
-                .name
-                .clone()
-                .unwrap_or_else(|| format!("Status Bar #{}", i));
+            let system_label = bar._cacoco_system_locked.clone();
+            let is_system = system_label.is_some();
+
+            let label = system_label.unwrap_or_else(|| {
+                bar.name
+                    .clone()
+                    .unwrap_or_else(|| format!("Status Bar #{}", i))
+            });
+
             let height_str = if bar.fullscreen_render {
                 "Fullscreen".to_string()
             } else {
@@ -48,7 +53,7 @@ pub fn draw_layouts_browser(
             let sub = format!("{}, Children: {}", height_str, bar.children.len());
             let thumb_label = format!("#{}", i);
 
-            let response = ui
+            let mut response = ui
                 .horizontal(|ui| {
                     ui.add_space(4.0);
                     ui.scope(|ui| {
@@ -58,11 +63,19 @@ pub fn draw_layouts_browser(
                             .fallback(&thumb_label)
                             .active(is_active)
                             .selected(is_selected)
+                            .dimmed(is_system)
+                            .system(is_system)
                             .show(ui)
                     })
                     .inner
                 })
                 .inner;
+
+            if is_system {
+                response = response.on_hover_text(
+                    "This layout slot is mandatory for the KEX port and cannot be modified.",
+                );
+            }
 
             if response.clicked() {
                 selection.clear();
@@ -70,7 +83,7 @@ pub fn draw_layouts_browser(
                 *current_bar_idx = i;
             }
 
-            if response.drag_started() {
+            if !is_system && response.drag_started() {
                 egui::DragAndDrop::set_payload(ui.ctx(), i);
             }
 
@@ -78,17 +91,20 @@ pub fn draw_layouts_browser(
                 if ui.rect_contains_pointer(response.rect) && *source_idx != i {
                     let pos = ui.input(|i| i.pointer.latest_pos().unwrap_or_default());
                     let is_top = pos.y < response.rect.center().y;
-                    let target_y = if is_top {
-                        response.rect.top()
-                    } else {
-                        response.rect.bottom()
-                    };
 
-                    shared::draw_yellow_line(ui, response.rect, target_y);
+                    let target_idx = if is_top { i } else { i + 1 };
 
-                    if ui.input(|i| i.pointer.any_released()) {
-                        let target = if is_top { i } else { i + 1 };
-                        move_request = Some((*source_idx, target));
+                    if target_idx > 0 && target_idx < bar_count {
+                        let target_y = if is_top {
+                            response.rect.top()
+                        } else {
+                            response.rect.bottom()
+                        };
+                        shared::draw_yellow_line(ui, response.rect, target_y);
+
+                        if ui.input(|i| i.pointer.any_released()) {
+                            move_request = Some((*source_idx, target_idx));
+                        }
                     }
                 }
             }
@@ -96,12 +112,21 @@ pub fn draw_layouts_browser(
             let just_opened = ContextMenu::check(ui, &response);
             if let Some(menu) = ContextMenu::get(ui, response.id) {
                 ContextMenu::show(ui, menu, just_opened, |ui| {
-                    if ContextMenu::button(ui, "Duplicate", true) {
+                    if is_system {
+                        ui.label(
+                            egui::RichText::new("🔒 System Locked Slot")
+                                .color(egui::Color32::from_rgb(200, 100, 100))
+                                .size(10.0),
+                        );
+                        ui.separator();
+                    }
+
+                    if ContextMenu::button(ui, "Duplicate", !is_system) {
                         duplicate_request = Some(i);
                         ContextMenu::close(ui);
                     }
                     ui.separator();
-                    if ContextMenu::button(ui, "Delete", bar_count > 1) {
+                    if ContextMenu::button(ui, "Delete", !is_system) {
                         if bar.children.is_empty() {
                             delete_request = Some(i);
                         } else {
@@ -122,13 +147,11 @@ pub fn draw_layouts_browser(
         actions.push(LayerAction::MoveStatusBar { source, target });
         changed = true;
     }
-
     if let Some(idx) = duplicate_request {
         actions.push(LayerAction::UndoSnapshot);
         actions.push(LayerAction::DuplicateStatusBar(idx));
         changed = true;
     }
-
     if let Some(idx) = delete_request {
         actions.push(LayerAction::UndoSnapshot);
         actions.push(LayerAction::DeleteStatusBar(idx));

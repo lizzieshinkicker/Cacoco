@@ -2,7 +2,9 @@ use super::common;
 use super::common::paint_thumb_content;
 use super::lookups;
 use crate::assets::{AssetId, AssetStore};
-use crate::model::{ConditionDef, ConditionType, Element, ElementWrapper, NumberType};
+use crate::model::{
+    ConditionDef, ConditionType, Element, ElementWrapper, ExportTarget, NumberType,
+};
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
 use eframe::egui;
@@ -15,6 +17,10 @@ pub fn draw_conditions_editor(
     state: &crate::state::PreviewState,
 ) -> bool {
     let mut changed = false;
+    let target = ui.data(|d| {
+        d.get_temp::<ExportTarget>(egui::Id::new("cacoco_current_target"))
+            .unwrap_or_default()
+    });
     let is_ammo_selected = is_ammo_selected_type(element);
 
     let common_ref = element.get_common_mut();
@@ -76,7 +82,16 @@ pub fn draw_conditions_editor(
         ui.push_id(id, |ui| {
             let can_remove =
                 !(is_ammo_selected && cond.condition == ConditionType::SelectedWeaponHasAmmo);
-            changed |= draw_condition_card(ui, cond, assets, &mut remove_idx, i, state, can_remove);
+            changed |= draw_condition_card(
+                ui,
+                cond,
+                assets,
+                &mut remove_idx,
+                i,
+                state,
+                can_remove,
+                target,
+            );
         });
         ui.add_space(4.0);
     }
@@ -105,6 +120,7 @@ fn draw_condition_card(
     my_idx: usize,
     state: &crate::state::PreviewState,
     can_remove: bool,
+    target: ExportTarget,
 ) -> bool {
     let mut changed = false;
     let is_true = crate::conditions::resolve(&[cond.clone()], state, assets);
@@ -174,6 +190,10 @@ fn draw_condition_card(
                                 ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
                                     ui.set_min_width(120.0);
                                     for (idx, g) in lookups::GROUPS.iter().enumerate() {
+                                        if target == ExportTarget::Basic && idx >= 6 && idx != 9 {
+                                            continue;
+                                        }
+
                                         if common::custom_menu_item(ui, g.name, g_idx == idx) {
                                             if idx != g_idx {
                                                 let new_group = &lookups::GROUPS[idx];
@@ -208,7 +228,7 @@ fn draw_condition_card(
                 ui.horizontal(|ui| {
                     let (g_idx, _) = lookups::find_group_for_type(cond.condition);
                     let group = &lookups::GROUPS[g_idx];
-                    changed |= draw_condition_predicate(ui, group, cond, assets, my_idx);
+                    changed |= draw_condition_predicate(ui, group, cond, assets, my_idx, target);
                 });
             });
         });
@@ -232,19 +252,20 @@ fn draw_condition_predicate(
     cond: &mut ConditionDef,
     assets: &AssetStore,
     my_idx: usize,
+    target: ExportTarget,
 ) -> bool {
     let mut changed = false;
     match group.style {
         lookups::GroupStyle::Standard => {
-            changed |= draw_operator_selector(ui, group, cond, assets, my_idx);
+            changed |= draw_operator_selector(ui, group, cond, assets, my_idx, target);
             changed |= draw_params_for_type(ui, cond, assets, my_idx);
         }
         lookups::GroupStyle::Natural => {
             changed |= draw_params_for_type(ui, cond, assets, my_idx);
-            changed |= draw_operator_selector(ui, group, cond, assets, my_idx);
+            changed |= draw_operator_selector(ui, group, cond, assets, my_idx, target);
         }
         lookups::GroupStyle::AmmoComplex => {
-            changed |= draw_operator_selector(ui, group, cond, assets, my_idx);
+            changed |= draw_operator_selector(ui, group, cond, assets, my_idx, target);
             changed |= ui
                 .add(
                     egui::DragValue::new(&mut cond.param)
@@ -283,6 +304,7 @@ fn draw_operator_selector(
     cond: &mut ConditionDef,
     _assets: &AssetStore,
     my_idx: usize,
+    target: ExportTarget,
 ) -> bool {
     let mut changed = false;
     let current_variant = group
@@ -302,6 +324,10 @@ fn draw_operator_selector(
     if let Some(menu) = ContextMenu::get(ui, id) {
         ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
             for v in group.variants {
+                if target == ExportTarget::Basic && (v.condition as u8) > 18 {
+                    continue;
+                }
+
                 if ContextMenu::button(ui, v.label, true) {
                     cond.condition = v.condition;
                     changed = true;
