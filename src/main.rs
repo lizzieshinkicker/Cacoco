@@ -31,6 +31,7 @@ const TITLES: &[&str] = &[
     "I wouldn't leave if I were you. JSON is much worse.",
     "*Cacodemon noise*",
     "Proudly made in a programming language!",
+    "Sometimes even supports KEX!",
 ];
 
 fn main() -> eframe::Result<()> {

@@ -1,5 +1,5 @@
 use crate::assets::{AssetId, AssetStore};
-use crate::model::{CanvasDef, CarouselDef, CropDef, GraphicDef};
+use crate::model::{CanvasDef, CarouselDef, CropDef, ExportTarget, GraphicDef};
 use crate::state::PreviewState;
 use eframe::egui;
 
@@ -17,6 +17,10 @@ impl PropertiesUI for GraphicDef {
         _: &PreviewState,
     ) -> bool {
         let mut changed = false;
+        let target = ui.data(|d| {
+            d.get_temp::<ExportTarget>(egui::Id::new("cacoco_current_target"))
+                .unwrap_or_default()
+        });
 
         let label_w = 50.0;
         let field_w = 100.0;
@@ -41,7 +45,7 @@ impl PropertiesUI for GraphicDef {
             .map(|t| (t.size()[0] as i32, t.size()[1] as i32))
             .unwrap_or((0, 0));
 
-        changed |= draw_crop_editor(ui, &mut self.crop, dw, dh);
+        changed |= draw_crop_editor(ui, &mut self.crop, dw, dh, target);
 
         changed
     }
@@ -63,13 +67,29 @@ pub fn draw_crop_editor(
     crop: &mut Option<CropDef>,
     default_w: i32,
     default_h: i32,
+    target: ExportTarget,
 ) -> bool {
     let mut changed = false;
     let mut is_enabled = crop.is_some();
 
+    if target == ExportTarget::Basic && !is_enabled {
+        return false;
+    }
+
     ui.horizontal(|ui| {
         ui.add_space((ui.available_width() - 130.0).max(0.0) / 2.0);
-        if ui.checkbox(&mut is_enabled, "Enable Cropping").changed() {
+
+        let mut check_ui = ui.add_enabled(
+            target == ExportTarget::Extended,
+            egui::Checkbox::new(&mut is_enabled, "Enable Cropping"),
+        );
+
+        if target == ExportTarget::Basic {
+            check_ui =
+                check_ui.on_disabled_hover_text("Cropping is only available for Extended targets.");
+        }
+
+        if check_ui.changed() {
             if is_enabled {
                 *crop = Some(CropDef {
                     width: default_w,

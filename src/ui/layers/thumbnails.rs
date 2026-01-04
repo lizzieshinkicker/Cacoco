@@ -312,6 +312,7 @@ pub struct ListRow<'a> {
     pub selected: bool,
     pub active: bool,
     pub dimmed: bool,
+    pub is_system: bool,
 }
 
 impl<'a> ListRow<'a> {
@@ -324,6 +325,7 @@ impl<'a> ListRow<'a> {
             selected: false,
             active: false,
             dimmed: false,
+            is_system: false,
         }
     }
 
@@ -349,6 +351,16 @@ impl<'a> ListRow<'a> {
 
     pub fn active(mut self, a: bool) -> Self {
         self.active = a;
+        self
+    }
+
+    pub fn dimmed(mut self, d: bool) -> Self {
+        self.dimmed = d;
+        self
+    }
+
+    pub fn system(mut self, s: bool) -> Self {
+        self.is_system = s;
         self
     }
 
@@ -387,13 +399,19 @@ impl<'a> ListRow<'a> {
         let title_pos_x = rect.min.x + 44.0;
         let center_y = rect.center().y;
 
+        let title_color = if self.is_system {
+            egui::Color32::from_rgb(200, 100, 100)
+        } else {
+            ui.visuals().text_color()
+        };
+
         if let Some(sub) = self.subtitle {
             ui.painter().text(
                 egui::pos2(title_pos_x, center_y - 7.0),
                 egui::Align2::LEFT_CENTER,
                 self.title,
                 egui::FontId::proportional(14.0),
-                ui.visuals().text_color(),
+                title_color,
             );
             ui.painter().text(
                 egui::pos2(title_pos_x, center_y + 8.0),
@@ -408,7 +426,7 @@ impl<'a> ListRow<'a> {
                 egui::Align2::LEFT_CENTER,
                 self.title,
                 egui::FontId::proportional(14.0),
-                ui.visuals().text_color(),
+                title_color,
             );
         }
 

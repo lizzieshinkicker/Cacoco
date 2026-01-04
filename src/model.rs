@@ -10,6 +10,10 @@ fn default_version() -> String {
     "1.2.0".to_string()
 }
 
+fn is_zero(num: &i32) -> bool {
+    *num == 0
+}
+
 /// A helper for serde to handle null values by falling back to the Default implementation.
 fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
@@ -18,6 +22,13 @@ where
 {
     let opt = Option::deserialize(deserializer)?;
     Ok(opt.unwrap_or_default())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ExportTarget {
+    #[default]
+    Basic, // SBARDEF 1.0.0 (KEX Compatible)
+    Extended, // SBARDEF 1.2.0 (Community Ports)
 }
 
 bitflags! {
@@ -198,8 +209,21 @@ pub struct SBarDefFile {
     /// SBARDEF Spec version.
     #[serde(default = "default_version")]
     pub version: String,
+    /// The intended target for this project.
+    #[serde(skip)]
+    pub target: ExportTarget,
     /// The actual definitions for fonts and layouts.
     pub data: StatusBarDefinition,
+}
+
+/// Temporary struct to enforce key order during export.
+#[derive(Serialize)]
+struct KexExport<'a> {
+    #[serde(rename = "type")]
+    type_: &'a str,
+    version: &'a str,
+    metadata: Option<serde_json::Value>,
+    data: serde_json::Value,
 }
 
 /// Container for all font and layout definitions in a project.
@@ -253,6 +277,9 @@ pub struct StatusBarLayout {
     /// The hierarchy of elements inside this layout.
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub children: Vec<ElementWrapper>,
+    /// Internal: Mark this bar as a system-managed mandatory slot.
+    #[serde(skip)]
+    pub _cacoco_system_locked: Option<String>,
 }
 
 impl Default for StatusBarLayout {
@@ -263,6 +290,7 @@ impl Default for StatusBarLayout {
             fullscreen_render: true,
             fill_flat: None,
             children: Vec::new(),
+            _cacoco_system_locked: None,
         }
     }
 }
@@ -347,37 +375,25 @@ impl Default for ElementWrapper {
 /// Attributes shared by nearly all HUD elements.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CommonAttrs {
-    /// Horizontal position relative to parent or alignment anchor.
     #[serde(default)]
     pub x: i32,
-    /// Vertical position relative to parent or alignment anchor.
     #[serde(default)]
     pub y: i32,
-    /// How the element is anchored.
     #[serde(default)]
     pub alignment: Alignment,
-    /// Optional translation lump name (e.g., player color).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    #[serde(default)]
     pub tranmap: Option<String>,
-    /// Optional translation range string.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub translation: Option<String>,
-    /// Enables additive translucency (Boom/MBF feature).
+
     #[serde(default)]
     pub translucency: bool,
-    /// Conditions that must be true for this element to render.
-    #[serde(
-        default,
-        skip_serializing_if = "Vec::is_empty",
-        deserialize_with = "deserialize_null_default"
-    )]
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub conditions: Vec<ConditionDef>,
-    /// Child elements nested inside this one.
-    #[serde(
-        default,
-        skip_serializing_if = "Vec::is_empty",
-        deserialize_with = "deserialize_null_default"
-    )]
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub children: Vec<ElementWrapper>,
 }
 
@@ -446,15 +462,15 @@ pub struct GraphicDef {
     pub common: CommonAttrs,
     /// The lump name of the patch to draw.
     pub patch: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub width: i32,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub height: i32,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub topoffset: i32,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub leftoffset: i32,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub midoffset: i32,
     /// Optional cropping parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -690,7 +706,235 @@ impl ElementWrapper {
 }
 
 impl SBarDefFile {
-    /// Traverses the element tree to find a mutable reference by path.
+    /// Inspects the content of the file to determine if it uses features beyond the Basic (1.0.0) spec.
+    pub fn determine_target(&self) -> ExportTarget {
+        if self.version != "1.0.0" {
+            return ExportTarget::Extended;
+        }
+        if !self.data.hud_fonts.is_empty() {
+            return ExportTarget::Extended;
+        }
+        for bar in &self.data.status_bars {
+            if Self::is_extended_feature_detected(&bar.children) {
+                return ExportTarget::Extended;
+            }
+        }
+        ExportTarget::Basic
+    }
+
+    fn is_extended_feature_detected(elements: &[ElementWrapper]) -> bool {
+        for el in elements {
+            if matches!(
+                el.data,
+                Element::List(_)
+                    | Element::String(_)
+                    | Element::Component(_)
+                    | Element::Carousel(_)
+            ) {
+                return true;
+            }
+            let common = el.get_common();
+            if common.translucency {
+                return true;
+            }
+            match &el.data {
+                Element::Number(n) | Element::Percent(n) => {
+                    if (n.type_ as u8) > 7 {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+            for cond in &common.conditions {
+                if (cond.condition as u8) > 18 {
+                    return true;
+                }
+            }
+            match &el.data {
+                Element::Graphic(g) if g.crop.is_some() => return true,
+                Element::Face(f) if f.crop.is_some() => return true,
+                Element::FaceBackground(f) if f.crop.is_some() => return true,
+                _ => {}
+            }
+            if Self::is_extended_feature_detected(&common.children) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Aggressively enforces the KEX status bar "sandwich" for the Basic target.
+    pub fn normalize_for_target(&mut self) {
+        if self.target != ExportTarget::Basic {
+            for bar in &mut self.data.status_bars {
+                bar._cacoco_system_locked = None;
+            }
+            return;
+        }
+
+        let mut standards = Vec::new();
+        let mut fullscreens = Vec::new();
+
+        let old_bars = self.data.status_bars.drain(..).collect::<Vec<_>>();
+
+        for (i, bar) in old_bars.into_iter().enumerate() {
+            if i == 0 && !bar.fullscreen_render {
+                standards.push(bar);
+                continue;
+            }
+
+            if bar._cacoco_system_locked.is_some() && bar.children.is_empty() {
+                continue;
+            }
+
+            if bar.fullscreen_render {
+                fullscreens.push(bar);
+            } else {
+                standards.push(bar);
+            }
+        }
+
+        let mut new_bars = Vec::new();
+
+        let mut slot_0 = if !standards.is_empty() {
+            standards.remove(0)
+        } else {
+            StatusBarLayout {
+                height: 32,
+                fullscreen_render: false,
+                ..Default::default()
+            }
+        };
+        slot_0.fullscreen_render = false;
+        slot_0._cacoco_system_locked = Some("KEX Mandatory Non-Fullscreen".to_string());
+        new_bars.push(slot_0);
+
+        if fullscreens.is_empty() {
+            new_bars.push(StatusBarLayout {
+                height: 200,
+                fullscreen_render: true,
+                ..Default::default()
+            });
+        } else {
+            for mut f_bar in fullscreens {
+                f_bar.fullscreen_render = true;
+                f_bar.height = 200;
+                f_bar._cacoco_system_locked = None;
+                new_bars.push(f_bar);
+            }
+        }
+
+        new_bars.push(StatusBarLayout {
+            height: 200,
+            fullscreen_render: true,
+            children: Vec::new(),
+            _cacoco_system_locked: Some("KEX Demo Blank Fullscreen".to_string()),
+            ..Default::default()
+        });
+
+        self.data.status_bars = new_bars;
+    }
+
+    pub fn to_sanitized_json(&self, assets: &crate::assets::AssetStore) -> String {
+        let mut clone = self.clone();
+        clone.normalize_for_target();
+
+        if clone.target == ExportTarget::Basic {
+            clone.version = "1.0.0".to_string();
+            clone.data.hud_fonts.clear();
+            if clone.data.number_fonts.is_empty() {
+                clone.data.number_fonts.push(NumberFontDef {
+                    name: "BigRed".to_string(),
+                    type_: 0,
+                    stem: "STT".to_string(),
+                });
+            }
+            let fonts = crate::ui::properties::font_cache::FontCache::new(&clone);
+            for bar in &mut clone.data.status_bars {
+                bar.name = None;
+                if bar.fullscreen_render {
+                    bar.height = 200;
+                }
+                Self::scrub_elements(&mut bar.children, assets, &fonts, ExportTarget::Basic);
+            }
+        } else {
+            clone.version = "1.2.0".to_string();
+        }
+
+        if let Ok(mut data_val) = serde_json::to_value(&clone.data) {
+            Self::prune_json_value(&mut data_val, clone.target);
+            let export = KexExport {
+                type_: &clone.type_,
+                version: &clone.version,
+                metadata: None,
+                data: data_val,
+            };
+            return serde_json::to_string_pretty(&export).unwrap_or_default();
+        }
+        String::new()
+    }
+
+    fn prune_json_value(v: &mut serde_json::Value, target: ExportTarget) {
+        if let Some(obj) = v.as_object_mut() {
+            obj.retain(|k, _| !k.starts_with("_cacoco_"));
+            if target == ExportTarget::Basic {
+                obj.remove("hudfonts");
+                obj.remove("translucency");
+                obj.remove("crop");
+                let keys: Vec<String> = obj.keys().cloned().collect();
+                for k in keys {
+                    let is_empty_array = obj
+                        .get(&k)
+                        .and_then(|v| v.as_array())
+                        .map_or(false, |a| a.is_empty());
+                    if is_empty_array {
+                        obj.insert(k, serde_json::Value::Null);
+                    }
+                }
+            } else {
+                obj.retain(|_, val| !val.is_null());
+            }
+            for value in obj.values_mut() {
+                Self::prune_json_value(value, target);
+            }
+        } else if let Some(arr) = v.as_array_mut() {
+            for value in arr {
+                Self::prune_json_value(value, target);
+            }
+        }
+    }
+
+    fn scrub_elements(
+        elements: &mut Vec<ElementWrapper>,
+        assets: &crate::assets::AssetStore,
+        fonts: &crate::ui::properties::font_cache::FontCache,
+        target: ExportTarget,
+    ) {
+        for el in elements.iter_mut() {
+            if target == ExportTarget::Basic && el._cacoco_text.is_some() {
+                crate::ui::properties::text_helper::rebake_text(el, assets, fonts);
+            }
+            el._cacoco_name = None;
+            el._cacoco_text = None;
+            let common = el.get_common_mut();
+            if target == ExportTarget::Basic {
+                common.translucency = false;
+            }
+            Self::scrub_elements(&mut common.children, assets, fonts, target);
+        }
+        if target == ExportTarget::Basic {
+            elements.retain(|el| {
+                !matches!(
+                    el.data,
+                    Element::List(_)
+                        | Element::String(_)
+                        | Element::Component(_)
+                        | Element::Carousel(_)
+                )
+            });
+        }
+    }
+
     pub fn get_element_mut(&mut self, path: &[usize]) -> Option<&mut ElementWrapper> {
         if path.is_empty() {
             return None;
@@ -699,25 +943,17 @@ impl SBarDefFile {
         if bar_idx >= self.data.status_bars.len() {
             return None;
         }
-
         let bar = &mut self.data.status_bars[bar_idx];
         if path.len() == 1 {
             return None;
         }
-
-        let mut current_element = bar.children.get_mut(path[1])?;
-
-        for &child_idx in &path[2..] {
-            current_element = current_element
-                .get_common_mut()
-                .children
-                .get_mut(child_idx)?;
+        let mut cur = bar.children.get_mut(path[1])?;
+        for &idx in &path[2..] {
+            cur = cur.get_common_mut().children.get_mut(idx)?;
         }
-
-        Some(current_element)
+        Some(cur)
     }
 
-    /// Traverses the element tree to find an immutable reference by path.
     pub fn get_element(&self, path: &[usize]) -> Option<&ElementWrapper> {
         if path.is_empty() {
             return None;
@@ -727,16 +963,13 @@ impl SBarDefFile {
         if path.len() == 1 {
             return None;
         }
-
-        let mut current_element = bar.children.get(path[1])?;
-        for &child_idx in &path[2..] {
-            current_element = current_element.get_common().children.get(child_idx)?;
+        let mut cur = bar.children.get(path[1])?;
+        for &idx in &path[2..] {
+            cur = cur.get_common().children.get(idx)?;
         }
-
-        Some(current_element)
+        Some(cur)
     }
 
-    /// Recursively scrubs all patch and lump names to ensure they are clean Doom lump names.
     pub fn normalize_paths(&mut self) {
         for bar in &mut self.data.status_bars {
             bar.normalize();

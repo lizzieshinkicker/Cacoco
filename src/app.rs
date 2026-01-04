@@ -30,6 +30,7 @@ pub enum ConfirmationRequest {
     DeleteLayers(Vec<Vec<usize>>),
     DeleteAssets(Vec<String>),
     DiscardChanges(PendingAction),
+    DowngradeTarget(crate::model::ExportTarget),
 }
 
 /// The main application container for the Cacoco SBARDEF editor.
@@ -154,7 +155,8 @@ impl CacocoApp {
     pub fn new_project(&mut self, ctx: &egui::Context) {
         let file = SBarDefFile {
             type_: "statusbar".to_string(),
-            version: "1.0.0".to_string(),
+            version: "1.2.0".to_string(),
+            target: crate::model::ExportTarget::Extended,
             data: crate::model::StatusBarDefinition {
                 status_bars: vec![crate::model::StatusBarLayout::default()],
                 ..Default::default()
@@ -181,6 +183,10 @@ impl CacocoApp {
         match serde_json::from_str::<SBarDefFile>(template.json_content) {
             Ok(mut parsed_file) => {
                 parsed_file.normalize_paths();
+
+                parsed_file.target = parsed_file.determine_target();
+                parsed_file.normalize_for_target();
+
                 self.doc = Some(SBarDocument::new(parsed_file, None));
                 self.assets = AssetStore::default();
                 self.preview_state = PreviewState::default();

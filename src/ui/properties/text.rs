@@ -4,7 +4,7 @@ use super::editor::PropertiesUI;
 use super::lookups;
 use super::preview::PreviewContent;
 use crate::assets::AssetStore;
-use crate::model::{Element, ElementWrapper, NumberDef, NumberType, StringDef};
+use crate::model::{Element, ElementWrapper, ExportTarget, NumberDef, NumberType, StringDef};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
@@ -267,6 +267,11 @@ pub fn draw_interactive_header(
     frame_color: egui::Color32,
 ) -> bool {
     let mut changed = false;
+    let target = ui.data(|d| {
+        d.get_temp::<ExportTarget>(egui::Id::new("cacoco_current_target"))
+            .unwrap_or_default()
+    });
+
     let frame = egui::Frame::new()
         .inner_margin(8.0)
         .corner_radius(4.0)
@@ -349,13 +354,13 @@ pub fn draw_interactive_header(
 
                         match &mut element.data {
                             Element::Number(n) => {
-                                if draw_number_options(ui, &mut n.type_, &mut n.param) {
+                                if draw_number_options(ui, &mut n.type_, &mut n.param, target) {
                                     close = true;
                                     changed = true;
                                 }
                             }
                             Element::Percent(p) => {
-                                if draw_number_options(ui, &mut p.type_, &mut p.param) {
+                                if draw_number_options(ui, &mut p.type_, &mut p.param, target) {
                                     close = true;
                                     changed = true;
                                 }
@@ -455,21 +460,39 @@ pub fn number_type_name(t: NumberType) -> &'static str {
     }
 }
 
-fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i32) -> bool {
+fn draw_number_options(
+    ui: &mut egui::Ui,
+    type_: &mut NumberType,
+    param: &mut i32,
+    target: ExportTarget,
+) -> bool {
     let mut changed = false;
+    let is_extended = target == ExportTarget::Extended;
+
     let items = [
         ("Health", NumberType::Health),
         ("Armor", NumberType::Armor),
         ("Frags", NumberType::Frags),
-        ("Kills", NumberType::Kills),
-        ("Items", NumberType::Items),
-        ("Secrets", NumberType::Secrets),
     ];
 
-    for (label, target) in items {
-        if common::custom_menu_item(ui, label, *type_ == target) {
-            *type_ = target;
+    for (label, target_type) in items {
+        if common::custom_menu_item(ui, label, *type_ == target_type) {
+            *type_ = target_type;
             changed = true;
+        }
+    }
+
+    if is_extended {
+        let ext_items = [
+            ("Kills", NumberType::Kills),
+            ("Items", NumberType::Items),
+            ("Secrets", NumberType::Secrets),
+        ];
+        for (label, target_type) in ext_items {
+            if common::custom_menu_item(ui, label, *type_ == target_type) {
+                *type_ = target_type;
+                changed = true;
+            }
         }
     }
 
@@ -491,12 +514,15 @@ fn draw_number_options(ui: &mut egui::Ui, type_: &mut NumberType, param: &mut i3
         }
         changed = true;
     }
-    if common::custom_menu_item(ui, "Powerup Time", *type_ == NumberType::PowerupDuration) {
-        *type_ = NumberType::PowerupDuration;
-        if !lookups::POWERUPS.iter().any(|i| i.id == *param) {
-            *param = 0;
+
+    if is_extended {
+        if common::custom_menu_item(ui, "Powerup Time", *type_ == NumberType::PowerupDuration) {
+            *type_ = NumberType::PowerupDuration;
+            if !lookups::POWERUPS.iter().any(|i| i.id == *param) {
+                *param = 0;
+            }
+            changed = true;
         }
-        changed = true;
     }
 
     ui.add_space(4.0);

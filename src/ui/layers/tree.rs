@@ -430,6 +430,7 @@ fn render_row_contents(
     let mut thumb_ui = ui.new_child(egui::UiBuilder::new().max_rect(thumb_rect));
 
     let is_selected = selection.contains(my_path);
+    let is_compatible = crate::ui::properties::compatibility::is_compatible(element, file.target);
 
     let res = if element._cacoco_text.is_some() {
         thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some("T"), !is_visible)
@@ -462,11 +463,16 @@ fn render_row_contents(
     }
 
     cursor_x += thumbnails::THUMB_SIZE + 8.0;
-    let color = if !is_visible {
+
+    let mut color = if !is_visible {
         ui.visuals().weak_text_color()
     } else {
         ui.visuals().text_color()
     };
+
+    if !is_compatible {
+        color = egui::Color32::from_rgb(200, 100, 100);
+    }
 
     ui.painter().text(
         egui::pos2(cursor_x, rect.center().y),

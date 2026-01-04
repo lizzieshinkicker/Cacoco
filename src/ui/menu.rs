@@ -20,9 +20,10 @@ pub enum MenuAction {
     SaveDone(String),
     ExportDone(String),
     PickPortAndRun,
+    SetTarget(crate::model::ExportTarget),
 }
 
-/// Draws the primary application menu bar (File, Run).
+/// Draws the primary application menu bar (File, Run, Target).
 pub fn draw_menu_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
@@ -38,15 +39,21 @@ pub fn draw_menu_bar(
 
     let file_id = ui.make_persistent_id("file_menu_area");
     let run_id = ui.make_persistent_id("run_menu_area");
+    let target_id = ui.make_persistent_id("target_menu_area");
 
     let mut open_file = false;
     let mut open_run = false;
+    let mut open_target = false;
 
     let dirty = doc.as_ref().map_or(false, |d| d.dirty);
 
+    let current_target = doc
+        .as_ref()
+        .map_or(crate::model::ExportTarget::Extended, |d| d.file.target);
+
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        let btn_w = (ui.available_width() - 4.0) / 2.0;
+        let btn_w = (ui.available_width() - 8.0) / 3.0;
 
         let file_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
             shared::section_header_button(ui, "File", None, ContextMenu::get(ui, file_id).is_some())
@@ -62,6 +69,23 @@ pub fn draw_menu_bar(
         if run_res.clicked() {
             open_run = true;
             trigger_menu(ui, run_id, run_res.rect.left_bottom());
+        }
+
+        let target_label = match current_target {
+            crate::model::ExportTarget::Basic => "Basic",
+            crate::model::ExportTarget::Extended => "Extended",
+        };
+        let target_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+            shared::section_header_button(
+                ui,
+                target_label,
+                None,
+                ContextMenu::get(ui, target_id).is_some(),
+            )
+        });
+        if target_res.clicked() {
+            open_target = true;
+            trigger_menu(ui, target_id, target_res.rect.left_bottom());
         }
     });
 
@@ -118,7 +142,17 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Export JSON...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(path) = io::save_json_dialog(&d.file, d.path.clone()) {
+                    let sanitized = d.file.to_sanitized_json(assets);
+                    if let Some(path) = io::save_json_dialog(&sanitized, d.path.clone()) {
+                        action = MenuAction::ExportDone(path);
+                    }
+                }
+                ContextMenu::close(ui);
+            }
+            if ContextMenu::button(ui, "Export WAD...", doc.is_some()) {
+                if let Some(d) = doc {
+                    let sanitized = d.file.to_sanitized_json(assets);
+                    if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone()) {
                         action = MenuAction::ExportDone(path);
                     }
                 }
@@ -156,7 +190,8 @@ pub fn draw_menu_bar(
                     if ContextMenu::button(ui, &format!("Launch in {name}"), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
-                            io::launch_game(&d.file, assets, path_str, iwad);
+                            let sanitized = d.file.to_sanitized_json(assets);
+                            io::launch_game(&sanitized, assets, path_str, iwad, d.file.target);
                         }
                         ContextMenu::close(ui);
                     }
@@ -167,6 +202,33 @@ pub fn draw_menu_bar(
                     ContextMenu::close(ui);
                 }
             }
+        });
+    }
+
+    if let Some(menu) = ContextMenu::get(ui, target_id) {
+        ContextMenu::show(ui, menu, open_target, |ui| {
+            if ContextMenu::button(
+                ui,
+                "Basic (KEX / 1.0.0)",
+                current_target != crate::model::ExportTarget::Basic,
+            ) {
+                action = MenuAction::SetTarget(crate::model::ExportTarget::Basic);
+                ContextMenu::close(ui);
+            }
+            if ContextMenu::button(
+                ui,
+                "Extended (1.2.0+)",
+                current_target != crate::model::ExportTarget::Extended,
+            ) {
+                action = MenuAction::SetTarget(crate::model::ExportTarget::Extended);
+                ContextMenu::close(ui);
+            }
+            ui.separator();
+            ui.label(
+                egui::RichText::new("Basic targets will sanitize \nSBARDEF and export as .WAD")
+                    .weak()
+                    .size(10.0),
+            );
         });
     }
 
@@ -234,7 +296,6 @@ pub fn draw_menu_bar(
     action
 }
 
-/// Renders the specialized "Settings" modal window.
 pub fn draw_settings_window(
     ctx: &egui::Context,
     settings_open: &mut bool,
@@ -348,7 +409,6 @@ pub fn draw_settings_window(
     }
 }
 
-/// Renders a large clickable card used for template and settings lists.
 pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     let width = ui.available_width();
     let height = 54.0;
@@ -390,7 +450,6 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     response.clicked()
 }
 
-/// Renders a small red trash icon card for deleting settings entries.
 pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     let height = 54.0;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
@@ -430,7 +489,6 @@ pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     response.clicked()
 }
 
-/// Helper to extract a friendly name from a source port binary path.
 pub fn get_port_name(command_str: &str) -> String {
     let program_part = if Path::new(command_str).is_file() {
         command_str.to_string()

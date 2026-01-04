@@ -107,6 +107,8 @@ impl SBarDocument {
                 }
             }
         }
+
+        self.file.normalize_for_target();
     }
 
     /// Performs an undo operation on the document state.
