@@ -145,7 +145,7 @@ pub fn draw_text_line(
 
     for glyph in layout.glyphs {
         if let Some(tex) = glyph.texture {
-            let char_pos = egui::pos2(cur_x, start_y + glyph.y_offset);
+            let char_pos = egui::pos2(cur_x.floor(), (start_y + glyph.y_offset).floor());
 
             let s_pos = ctx.to_screen(char_pos);
             let s_size = egui::vec2(

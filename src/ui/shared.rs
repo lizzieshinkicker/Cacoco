@@ -14,11 +14,20 @@ pub fn draw_scaled_image(
 ) {
     let tex_size = tex.size_vec2();
     if tex_size.x > 0.0 && tex_size.y > 0.0 {
-        let scale = (rect.width() / tex_size.x)
+        let raw_scale = (rect.width() / tex_size.x)
             .min(rect.height() / tex_size.y)
             .min(max_scale);
+
+        let scale = if raw_scale >= 1.0 {
+            raw_scale.floor()
+        } else {
+            raw_scale
+        };
         let final_size = tex_size * scale;
-        let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
+
+        let left = (rect.left() + (rect.width() - final_size.x) / 2.0).floor();
+        let top = (rect.top() + (rect.height() - final_size.y) / 2.0).floor();
+        let draw_rect = egui::Rect::from_min_size(egui::pos2(left, top), final_size);
 
         ui.painter().image(
             tex.id(),

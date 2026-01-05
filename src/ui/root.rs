@@ -54,6 +54,17 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE)
                 .show_inside(ui, |ui| {
+                    if app.doc.is_some() {
+                        let has_focus = ui.ctx().memory(|mem| mem.focused().is_some());
+                        let tab_pressed = ui.input(|i| i.key_pressed(egui::Key::Tab));
+                        let mouse_clicked =
+                            ui.input(|i| i.pointer.any_pressed()) && ui.ui_contains_pointer();
+
+                        if mouse_clicked || (has_focus && tab_pressed) {
+                            app.execute_actions(vec![document::LayerAction::UndoSnapshot]);
+                        }
+                    }
+
                     if let Some(doc) = &mut app.doc {
                         let mut file_clone = Some(doc.file.clone());
                         if ui::draw_properties_panel(
@@ -193,7 +204,7 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
     let last_tab_id = ui.make_persistent_id("sidebar_last_tab_idx");
     let heights_id = ui.make_persistent_id("sidebar_tab_heights");
 
-    let mut tab_idx: Option<usize> = ui.data(|d| d.get_temp(tab_id).unwrap_or(Some(0)));
+    let mut tab_idx: Option<usize> = ui.data(|d| d.get_temp(tab_id).unwrap_or(None));
     let mut last_tab: usize = ui.data(|d| d.get_temp(last_tab_id).unwrap_or(0));
     let mut heights: [f32; 2] = ui.data(|d| d.get_temp(heights_id).unwrap_or([428.0, 428.0]));
 

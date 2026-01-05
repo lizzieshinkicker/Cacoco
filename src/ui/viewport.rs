@@ -21,21 +21,24 @@ pub fn draw_viewport(
 ) -> Vec<LayerAction> {
     let mut actions = Vec::new();
 
+    let mut estimate_rect = ui.available_rect_before_wrap();
+    estimate_rect.min.y += 32.0;
+
+    let temp_proj = ViewportProjection::new(
+        estimate_rect,
+        preview_state.engine.widescreen_mode,
+        preview_state.engine.aspect_correction,
+        if preview_state.engine.auto_zoom {
+            None
+        } else {
+            Some(preview_state.engine.zoom_level)
+        },
+        preview_state.engine.pan_offset,
+    );
+
     ui.vertical(|ui| {
         ui.add_space(2.0);
         ui.horizontal(|ui| {
-            let temp_proj = ViewportProjection::new(
-                ui.available_rect_before_wrap(),
-                preview_state.engine.widescreen_mode,
-                preview_state.engine.aspect_correction,
-                if preview_state.engine.auto_zoom {
-                    None
-                } else {
-                    Some(preview_state.engine.zoom_level)
-                },
-                preview_state.engine.pan_offset,
-            );
-
             ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

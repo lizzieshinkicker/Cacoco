@@ -176,7 +176,7 @@ fn draw_layer_row(
         actions,
     );
 
-    render_row_visuals(ui, rect, &response, element, is_selected);
+    render_row_visuals(ui, rect, element, is_selected);
 
     let thumb_response = render_row_contents(
         ui,
@@ -388,18 +388,20 @@ fn wrap_graphic(patch: &str) -> ElementWrapper {
 fn render_row_visuals(
     ui: &mut egui::Ui,
     rect: egui::Rect,
-    response: &egui::Response,
     element: &ElementWrapper,
     is_selected: bool,
 ) {
     let base_bg = colors::get_layer_color(element)
         .map_or(egui::Color32::TRANSPARENT, |c| c.linear_multiply(0.08));
 
-    let final_bg = if response.hovered() {
+    let is_hovered = ui.rect_contains_pointer(rect) && ui.ctx().dragged_id().is_none();
+
+    let final_bg = if is_hovered {
         ui.visuals().widgets.hovered.bg_fill
     } else {
         base_bg
     };
+
     let stroke = if is_selected {
         ui.visuals().selection.stroke
     } else {
@@ -434,7 +436,7 @@ fn render_row_contents(
 
     let res = if element._cacoco_text.is_some() {
         thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some("T"), !is_visible)
-    } else if matches!(element.data, Element::Canvas(_)) {
+    } else if element.is_natural_container() {
         let icon = if folder_state.is_open() {
             "📂"
         } else {

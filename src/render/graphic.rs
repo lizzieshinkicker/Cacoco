@@ -16,10 +16,10 @@ pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, mut pos: egui:
 /// A low-level primitive for drawing a Doom patch or flat by its AssetId.
 ///
 /// This handles:
-/// 1. Doom-specific offsets (internal patch coordinates).
-/// 2. SBARDEF image cropping logic.
-/// 3. Virtual-to-physical screen projection.
-/// 4. Alpha tinting and alignment anchoring.
+/// Doom-specific offsets (internal patch coordinates).
+/// SBARDEF image cropping logic.
+/// Virtual-to-physical screen projection.
+/// Alpha tinting and alignment anchoring.
 pub(super) fn draw_simple_graphic_patch(
     ctx: &RenderContext,
     patch_id: AssetId,
@@ -70,8 +70,8 @@ pub(super) fn draw_simple_graphic_patch(
         let align_offset = get_alignment_anchor_offset(alignment, size.x, size.y);
 
         let final_pos = egui::pos2(
-            pos.x + align_offset.x - off_x,
-            pos.y + align_offset.y - off_y,
+            (pos.x + align_offset.x - off_x).floor(),
+            (pos.y + align_offset.y - off_y).floor(),
         );
 
         let screen_pos = ctx.to_screen(final_pos);

@@ -60,13 +60,13 @@ pub(super) fn draw_list(
     if def.common.alignment.contains(Alignment::RIGHT) {
         global_block_offset.x = -total_size.x;
     } else if def.common.alignment.contains(Alignment::H_CENTER) {
-        global_block_offset.x = -total_size.x / 2.0;
+        global_block_offset.x = -(total_size.x / 2.0).floor();
     }
 
     if def.common.alignment.contains(Alignment::BOTTOM) {
         global_block_offset.y = -total_size.y;
     } else if def.common.alignment.contains(Alignment::V_CENTER) {
-        global_block_offset.y = -total_size.y / 2.0;
+        global_block_offset.y = -(total_size.y / 2.0).floor();
     }
 
     let mut current_stack_pos = 0.0;
@@ -82,7 +82,7 @@ pub(super) fn draw_list(
             if def.common.alignment.contains(Alignment::BOTTOM) {
                 child_draw_pos.y += total_size.y - child_size.y;
             } else if def.common.alignment.contains(Alignment::V_CENTER) {
-                child_draw_pos.y += (total_size.y - child_size.y) / 2.0;
+                child_draw_pos.y += ((total_size.y - child_size.y) / 2.0).floor();
             }
 
             current_stack_pos += child_size.x + spacing;
@@ -92,7 +92,7 @@ pub(super) fn draw_list(
             if def.common.alignment.contains(Alignment::RIGHT) {
                 child_draw_pos.x += total_size.x - child_size.x;
             } else if def.common.alignment.contains(Alignment::H_CENTER) {
-                child_draw_pos.x += (total_size.x - child_size.x) / 2.0;
+                child_draw_pos.x += ((total_size.x - child_size.x) / 2.0).floor();
             }
 
             current_stack_pos += child_size.y + spacing;

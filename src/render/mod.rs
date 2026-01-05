@@ -176,7 +176,8 @@ pub(super) fn resolve_position(
             pos.x += ctx.proj.origin_x;
         }
     }
-    pos
+
+    egui::pos2(pos.x.floor(), pos.y.floor())
 }
 
 /// Returns a pixel offset vector based on the alignment flags and provided dimensions.

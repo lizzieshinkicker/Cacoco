@@ -314,15 +314,12 @@ fn draw_asset_grid(
     is_project_tab: bool,
 ) {
     let available_w = ui.available_width() - 12.0;
-    let target_size = thumbnails::THUMB_SIZE * zoom;
+    let (size, _cols) = calculate_grid_metrics(available_w, zoom);
 
     let mut selection: HashSet<String> =
         ui.data(|d| d.get_temp(egui::Id::new(ASSET_SEL_KEY)).unwrap_or_default());
 
     let mut pivot: Option<String> = ui.data(|d| d.get_temp(egui::Id::new(ASSET_PIVOT_KEY)));
-
-    let cols = ((available_w + 4.0) / (target_size + 4.0)).floor().max(1.0);
-    let size = (available_w - ((cols - 1.0) * 4.0)) / cols;
 
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
@@ -493,15 +490,13 @@ pub fn draw_library_browser(
     ui.add_space(8.0);
     ui.label(egui::RichText::new("Loose Library Assets"));
 
-    let available_w = ui.available_width() - 12.0;
-    let target_size = thumbnails::THUMB_SIZE * zoom;
-    let cols = ((available_w + 4.0) / (target_size + 4.0)).floor().max(1.0);
-    let size = (available_w - ((cols - 1.0) * 4.0)) / cols;
-
     for group in LIB_GROUPS {
         egui::CollapsingHeader::new(group.title)
             .default_open(group.default_open)
             .show(ui, |ui| {
+                let available_w = ui.available_width() - 8.0;
+                let (size, _cols) = calculate_grid_metrics(available_w, zoom);
+
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
                     for lib_asset in library::ASSETS {
@@ -606,4 +601,12 @@ fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
             &label,
         );
     }
+}
+
+/// Calculates pixel-perfect grid metrics (tile size and column count).
+fn calculate_grid_metrics(available_w: f32, zoom: f32) -> (f32, f32) {
+    let target_size = thumbnails::THUMB_SIZE * zoom;
+    let cols = ((available_w + 4.0) / (target_size + 4.0)).floor().max(1.0);
+    let size = ((available_w - ((cols - 1.0) * 4.0)) / cols).floor();
+    (size, cols)
 }

@@ -56,9 +56,13 @@ impl ViewportProjection {
     }
 
     pub fn to_screen(&self, pos: egui::Pos2) -> egui::Pos2 {
-        let x = pos.x * self.final_scale_x;
-        let y = pos.y * self.final_scale_y;
-        self.screen_rect.min + egui::vec2(x, y)
+        let virtual_x = pos.x.floor();
+        let virtual_y = pos.y.floor();
+
+        let x = virtual_x * self.final_scale_x;
+        let y = virtual_y * self.final_scale_y;
+
+        (self.screen_rect.min + egui::vec2(x, y)).floor()
     }
 
     pub fn to_virtual(&self, pos: egui::Pos2) -> egui::Pos2 {

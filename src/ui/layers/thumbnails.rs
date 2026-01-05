@@ -15,8 +15,6 @@ pub fn draw_thumb_bg(ui: &mut egui::Ui, rect: egui::Rect) {
 }
 
 /// Draws a live, context-aware thumbnail for an element in the layer tree.
-///
-/// Specialized for components and numbers to show the current game values.
 pub fn draw_thumbnail(
     ui: &mut egui::Ui,
     element: &ElementWrapper,
@@ -31,6 +29,12 @@ pub fn draw_thumbnail(
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), egui::Sense::click());
     draw_thumb_bg(ui, rect);
+
+    let tint = if is_visible {
+        egui::Color32::WHITE
+    } else {
+        egui::Color32::from_white_alpha(64)
+    };
 
     match &element.data {
         Element::Component(c) => {
@@ -48,6 +52,27 @@ pub fn draw_thumbnail(
         Element::Percent(p) => {
             ui.ctx().request_repaint();
             draw_live_number_thumbnail(ui, rect, p, true, state, file, assets, !is_visible);
+        }
+        Element::String(s) => {
+            let raw_text = match s.type_ {
+                0 => s.data.as_deref().unwrap_or("???"),
+                1 => "MAP",
+                2 => "ENT",
+                3 => "AUT",
+                _ => "TXT",
+            };
+
+            let clean_text: String = raw_text
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .take(3)
+                .collect();
+
+            if let Some(stem) = find_hud_stem(file, &s.font) {
+                draw_live_patches(ui, rect, &clean_text, stem, assets, tint, false);
+            } else {
+                draw_font_error(ui, rect);
+            }
         }
         _ => {
             let texture = get_preview_texture(element, assets, file, state, false);
@@ -243,16 +268,23 @@ pub fn draw_live_patches(
     }
 
     let content_size = THUMB_SIZE - (INNER_MARGIN * 2.0);
-    let scale = (content_size / total_width)
+    let raw_scale = (content_size / total_width)
         .min(content_size / max_height)
         .min(4.0);
 
-    let mut current_x = rect.center().x - (total_width * scale / 2.0);
-    let center_y = rect.center().y;
+    let scale = if raw_scale >= 1.0 {
+        raw_scale.floor()
+    } else {
+        raw_scale
+    };
+
+    let mut current_x = (rect.left() + (rect.width() - (total_width * scale)) / 2.0).floor();
+    let rect_top = rect.top();
+    let rect_h = rect.height();
 
     for tex in textures {
         let scaled_size = tex.size_vec2() * scale;
-        let y_pos = center_y - (scaled_size.y / 2.0);
+        let y_pos = (rect_top + (rect_h - scaled_size.y) / 2.0).floor();
         let draw_rect = egui::Rect::from_min_size(egui::pos2(current_x, y_pos), scaled_size);
 
         ui.painter().image(

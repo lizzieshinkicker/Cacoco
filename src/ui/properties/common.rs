@@ -355,9 +355,16 @@ pub fn paint_thumb_content(
     if let Some(t) = tex {
         let sz = t.size_vec2();
         if sz.x > 0.0 && sz.y > 0.0 {
-            let scale = (content_size / sz.x).min(content_size / sz.y).min(4.0);
-            let final_size = sz * if scale >= 1.0 { scale.floor() } else { scale };
-            let draw_rect = egui::Rect::from_center_size(rect.center(), final_size);
+            let raw_scale = (content_size / sz.x).min(content_size / sz.y).min(4.0);
+
+            let scale = if raw_scale >= 1.0 {
+                raw_scale.floor()
+            } else {
+                raw_scale
+            };
+            let final_size = (sz * scale).floor();
+            let draw_rect = egui::Rect::from_center_size(rect.center().floor(), final_size);
+
             ui.painter().image(
                 t.id(),
                 draw_rect,

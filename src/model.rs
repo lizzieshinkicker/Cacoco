@@ -591,16 +591,18 @@ pub struct CarouselDef {
 
 impl ElementWrapper {
     /// Returns true if the SBARDEF spec allows this element to have children.
+    /// In Cacoco, we allow "Child Mode" (Ctrl/Cmd) to target any container-type element.
     pub fn is_spec_container(&self) -> bool {
-        self._cacoco_text.is_none()
-    }
-
-    /// Returns true if this is a logical organizational folder (Canvas, List, etc.).
-    pub fn is_natural_container(&self) -> bool {
         matches!(
             self.data,
             Element::Canvas(_) | Element::List(_) | Element::Carousel(_)
         )
+    }
+
+    /// Returns true if this is a logical organizational folder (Canvas, List, etc.).
+    /// Natural containers allow nesting by default.
+    pub fn is_natural_container(&self) -> bool {
+        self._cacoco_text.is_none() && self.is_spec_container()
     }
 
     /// Returns a human-friendly name for use in the layer tree.
@@ -621,7 +623,16 @@ impl ElementWrapper {
             Element::FaceBackground(_) => "Face Background".to_string(),
             Element::Number(n) => format!("Number ({:?})", n.type_),
             Element::Percent(p) => format!("Percent ({:?})", p.type_),
-            Element::String(s) => format!("String (Type {})", s.type_),
+            Element::String(s) => {
+                if s.type_ == 0 {
+                    if let Some(data) = &s.data {
+                        if !data.is_empty() {
+                            return format!("\"{}\"", data);
+                        }
+                    }
+                }
+                format!("String (Type {})", s.type_)
+            }
             Element::Component(c) => format!("Component: {:?}", c.type_),
             Element::Carousel(_) => "Carousel".to_string(),
         }
