@@ -164,6 +164,11 @@ pub fn measure_text_line(ctx: &RenderContext, txt: &str, font: &str, is_num: boo
     layout_text_line(ctx, txt, font, is_num).map_or(0.0, |l| l.size.x)
 }
 
+/// Calculates the full virtual size (width and height) of a rendered string.
+pub fn measure_text_size(ctx: &RenderContext, txt: &str, font: &str, is_num: bool) -> egui::Vec2 {
+    layout_text_line(ctx, txt, font, is_num).map_or(egui::Vec2::ZERO, |l| l.size)
+}
+
 fn layout_text_line<'a>(
     ctx: &'a RenderContext,
     text: &str,

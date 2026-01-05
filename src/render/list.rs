@@ -1,7 +1,8 @@
 use crate::assets::AssetId;
 use crate::conditions;
 use crate::model::*;
-use crate::render::{RenderContext, draw_element_wrapper, text::measure_text_line};
+use crate::render::text::measure_text_size;
+use crate::render::{RenderContext, draw_element_wrapper};
 use eframe::egui;
 
 /// Renders a SBARDEF List element, stacking children based on alignment and spacing.
@@ -150,15 +151,11 @@ fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> 
             } else {
                 "100"
             };
-            let w = measure_text_line(ctx, sample_text, &n.font, true);
-            egui::Vec2::new(w, 12.0)
+            measure_text_size(ctx, sample_text, &n.font, true)
         }
-        Element::String(s) => {
-            let w = measure_text_line(ctx, "Sample Text", &s.font, false);
-            egui::Vec2::new(w, 12.0)
-        }
+        Element::String(s) => measure_text_size(ctx, "Sample Text", &s.font, false),
         Element::Face(_) | Element::FaceBackground(_) => egui::vec2(24.0, 29.0),
-        Element::Component(_) => egui::vec2(64.0, 12.0),
+        Element::Component(c) => measure_text_size(ctx, "Sample Text", &c.font, false),
         Element::Canvas(_) | Element::List(_) | Element::Carousel(_) => egui::Vec2::ZERO,
     };
 
