@@ -52,15 +52,6 @@ impl<'a> RenderContext<'a> {
     pub fn to_screen(&self, pos: egui::Pos2) -> egui::Pos2 {
         self.proj.to_screen(pos)
     }
-
-    /// Helper to retrieve a Number Font definition by name from the current file.
-    pub fn get_number_font(&self, name: &str) -> Option<&NumberFontDef> {
-        self.file
-            .data
-            .number_fonts
-            .iter()
-            .find(|f| f.name.eq_ignore_ascii_case(name))
-    }
 }
 
 /// The main recursive entry point for drawing an SBARDEF element and its children.

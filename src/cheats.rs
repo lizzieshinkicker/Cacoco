@@ -126,7 +126,10 @@ impl CheatEngine {
         ctx.input(|i| {
             if i.key_pressed(egui::Key::Num1) {
                 state.selected_weapon_slot = 1;
-                state.inventory.has_chainsaw = true;
+                state.inventory.has_fist = true;
+                if state.engine.slot_mapping == crate::state::SlotMapping::Vanilla {
+                    state.inventory.has_chainsaw = true;
+                }
             }
             if i.key_pressed(egui::Key::Num2) {
                 state.selected_weapon_slot = 2;
@@ -153,6 +156,14 @@ impl CheatEngine {
             if i.key_pressed(egui::Key::Num7) {
                 state.selected_weapon_slot = 7;
                 state.inventory.has_bfg = true;
+            }
+            if i.key_pressed(egui::Key::Num8) {
+                state.selected_weapon_slot = 8;
+                state.inventory.has_chainsaw = true;
+            }
+            if i.key_pressed(egui::Key::Num9) {
+                state.selected_weapon_slot = 9;
+                state.inventory.has_super_shotgun = true;
             }
         });
 

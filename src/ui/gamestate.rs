@@ -362,9 +362,9 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         |ui: &mut egui::Ui, label: &str, cur: &mut i32, max: &mut i32| {
                             ui.label(label);
                             ui.horizontal(|ui| {
-                                ui.add(egui::DragValue::new(cur).range(0..=999).speed(0.5));
+                                ui.add(egui::DragValue::new(cur).range(0..=9999).speed(0.5));
                                 ui.label("/");
-                                ui.add(egui::DragValue::new(max).range(0..=999).speed(0.5));
+                                ui.add(egui::DragValue::new(max).range(0..=9999).speed(0.5));
                             });
                             ui.end_row();
                         };
@@ -472,6 +472,27 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
         ui.separator();
         ui.add_space(4.0);
 
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
+            ui.label("Slot Mapping:");
+            egui::ComboBox::from_id_salt("slot_map_dd")
+                .selected_text(format!("{:?}", state.engine.slot_mapping))
+                .width(100.0)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut state.engine.slot_mapping,
+                        crate::state::SlotMapping::Vanilla,
+                        "Vanilla",
+                    );
+                    ui.selectable_value(
+                        &mut state.engine.slot_mapping,
+                        crate::state::SlotMapping::Extended,
+                        "Extended (8/9)",
+                    );
+                });
+        });
+
+        ui.add_space(4.0);
         ui.checkbox(&mut state.engine.widescreen_mode, "Widescreen Mode");
 
         ui.horizontal(|ui| {

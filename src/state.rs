@@ -10,6 +10,14 @@ fn default_one() -> i32 {
     1
 }
 
+/// Represents visually whether slots 1 and 3 are overloaded (Vanilla), or extended to 8 and 9.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum SlotMapping {
+    #[default]
+    Vanilla, // 1: Fist/Saw, 3: Shot/SSG
+    Extended, // 1: Fist, 8: Saw, 3: Shot, 9: SSG
+}
+
 /// Represents the physical state of the player character.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerStats {
@@ -159,10 +167,11 @@ impl Inventory {
     /// Maps a weapon parameter (ID24) to an ammo type.
     pub fn get_weapon_ammo_type(&self, weapon_param: i32) -> Option<i32> {
         match weapon_param {
-            101 | 3 => Some(1),
-            103 | 2 | 4 => Some(0),
-            104 | 5 => Some(3),
-            105 | 106 | 6 | 7 => Some(2),
+            0 | 9 => None,
+            1 | 3 | 102 | 103 => Some(0),
+            2 | 10 | 101 => Some(1),
+            4 | 104 => Some(3),
+            5 | 6 | 105 | 106 => Some(2),
             _ => None,
         }
     }
@@ -187,6 +196,7 @@ pub struct EngineContext {
     pub automap_overlay: bool,
     pub disabled_widgets: HashSet<i32>,
     pub disabled_components: HashSet<String>,
+    pub slot_mapping: SlotMapping,
 
     #[serde(default = "default_true")]
     pub auto_zoom: bool,
@@ -209,6 +219,7 @@ impl Default for EngineContext {
             auto_zoom: true,
             zoom_level: 1,
             pan_offset: eframe::egui::Vec2::ZERO,
+            slot_mapping: SlotMapping::default(),
         }
     }
 }

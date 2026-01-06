@@ -492,6 +492,9 @@ pub struct AnimationDef {
 fn default_fps() -> f64 {
     10.0
 }
+fn default_duration() -> f32 {
+    4.0
+}
 
 /// A single frame within an animation sequence.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -569,7 +572,7 @@ pub struct StringDef {
 }
 
 /// Renders complex engine-driven components.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ComponentDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
@@ -578,8 +581,20 @@ pub struct ComponentDef {
     pub font: String,
     #[serde(default)]
     pub vertical: bool,
-    #[serde(default)]
-    pub duration: f64,
+    #[serde(default = "default_duration")]
+    pub duration: f32,
+}
+
+impl Default for ComponentDef {
+    fn default() -> Self {
+        Self {
+            common: CommonAttrs::default(),
+            type_: ComponentType::Unknown,
+            font: String::new(),
+            vertical: false,
+            duration: 4.0,
+        }
+    }
 }
 
 /// Represents the KEX/Woof style weapon selection carousel.

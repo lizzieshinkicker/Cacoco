@@ -470,26 +470,38 @@ fn render_player_weapon(
     proj: &ViewportProjection,
     v_shift: f32,
 ) {
-    let (weapon_lump_name, constant_offset) = match state.editor.display_weapon_slot {
-        1 => {
-            if state.inventory.has_chainsaw {
-                (Some("SAWGC0"), 0.0)
-            } else {
-                (Some("PUNGA0"), 0.0)
-            }
-        }
+    let (weapon_lump_name, constant_offset) = match state.selected_weapon_slot {
+        1 => (
+            Some(
+                if state.inventory.has_chainsaw
+                    && state.engine.slot_mapping == crate::state::SlotMapping::Vanilla
+                {
+                    "SAWGC0"
+                } else {
+                    "PUNGA0"
+                },
+            ),
+            0.0,
+        ),
         2 => (Some("PISGA0"), 0.0),
-        3 => {
-            if state.editor.display_super_shotgun {
-                (Some("SHT2A0"), 0.0)
-            } else {
-                (Some("SHTGA0"), 0.0)
-            }
-        }
+        3 => (
+            Some(
+                if state.use_super_shotgun
+                    && state.engine.slot_mapping == crate::state::SlotMapping::Vanilla
+                {
+                    "SHT2A0"
+                } else {
+                    "SHTGA0"
+                },
+            ),
+            0.0,
+        ),
         4 => (Some("CHGGA0"), 32.0),
         5 => (Some("MISGA0"), 32.0),
         6 => (Some("PLSGA0"), 0.0),
         7 => (Some("BFGGA0"), 32.0),
+        8 => (Some("SAWGC0"), 0.0),
+        9 => (Some("SHT2A0"), 0.0),
         _ => (None, 0.0),
     };
 

@@ -9,7 +9,7 @@ use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
 
 impl PropertiesUI for ComponentDef {
-    /// Renders font selection for HUD components.
+    /// Renders font selection and duration for HUD components.
     fn draw_specific_fields(
         &mut self,
         ui: &mut egui::Ui,
@@ -42,6 +42,29 @@ impl PropertiesUI for ComponentDef {
                     });
                 }
             });
+
+            use crate::model::ComponentType::*;
+            if matches!(self.type_, Message | AnnounceLevelTitle) {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.add_space((ui.available_width() - 140.0).max(0.0) / 2.0);
+                    ui.label("Duration:");
+
+                    let mut tenths = (self.duration * 10.0).round() as i32;
+
+                    let res = ui.add(
+                        egui::DragValue::new(&mut tenths)
+                            .speed(1)
+                            .range(0..=600)
+                            .custom_formatter(|n, _| format!("{:.1}s", n / 10.0)),
+                    );
+
+                    if res.changed() {
+                        self.duration = tenths as f32 / 10.0;
+                        changed = true;
+                    }
+                });
+            }
         });
         changed
     }

@@ -175,15 +175,20 @@ fn layout_text_line<'a>(
     font: &str,
     is_num: bool,
 ) -> Option<TextLayout<'a>> {
-    let stem = if is_num {
-        ctx.get_number_font(font).map(|f| f.stem.clone())
+    let (stem, font_type) = if is_num {
+        ctx.file
+            .data
+            .number_fonts
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case(font))
+            .map(|f| (f.stem.clone(), f.type_))
     } else {
         ctx.file
             .data
             .hud_fonts
             .iter()
             .find(|f| f.name.eq_ignore_ascii_case(font))
-            .map(|f| f.stem.clone())
+            .map(|f| (f.stem.clone(), f.type_))
     }?;
 
     let mut glyphs = Vec::new();
@@ -191,16 +196,39 @@ fn layout_text_line<'a>(
     let mut max_h = 0.0;
     let stem_upper = stem.to_uppercase();
 
+    let mut mono_width = 0.0;
+    if font_type == 0 {
+        let zero_id = ctx.assets.resolve_patch_id(&stem, '0', is_num);
+        mono_width = ctx
+            .assets
+            .textures
+            .get(&zero_id)
+            .map(|t| t.size_vec2().x)
+            .unwrap_or(DEFAULT_GLYPH_W);
+    } else if font_type == 1 {
+        let chars = if is_num { "0123456789" } else { "ABCDEFGHJM" };
+        for c in chars.chars() {
+            let id = ctx.assets.resolve_patch_id(&stem, c, is_num);
+            if let Some(tex) = ctx.assets.textures.get(&id) {
+                mono_width = mono_width.max(tex.size_vec2().x);
+            }
+        }
+        if mono_width == 0.0 {
+            mono_width = DEFAULT_GLYPH_W;
+        }
+    }
+
     for c in text.chars() {
         if c == ' ' {
+            let w = if font_type == 2 { 4.0 } else { mono_width };
             glyphs.push(Glyph {
                 texture: None,
                 tex_w: 0.0,
-                advance: 4.0,
+                advance: w,
                 h: 0.0,
                 y_offset: 0.0,
             });
-            total_w += 4.0;
+            total_w += w;
             continue;
         }
 
@@ -208,12 +236,14 @@ fn layout_text_line<'a>(
 
         if let Some(tex) = ctx.assets.textures.get(&id) {
             let sz = tex.size_vec2();
-
             let mut y_offset = 0.0;
-            let mut advance = sz.x;
+
+            let advance = if font_type == 2 { sz.x } else { mono_width };
 
             if stem_upper == "STT" && c == '1' {
-                advance += 2.0;
+                if font_type == 2 {
+                    total_w += 2.0;
+                }
             }
 
             if stem_upper == "STCFN" {
@@ -237,14 +267,19 @@ fn layout_text_line<'a>(
                 max_h = sz.y + y_offset;
             }
         } else {
+            let w = if font_type == 2 {
+                DEFAULT_GLYPH_W
+            } else {
+                mono_width
+            };
             glyphs.push(Glyph {
                 texture: None,
                 tex_w: 0.0,
-                advance: DEFAULT_GLYPH_W,
+                advance: w,
                 h: 0.0,
                 y_offset: 0.0,
             });
-            total_w += DEFAULT_GLYPH_W;
+            total_w += w;
         }
     }
 
