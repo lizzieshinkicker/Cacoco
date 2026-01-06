@@ -1,6 +1,7 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::assets::AssetId;
 use crate::document;
+use crate::ui::messages::{self, EditorEvent};
 use eframe::egui;
 
 /// Renders the onboarding screen for users who haven't selected an IWAD yet.
@@ -92,7 +93,11 @@ pub fn draw_confirmation_modal(
                     ui.label("Discard unsaved changes and continue?");
                 }
                 ConfirmationRequest::DowngradeTarget(_) => {
-                    ui.label(egui::RichText::new("Warning: Extended Features Detected").color(egui::Color32::from_rgb(200, 100, 100)).strong());
+                    ui.label(
+                        egui::RichText::new("Warning: Extended Features Detected")
+                            .color(egui::Color32::from_rgb(200, 100, 100))
+                            .strong(),
+                    );
                     ui.add_space(8.0);
                     ui.label("Switching to Basic (KEX) target will strip extended features (Components, Lists, Conditionals) and enforce mandatory layout slots.");
                     ui.add_space(4.0);
@@ -107,8 +112,12 @@ pub fn draw_confirmation_modal(
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let (text, color) = match request {
-                        ConfirmationRequest::DiscardChanges(_) => ("Discard", egui::Color32::from_rgb(110, 40, 40)),
-                        ConfirmationRequest::DowngradeTarget(_) => ("Downgrade", egui::Color32::from_rgb(110, 40, 40)),
+                        ConfirmationRequest::DiscardChanges(_) => {
+                            ("Discard", egui::Color32::from_rgb(110, 40, 40))
+                        }
+                        ConfirmationRequest::DowngradeTarget(_) => {
+                            ("Downgrade", egui::Color32::from_rgb(110, 40, 40))
+                        }
                         _ => ("Delete", egui::Color32::from_rgb(110, 40, 40)),
                     };
 
@@ -125,13 +134,15 @@ pub fn draw_confirmation_modal(
         match request {
             ConfirmationRequest::DeleteStatusBar(idx) => {
                 app.execute_actions(vec![document::LayerAction::DeleteStatusBar(*idx)]);
+                messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
             ConfirmationRequest::DeleteLayers(paths) => {
                 app.execute_actions(vec![document::LayerAction::DeleteSelection(paths.clone())]);
+                messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
             ConfirmationRequest::DeleteAssets(items) => {
                 for key in items {
-                    let id = AssetId::new(key);
+                    let id = crate::assets::AssetId::new(key);
                     app.assets.textures.remove(&id);
                     app.assets.raw_files.remove(&id);
                     app.assets.offsets.remove(&id);
@@ -140,6 +151,7 @@ pub fn draw_confirmation_modal(
                 if let Some(doc) = &mut app.doc {
                     doc.dirty = true;
                 }
+                messages::log_event(&mut app.preview_state, EditorEvent::AssetsDeleted);
             }
             ConfirmationRequest::DiscardChanges(pending) => {
                 if let Some(doc) = &mut app.doc {

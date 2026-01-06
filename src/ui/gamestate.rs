@@ -1,5 +1,6 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::state::PreviewState;
+use crate::ui::messages::{self, EditorEvent, MessageItem};
 use crate::ui::shared;
 use eframe::egui;
 
@@ -34,6 +35,34 @@ enum ItemId {
     RocketLauncher,
     PlasmaGun,
     BFG,
+}
+
+impl ItemId {
+    /// Maps internal UI ItemIds to the shared MessageItem system.
+    fn to_msg_item(self) -> MessageItem {
+        match self {
+            ItemId::BlueCard => MessageItem::BlueCard,
+            ItemId::YellowCard => MessageItem::YellowCard,
+            ItemId::RedCard => MessageItem::RedCard,
+            ItemId::BlueSkull => MessageItem::BlueSkull,
+            ItemId::YellowSkull => MessageItem::YellowSkull,
+            ItemId::RedSkull => MessageItem::RedSkull,
+            ItemId::Berserk => MessageItem::Berserk,
+            ItemId::Invisibility => MessageItem::Invisibility,
+            ItemId::Map => MessageItem::Map,
+            ItemId::Radsuit => MessageItem::Radsuit,
+            ItemId::Liteamp => MessageItem::Liteamp,
+            ItemId::Invuln => MessageItem::Invulnerability,
+            ItemId::Chainsaw => MessageItem::Chainsaw,
+            ItemId::Pistol => MessageItem::Pistol,
+            ItemId::Shotgun => MessageItem::Shotgun,
+            ItemId::SuperShotgun => MessageItem::SuperShotgun,
+            ItemId::Chaingun => MessageItem::Chaingun,
+            ItemId::RocketLauncher => MessageItem::RocketLauncher,
+            ItemId::PlasmaGun => MessageItem::PlasmaGun,
+            ItemId::BFG => MessageItem::BFG,
+        }
+    }
 }
 
 /// Draws the "Held Items" grid.
@@ -267,11 +296,39 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                     .spacing(egui::vec2(4.0, 4.0))
                     .show(ui, |ui| {
                         ui.label("Health:");
-                        ui.add(egui::DragValue::new(&mut state.player.health).range(0..=200));
+                        let old_h = state.player.health;
+                        if ui
+                            .add(egui::DragValue::new(&mut state.player.health).range(0..=200))
+                            .changed()
+                        {
+                            if state.player.health > old_h {
+                                messages::log_event(
+                                    state,
+                                    EditorEvent::Pickup(MessageItem::HealthBonus),
+                                );
+                            }
+                            if state.player.health == 0 {
+                                messages::log_event(
+                                    state,
+                                    EditorEvent::Pickup(MessageItem::DoomguyDeath),
+                                );
+                            }
+                        }
                         ui.end_row();
 
                         ui.label("Armor:");
-                        ui.add(egui::DragValue::new(&mut state.player.armor).range(0..=200));
+                        let old_a = state.player.armor;
+                        if ui
+                            .add(egui::DragValue::new(&mut state.player.armor).range(0..=200))
+                            .changed()
+                        {
+                            if state.player.armor > old_a {
+                                messages::log_event(
+                                    state,
+                                    EditorEvent::Pickup(MessageItem::ArmorBonus),
+                                );
+                            }
+                        }
                         ui.end_row();
                     });
             });
@@ -293,6 +350,12 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
 
                 if response.clicked() {
                     state.player.armor_max = if is_blue { 100 } else { 200 };
+                    let item = if state.player.armor_max == 200 {
+                        MessageItem::Megaarmor
+                    } else {
+                        MessageItem::GreenArmor
+                    };
+                    messages::log_event(state, EditorEvent::Pickup(item));
                 }
             });
         });
@@ -315,36 +378,83 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                     .spacing(egui::vec2(4.0, 1.0))
                     .show(ui, |ui| {
                         ui.label("Bullets:");
-                        ui.add(
-                            egui::DragValue::new(&mut state.inventory.ammo_bullets)
-                                .range(0..=m_bul),
-                        );
+                        let old_bul = state.inventory.ammo_bullets;
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut state.inventory.ammo_bullets)
+                                    .range(0..=m_bul),
+                            )
+                            .changed()
+                        {
+                            if state.inventory.ammo_bullets > old_bul {
+                                messages::log_event(state, EditorEvent::Pickup(MessageItem::Clip));
+                            }
+                        }
                         ui.end_row();
+
                         ui.label("Shells:");
-                        ui.add(
-                            egui::DragValue::new(&mut state.inventory.ammo_shells).range(0..=m_shl),
-                        );
+                        let old_shl = state.inventory.ammo_shells;
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut state.inventory.ammo_shells)
+                                    .range(0..=m_shl),
+                            )
+                            .changed()
+                        {
+                            if state.inventory.ammo_shells > old_shl {
+                                messages::log_event(
+                                    state,
+                                    EditorEvent::Pickup(MessageItem::Shells),
+                                );
+                            }
+                        }
                         ui.end_row();
+
                         ui.label("Rockets:");
-                        ui.add(
-                            egui::DragValue::new(&mut state.inventory.ammo_rockets)
-                                .range(0..=m_rkt),
-                        );
+                        let old_rkt = state.inventory.ammo_rockets;
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut state.inventory.ammo_rockets)
+                                    .range(0..=m_rkt),
+                            )
+                            .changed()
+                        {
+                            if state.inventory.ammo_rockets > old_rkt {
+                                messages::log_event(
+                                    state,
+                                    EditorEvent::Pickup(MessageItem::Rocket),
+                                );
+                            }
+                        }
                         ui.end_row();
+
                         ui.label("Cells:");
-                        ui.add(
-                            egui::DragValue::new(&mut state.inventory.ammo_cells).range(0..=m_cel),
-                        );
+                        let old_cel = state.inventory.ammo_cells;
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut state.inventory.ammo_cells)
+                                    .range(0..=m_cel),
+                            )
+                            .changed()
+                        {
+                            if state.inventory.ammo_cells > old_cel {
+                                messages::log_event(state, EditorEvent::Pickup(MessageItem::Cell));
+                            }
+                        }
                         ui.end_row();
                     });
             });
 
             ui.vertical(|ui| {
                 ui.set_width(42.0);
-                let _ =
-                    draw_icon_button(ui, assets, "BPAKA0", state.inventory.has_backpack, "Pack")
-                        .clicked()
-                        .then(|| state.inventory.has_backpack = !state.inventory.has_backpack);
+                if draw_icon_button(ui, assets, "BPAKA0", state.inventory.has_backpack, "Pack")
+                    .clicked()
+                {
+                    state.inventory.has_backpack = !state.inventory.has_backpack;
+                    if state.inventory.has_backpack {
+                        messages::log_event(state, EditorEvent::Pickup(MessageItem::Backpack));
+                    }
+                }
             });
         });
 
@@ -558,6 +668,10 @@ fn item_btn(
 
         if response.clicked() {
             let new_val = !is_owned;
+            if new_val {
+                messages::log_event(state, EditorEvent::Pickup(item_id.to_msg_item()));
+            }
+
             if let Some(id) = pwr_id {
                 let dur = if new_val {
                     match id {
@@ -645,6 +759,10 @@ fn weapon_complex_btn(
 
         if response.clicked() {
             let new_owned = !owned;
+            if new_owned {
+                messages::log_event(state, EditorEvent::Pickup(item_id.to_msg_item()));
+            }
+
             match item_id {
                 ItemId::Chainsaw => state.inventory.has_chainsaw = new_owned,
                 ItemId::Pistol => state.inventory.has_pistol = new_owned,

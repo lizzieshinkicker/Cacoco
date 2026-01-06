@@ -7,6 +7,7 @@ use crate::model::{
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::font_wizard::FontWizardState;
+use crate::ui::messages::{self, EditorEvent};
 use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
@@ -213,14 +214,26 @@ pub fn draw_layers_panel(
                             if active_tab == BrowserTab::Graphics {
                                 ui.menu_button("Import...", |ui| {
                                     if ui.button("Files").clicked() {
-                                        if crate::io::import_images_dialog(ui.ctx(), assets) > 0 {
+                                        let count =
+                                            crate::io::import_images_dialog(ui.ctx(), assets);
+                                        if count > 0 {
                                             changed = true;
+                                            messages::log_event(
+                                                state,
+                                                EditorEvent::ImportImages(count),
+                                            );
                                         }
                                         ui.close();
                                     }
                                     if ui.button("Folder").clicked() {
-                                        if crate::io::import_folder_dialog(ui.ctx(), assets) > 0 {
+                                        let count =
+                                            crate::io::import_folder_dialog(ui.ctx(), assets);
+                                        if count > 0 {
                                             changed = true;
+                                            messages::log_event(
+                                                state,
+                                                EditorEvent::ImportFolder(count),
+                                            );
                                         }
                                         ui.close();
                                     }

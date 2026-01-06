@@ -1,5 +1,6 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::ui::font_wizard;
+use crate::ui::messages::{self, EditorEvent};
 use crate::{document, ui};
 use eframe::egui;
 use std::collections::HashSet;
@@ -313,11 +314,13 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         Action::Undo => {
             if let Some(doc) = &mut app.doc {
                 doc.undo();
+                messages::log_event(&mut app.preview_state, EditorEvent::Undo);
             }
         }
         Action::Redo => {
             if let Some(doc) = &mut app.doc {
                 doc.redo();
+                messages::log_event(&mut app.preview_state, EditorEvent::Redo);
             }
         }
         Action::Open => {
@@ -343,11 +346,16 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         doc.path = Some(p.clone());
                         doc.dirty = false;
                         app.add_to_recent(&p);
+                        messages::log_event(&mut app.preview_state, EditorEvent::ProjectSaved(p));
                     }
                 } else {
                     let p = doc.path.as_ref().unwrap();
                     if crate::io::save_pk3_silent(&doc.file, &app.assets, p).is_ok() {
                         doc.dirty = false;
+                        messages::log_event(
+                            &mut app.preview_state,
+                            EditorEvent::ProjectSaved(p.clone()),
+                        );
                     }
                 }
             }
@@ -357,6 +365,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 let sanitized = doc.file.to_sanitized_json(&app.assets);
                 if let Some(p) = crate::io::save_json_dialog(&sanitized, doc.path.clone()) {
                     app.add_to_recent(&p);
+                    messages::log_event(&mut app.preview_state, EditorEvent::ProjectExported(p));
                 }
             }
         }
@@ -381,14 +390,19 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         doc.history.clipboard.push(el.clone());
                     }
                 }
+                let count = doc.history.clipboard.len() + doc.history.bar_clipboard.len();
+                messages::log_event(&mut app.preview_state, EditorEvent::ClipboardCopy(count));
             }
         }
         Action::Paste => {
             if let Some(doc) = &mut app.doc {
                 if !doc.history.bar_clipboard.is_empty() {
+                    let count = doc.history.bar_clipboard.len();
                     let pasted = doc.history.prepare_bar_clipboard_for_paste();
                     doc.execute_actions(vec![LayerAction::PasteStatusBars(pasted)]);
+                    messages::log_event(&mut app.preview_state, EditorEvent::ClipboardPaste(count));
                 } else if !doc.history.clipboard.is_empty() {
+                    let count = doc.history.clipboard.len();
                     let pasted = doc.history.prepare_clipboard_for_paste();
 
                     let (p, i) = document::determine_insertion_point(
@@ -402,6 +416,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         insert_idx: i,
                         elements: pasted,
                     }]);
+                    messages::log_event(&mut app.preview_state, EditorEvent::ClipboardPaste(count));
                 }
             }
         }
@@ -425,6 +440,7 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     if !layers.is_empty() {
                         doc.execute_actions(vec![LayerAction::DuplicateSelection(layers)]);
                     }
+                    messages::log_event(&mut app.preview_state, EditorEvent::Duplicate);
                 }
             }
         }
@@ -449,11 +465,13 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                                 Some(ConfirmationRequest::DeleteStatusBar(idx));
                         } else if doc.file.data.status_bars.len() > 1 {
                             doc.execute_actions(vec![LayerAction::DeleteStatusBar(idx)]);
+                            messages::log_event(&mut app.preview_state, EditorEvent::Delete);
                         }
                     } else if needs_conf {
                         app.confirmation_modal = Some(ConfirmationRequest::DeleteLayers(paths));
                     } else {
                         doc.execute_actions(vec![LayerAction::DeleteSelection(paths)]);
+                        messages::log_event(&mut app.preview_state, EditorEvent::Delete);
                     }
                 }
             }
@@ -494,10 +512,12 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
                 doc.path = Some(path.clone());
                 doc.dirty = false;
                 app.add_to_recent(&path);
+                messages::log_event(&mut app.preview_state, EditorEvent::ProjectSaved(path));
             }
         }
         ui::MenuAction::ExportDone(path) => {
             app.add_to_recent(&path);
+            messages::log_event(&mut app.preview_state, EditorEvent::ProjectExported(path));
         }
         ui::MenuAction::PickPortAndRun => {
             handle_pick_port_and_run(app);
