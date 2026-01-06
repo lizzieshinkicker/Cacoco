@@ -22,7 +22,7 @@
     "hudfonts": [
       {
         "name": "Classic HUD",
-        "type": 0,
+        "type": 2,
         "stem": "STCFN"
       }
     ],
@@ -37,13 +37,12 @@
               "x": 160,
               "y": 0,
               "alignment": 49,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
-              "patch": "STBAR",
-              "width": 0,
-              "height": 0,
-              "topoffset": 0,
-              "leftoffset": 0,
-              "midoffset": 0
+              "conditions": [],
+              "children": [],
+              "patch": "STBAR"
             }
           },
           {
@@ -51,11 +50,15 @@
               "x": 44,
               "y": 3,
               "alignment": 2,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
+              "children": [],
               "font": "Classic Status Bar",
               "type": 4,
               "param": 0,
-              "maxlength": 0
+              "maxlength": 3
             }
           },
           {
@@ -63,11 +66,15 @@
               "x": 104,
               "y": 3,
               "alignment": 2,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
+              "children": [],
               "font": "Classic Status Bar",
               "type": 0,
               "param": 0,
-              "maxlength": 0
+              "maxlength": 3
             }
           },
           {
@@ -75,6 +82,8 @@
               "x": 104,
               "y": 0,
               "alignment": 0,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
               "conditions": [
                 {
@@ -89,13 +98,12 @@
                     "x": 0,
                     "y": 0,
                     "alignment": 0,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
-                    "patch": "STARMS",
-                    "width": 0,
-                    "height": 0,
-                    "topoffset": 0,
-                    "leftoffset": 0,
-                    "midoffset": 0
+                    "conditions": [],
+                    "children": [],
+                    "patch": "STARMS"
                   }
                 },
                 {
@@ -103,20 +111,22 @@
                     "x": 0,
                     "y": 0,
                     "alignment": 0,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
                     "children": [
                       {
                         "graphic": {
                           "x": 7,
                           "y": 4,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
-                          "patch": "STGNUM2",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "conditions": [],
+                          "children": [],
+                          "patch": "STGNUM2"
                         }
                       },
                       {
@@ -124,13 +134,12 @@
                           "x": 19,
                           "y": 4,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
-                          "patch": "STGNUM3",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "conditions": [],
+                          "children": [],
+                          "patch": "STGNUM3"
                         }
                       },
                       {
@@ -138,13 +147,12 @@
                           "x": 31,
                           "y": 4,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
-                          "patch": "STGNUM4",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "conditions": [],
+                          "children": [],
+                          "patch": "STGNUM4"
                         }
                       },
                       {
@@ -152,13 +160,12 @@
                           "x": 7,
                           "y": 14,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
-                          "patch": "STGNUM5",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "conditions": [],
+                          "children": [],
+                          "patch": "STGNUM5"
                         }
                       },
                       {
@@ -166,13 +173,12 @@
                           "x": 19,
                           "y": 14,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
-                          "patch": "STGNUM6",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "conditions": [],
+                          "children": [],
+                          "patch": "STGNUM6"
                         }
                       },
                       {
@@ -180,13 +186,12 @@
                           "x": 31,
                           "y": 14,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
-                          "patch": "STGNUM7",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "conditions": [],
+                          "children": [],
+                          "patch": "STGNUM7"
                         }
                       },
                       {
@@ -194,6 +199,8 @@
                           "x": 7,
                           "y": 4,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -202,12 +209,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STYSNUM2",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STYSNUM2"
                         }
                       },
                       {
@@ -215,6 +218,8 @@
                           "x": 19,
                           "y": 4,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -223,12 +228,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STYSNUM3",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STYSNUM3"
                         }
                       },
                       {
@@ -236,6 +237,8 @@
                           "x": 31,
                           "y": 4,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -244,12 +247,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STYSNUM4",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STYSNUM4"
                         }
                       },
                       {
@@ -257,6 +256,8 @@
                           "x": 7,
                           "y": 14,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -265,12 +266,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STYSNUM5",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STYSNUM5"
                         }
                       },
                       {
@@ -278,6 +275,8 @@
                           "x": 19,
                           "y": 14,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -286,12 +285,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STYSNUM6",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STYSNUM6"
                         }
                       },
                       {
@@ -299,6 +294,8 @@
                           "x": 31,
                           "y": 14,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -307,12 +304,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STYSNUM7",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STYSNUM7"
                         }
                       }
                     ]
@@ -328,6 +321,8 @@
               "x": 0,
               "y": 0,
               "alignment": 0,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
               "conditions": [
                 {
@@ -342,11 +337,15 @@
                     "x": 138,
                     "y": 3,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Status Bar",
                     "type": 2,
                     "param": 0,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -354,7 +353,11 @@
                     "x": 143,
                     "y": 1,
                     "alignment": 0,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "width": 0,
                     "height": 0,
                     "topoffset": 0,
@@ -371,7 +374,11 @@
               "x": 143,
               "y": 0,
               "alignment": 0,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
+              "children": [],
               "width": 0,
               "height": 0,
               "topoffset": 0,
@@ -384,20 +391,28 @@
               "x": 239,
               "y": 0,
               "alignment": 0,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
               "children": [
                 {
                   "canvas": {
                     "x": 0,
                     "y": 3,
                     "alignment": 0,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
                     "children": [
                       {
                         "graphic": {
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -411,12 +426,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS0",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS0"
                         }
                       },
                       {
@@ -424,6 +435,8 @@
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -437,12 +450,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS3",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS3"
                         }
                       },
                       {
@@ -450,6 +459,8 @@
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -463,12 +474,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS6",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS6"
                         }
                       }
                     ]
@@ -480,13 +487,18 @@
                     "x": 0,
                     "y": 13,
                     "alignment": 0,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
                     "children": [
                       {
                         "graphic": {
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -500,12 +512,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS1",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS1"
                         }
                       },
                       {
@@ -513,6 +521,8 @@
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -526,12 +536,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS4",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS4"
                         }
                       },
                       {
@@ -539,6 +545,8 @@
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -552,12 +560,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS7",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS7"
                         }
                       }
                     ]
@@ -569,13 +573,18 @@
                     "x": 0,
                     "y": 23,
                     "alignment": 0,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
                     "children": [
                       {
                         "graphic": {
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -589,12 +598,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS2",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS2"
                         }
                       },
                       {
@@ -602,6 +607,8 @@
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -615,12 +622,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS5",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS5"
                         }
                       },
                       {
@@ -628,6 +631,8 @@
                           "x": 0,
                           "y": 0,
                           "alignment": 0,
+                          "tranmap": null,
+                          "translation": null,
                           "translucency": false,
                           "conditions": [
                             {
@@ -641,12 +646,8 @@
                               "param2": 0
                             }
                           ],
-                          "patch": "STKEYS8",
-                          "width": 0,
-                          "height": 0,
-                          "topoffset": 0,
-                          "leftoffset": 0,
-                          "midoffset": 0
+                          "children": [],
+                          "patch": "STKEYS8"
                         }
                       }
                     ]
@@ -662,11 +663,15 @@
               "x": 235,
               "y": 3,
               "alignment": 2,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
+              "children": [],
               "font": "Classic Status Bar",
               "type": 1,
               "param": 0,
-              "maxlength": 0
+              "maxlength": 3
             }
           },
           {
@@ -674,18 +679,25 @@
               "x": 288,
               "y": 0,
               "alignment": 0,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
               "children": [
                 {
                   "number": {
                     "x": 0,
                     "y": 5,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 3,
                     "param": 0,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -693,11 +705,15 @@
                     "x": 0,
                     "y": 11,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 3,
                     "param": 1,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -705,11 +721,15 @@
                     "x": 0,
                     "y": 17,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 3,
                     "param": 3,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -717,11 +737,15 @@
                     "x": 0,
                     "y": 23,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 3,
                     "param": 2,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 }
               ]
@@ -733,18 +757,25 @@
               "x": 314,
               "y": 0,
               "alignment": 0,
+              "tranmap": null,
+              "translation": null,
               "translucency": false,
+              "conditions": [],
               "children": [
                 {
                   "number": {
                     "x": 0,
                     "y": 5,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 5,
                     "param": 0,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -752,11 +783,15 @@
                     "x": 0,
                     "y": 11,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 5,
                     "param": 1,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -764,11 +799,15 @@
                     "x": 0,
                     "y": 17,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 5,
                     "param": 3,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 },
                 {
@@ -776,11 +815,15 @@
                     "x": 0,
                     "y": 23,
                     "alignment": 2,
+                    "tranmap": null,
+                    "translation": null,
                     "translucency": false,
+                    "conditions": [],
+                    "children": [],
                     "font": "Classic Yellow",
                     "type": 5,
                     "param": 2,
-                    "maxlength": 0
+                    "maxlength": 3
                   }
                 }
               ]

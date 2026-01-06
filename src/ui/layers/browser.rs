@@ -37,6 +37,7 @@ const LIB_GROUPS: &[LibraryGroup] = &[
 ];
 
 /// Draws the list of fonts currently registered in the project's SBARDEF.
+/// Draws the list of fonts currently registered in the project's SBARDEF.
 pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &AssetStore) -> bool {
     let mut changed = false;
     let mut remove_num = None;
@@ -44,12 +45,21 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
 
     if !file.data.hud_fonts.is_empty() {
         ui.label(egui::RichText::new("HUD Fonts"));
-        for (i, font) in file.data.hud_fonts.iter().enumerate() {
+        for (i, font) in file.data.hud_fonts.iter_mut().enumerate() {
             let preview_char = (b'A' + (i % 26) as u8) as char;
-            if draw_registered_font_row(ui, &font.name, &font.stem, false, preview_char, assets) {
+            if draw_registered_font_row(
+                ui,
+                &font.name,
+                &font.stem,
+                &mut font.type_,
+                false,
+                preview_char,
+                assets,
+                &mut changed,
+            ) {
                 remove_hud = Some(i);
-                changed = true;
             }
+            ui.add_space(8.0)
         }
     }
 
@@ -59,20 +69,31 @@ pub fn draw_fonts_content(ui: &mut egui::Ui, file: &mut SBarDefFile, assets: &As
 
     if !file.data.number_fonts.is_empty() {
         ui.label(egui::RichText::new("Number Fonts"));
-        for (i, font) in file.data.number_fonts.iter().enumerate() {
+        for (i, font) in file.data.number_fonts.iter_mut().enumerate() {
             let preview_char = std::char::from_digit((i % 10) as u32, 10).unwrap_or('0');
-            if draw_registered_font_row(ui, &font.name, &font.stem, true, preview_char, assets) {
+            if draw_registered_font_row(
+                ui,
+                &font.name,
+                &font.stem,
+                &mut font.type_,
+                true,
+                preview_char,
+                assets,
+                &mut changed,
+            ) {
                 remove_num = Some(i);
-                changed = true;
             }
+            ui.add_space(8.0);
         }
     }
 
     if let Some(i) = remove_num {
         file.data.number_fonts.remove(i);
+        changed = true;
     }
     if let Some(i) = remove_hud {
         file.data.hud_fonts.remove(i);
+        changed = true;
     }
 
     changed
@@ -82,9 +103,11 @@ fn draw_registered_font_row(
     ui: &mut egui::Ui,
     name: &str,
     stem: &str,
+    font_type: &mut u8,
     is_num: bool,
     prev_char: char,
     assets: &AssetStore,
+    changed_out: &mut bool,
 ) -> bool {
     let patch_id = assets.resolve_patch_id(stem, prev_char, is_num);
     let texture = assets.textures.get(&patch_id);
@@ -94,6 +117,32 @@ fn draw_registered_font_row(
         .texture(texture)
         .fallback("?")
         .show(ui);
+
+    let combo_rect = egui::Rect::from_center_size(
+        egui::pos2(response.rect.right() - 58.0, response.rect.center().y),
+        egui::vec2(100.0, 24.0),
+    );
+
+    ui.put(combo_rect, |ui: &mut egui::Ui| {
+        let res = egui::ComboBox::from_id_salt(format!("spacing_{}", name))
+            .selected_text(match *font_type {
+                0 => "Mono (0)",
+                1 => "Mono (Max)",
+                _ => "Prop.",
+            })
+            .width(90.0)
+            .show_ui(ui, |ui| {
+                ui.selectable_value(font_type, 0, "Mono (0)");
+                ui.selectable_value(font_type, 1, "Mono (Max)");
+                ui.selectable_value(font_type, 2, "Proportional");
+            })
+            .response;
+
+        if res.changed() {
+            *changed_out = true;
+        }
+        res
+    });
 
     let mut remove_clicked = false;
     let just_opened = ContextMenu::check(ui, &response);
@@ -285,7 +334,7 @@ fn draw_unified_font_row(
                 if font.is_hud {
                     f.data.hud_fonts.push(HudFontDef {
                         name: font.name.to_string(),
-                        type_: 0,
+                        type_: 2,
                         stem: stem_upper,
                     });
                 } else {

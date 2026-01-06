@@ -46,13 +46,15 @@ pub const ITEMS: &[LookupItem] = &[
 
 /// Registry of weapon parameter indices used for ownership and source queries.
 pub const WEAPONS: &[LookupItem] = &[
-    item!(100, "Chainsaw", "SAWGA0"),
-    item!(101, "Shotgun", "SHTGA0"),
-    item!(102, "Super Shotgun", "SHT2A0"),
-    item!(103, "Chaingun", "CHGGA0"),
-    item!(104, "Rocket Launcher", "MISGA0"),
-    item!(105, "Plasma Rifle", "PLSGA0"),
-    item!(106, "BFG 9000", "BFGGA0"),
+    item!(0, "Fist", "PUNGA0"),
+    item!(1, "Pistol", "PISGA0"),
+    item!(2, "Shotgun", "SHTGA0"),
+    item!(3, "Chaingun", "CHGGA0"),
+    item!(4, "Rocket Launcher", "MISGA0"),
+    item!(5, "Plasma Rifle", "PLSGA0"),
+    item!(6, "BFG 9000", "BFGGA0"),
+    item!(7, "Chainsaw", "SAWGA0"),
+    item!(8, "Super Shotgun", "SHT2A0"),
 ];
 
 /// Registry of internal ammo type indices.

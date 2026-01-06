@@ -145,7 +145,7 @@ pub fn draw_font_wizard(
                 FontTypeWrapper::Hud => {
                     file.data.hud_fonts.push(HudFontDef {
                         name: data.font_name.clone(),
-                        type_: 0,
+                        type_: 2,
                         stem: data.detected_stem.clone(),
                     });
                 }

@@ -85,16 +85,22 @@ fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetSt
 fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
     use crate::model::ConditionType::*;
     let inv = &state.inventory;
+    let map = state.engine.slot_mapping;
 
     match condition.condition {
         WeaponOwned => match condition.param {
+            0 => inv.has_fist,
+            1 => inv.has_pistol,
+            2 => inv.has_shotgun,
+            3 => inv.has_chaingun,
+            4 => inv.has_rocket_launcher,
+            5 => inv.has_plasma_gun,
+            6 => inv.has_bfg,
+            7 | 9 => inv.has_chainsaw,
+            8 | 10 => inv.has_super_shotgun,
             100 => inv.has_chainsaw,
             101 => inv.has_shotgun,
             102 => inv.has_super_shotgun,
-            103 => inv.has_chaingun,
-            104 => inv.has_rocket_launcher,
-            105 => inv.has_plasma_gun,
-            106 => inv.has_bfg,
             _ => false,
         },
         WeaponNotOwned => !check_weapon_condition(
@@ -105,13 +111,18 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
             state,
         ),
         SlotOwned => match condition.param {
-            1 => inv.has_fist || inv.has_chainsaw,
+            1 => inv.has_fist || (map == crate::state::SlotMapping::Vanilla && inv.has_chainsaw),
             2 => inv.has_pistol,
-            3 => inv.has_shotgun || inv.has_super_shotgun,
+            3 => {
+                inv.has_shotgun
+                    || (map == crate::state::SlotMapping::Vanilla && inv.has_super_shotgun)
+            }
             4 => inv.has_chaingun,
             5 => inv.has_rocket_launcher,
             6 => inv.has_plasma_gun,
             7 => inv.has_bfg,
+            8 => inv.has_chainsaw,
+            9 => inv.has_super_shotgun,
             _ => false,
         },
         SlotNotOwned => !check_weapon_condition(
@@ -123,16 +134,36 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
         ),
         SlotSelected => state.selected_weapon_slot == condition.param as u8,
         SlotNotSelected => state.selected_weapon_slot != condition.param as u8,
-        WeaponSelected => match condition.param {
-            100 => state.selected_weapon_slot == 1,
-            101 => state.selected_weapon_slot == 3 && !state.use_super_shotgun,
-            102 => state.selected_weapon_slot == 3 && state.use_super_shotgun,
-            103 => state.selected_weapon_slot == 4,
-            104 => state.selected_weapon_slot == 5,
-            105 => state.selected_weapon_slot == 6,
-            106 => state.selected_weapon_slot == 7,
-            _ => false,
-        },
+        WeaponSelected => {
+            let slot = state.selected_weapon_slot;
+            match condition.param {
+                0 => slot == 1 && (map == crate::state::SlotMapping::Extended || !inv.has_chainsaw),
+                1 => slot == 2,
+                2 => {
+                    slot == 3
+                        && (map == crate::state::SlotMapping::Extended || !state.use_super_shotgun)
+                }
+                3 => slot == 4,
+                4 => slot == 5,
+                5 => slot == 6,
+                6 => slot == 7,
+                7 | 9 => {
+                    if map == crate::state::SlotMapping::Extended {
+                        slot == 8
+                    } else {
+                        slot == 1 && inv.has_chainsaw
+                    }
+                }
+                8 | 10 => {
+                    if map == crate::state::SlotMapping::Extended {
+                        slot == 9
+                    } else {
+                        slot == 3 && state.use_super_shotgun
+                    }
+                }
+                _ => false,
+            }
+        }
         WeaponNotSelected => !check_weapon_condition(
             &ConditionDef {
                 condition: WeaponSelected,
