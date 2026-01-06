@@ -3,6 +3,7 @@ pub mod font_wizard;
 pub mod gamestate;
 pub mod layers;
 pub mod menu;
+pub mod messages;
 pub mod modals;
 pub(crate) mod properties;
 pub mod root;

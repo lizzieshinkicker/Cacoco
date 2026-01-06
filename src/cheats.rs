@@ -1,4 +1,5 @@
 use crate::state::PreviewState;
+use crate::ui::messages::{self, EditorEvent};
 use eframe::egui;
 
 /// Represents a secret console command that modifies the preview state.
@@ -19,21 +20,21 @@ static CHEATS: &[Cheat] = &[
             } else {
                 "Degreelessness Mode Off"
             };
-            s.push_message(msg);
+            messages::log_event(s, EditorEvent::Cheat(msg.to_string()));
         },
     },
     Cheat {
         code: "idkfa",
         action: |s| {
             give_all(s, true);
-            s.push_message("Very Happy Ammo Added.");
+            messages::log_event(s, EditorEvent::Cheat("Very Happy Ammo Added.".to_string()));
         },
     },
     Cheat {
         code: "idfa",
         action: |s| {
             give_all(s, false);
-            s.push_message("Happy Ammo Added.");
+            messages::log_event(s, EditorEvent::Cheat("Happy Ammo Added.".to_string()));
         },
     },
     Cheat {
@@ -41,7 +42,10 @@ static CHEATS: &[Cheat] = &[
         action: |s| {
             s.inventory.has_chainsaw = true;
             s.selected_weapon_slot = 1;
-            s.push_message("...something small for the children, sir?");
+            messages::log_event(
+                s,
+                EditorEvent::Cheat("...something small for the children, sir?".to_string()),
+            );
         },
     },
     Cheat {
@@ -53,7 +57,7 @@ static CHEATS: &[Cheat] = &[
                 30.0
             };
             s.player.powerup_durations.insert(0, dur);
-            s.push_message("Invulnerability On/Off");
+            messages::log_event(s, EditorEvent::Cheat("Invulnerability On/Off".to_string()));
         },
     },
     Cheat {
@@ -62,7 +66,7 @@ static CHEATS: &[Cheat] = &[
             let dur = if s.inventory.has_berserk { 0.0 } else { 1.0 };
             s.player.powerup_durations.insert(1, dur);
             s.player.health = 100;
-            s.push_message("Berserk On/Off");
+            messages::log_event(s, EditorEvent::Cheat("Berserk On/Off".to_string()));
         },
     },
     Cheat {
@@ -74,7 +78,7 @@ static CHEATS: &[Cheat] = &[
                 60.0
             };
             s.player.powerup_durations.insert(2, dur);
-            s.push_message("Invisibility On/Off");
+            messages::log_event(s, EditorEvent::Cheat("Invisibility On/Off".to_string()));
         },
     },
     Cheat {
@@ -82,7 +86,7 @@ static CHEATS: &[Cheat] = &[
         action: |s| {
             let dur = if s.inventory.has_radsuit { 0.0 } else { 60.0 };
             s.player.powerup_durations.insert(3, dur);
-            s.push_message("Radiation Suit On/Off");
+            messages::log_event(s, EditorEvent::Cheat("Radiation Suit On/Off".to_string()));
         },
     },
     Cheat {
@@ -90,7 +94,7 @@ static CHEATS: &[Cheat] = &[
         action: |s| {
             let dur = if s.inventory.has_automap { 0.0 } else { 1.0 };
             s.player.powerup_durations.insert(4, dur);
-            s.push_message("Computer Map Added");
+            messages::log_event(s, EditorEvent::Cheat("Computer Map Added".to_string()));
         },
     },
     Cheat {
@@ -98,7 +102,10 @@ static CHEATS: &[Cheat] = &[
         action: |s| {
             let dur = if s.inventory.has_liteamp { 0.0 } else { 120.0 };
             s.player.powerup_durations.insert(5, dur);
-            s.push_message("Light Amplification On/Off");
+            messages::log_event(
+                s,
+                EditorEvent::Cheat("Light Amplification On/Off".to_string()),
+            );
         },
     },
 ];

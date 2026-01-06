@@ -9,6 +9,9 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
         ComponentType::StatTotals => {
             render_stat_totals(ctx, def, pos, alpha);
         }
+        ComponentType::Coordinates => {
+            render_coordinates(ctx, def, pos, alpha);
+        }
         _ => {
             let text = match def.type_ {
                 ComponentType::Time => {
@@ -32,9 +35,6 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
                     }
                 }
                 ComponentType::FpsCounter => format!("{:.0}", ctx.fps),
-                ComponentType::Coordinates => {
-                    format!("X: {:.0} Y: {:.0} Z: 0", ctx.mouse_pos.x, ctx.mouse_pos.y)
-                }
                 ComponentType::Message => ctx
                     .state
                     .editor
@@ -94,5 +94,41 @@ fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
             );
             cur_pos.x += measure_text_line(ctx, part, &def.font, false) + 8.0;
         }
+    }
+}
+
+fn render_coordinates(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, alpha: f32) {
+    let parts = [
+        format!("X: {:.0}", ctx.mouse_pos.x),
+        format!("Y: {:.0}", ctx.mouse_pos.y),
+        "Z: 0".to_string(),
+    ];
+
+    let mut cur_pos = pos;
+
+    if def.vertical {
+        for part in &parts {
+            draw_text_line(
+                ctx,
+                part,
+                &def.font,
+                cur_pos,
+                def.common.alignment,
+                false,
+                alpha,
+            );
+            cur_pos.y += 8.0;
+        }
+    } else {
+        let text = format!("X: {:.0} Y: {:.0} Z: 0", ctx.mouse_pos.x, ctx.mouse_pos.y);
+        draw_text_line(
+            ctx,
+            &text,
+            &def.font,
+            pos,
+            def.common.alignment,
+            false,
+            alpha,
+        );
     }
 }

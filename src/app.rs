@@ -8,6 +8,7 @@ use crate::model::SBarDefFile;
 use crate::state::PreviewState;
 use crate::ui;
 use crate::ui::font_wizard::FontWizardState;
+use crate::ui::messages::{self, EditorEvent};
 use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
@@ -147,8 +148,10 @@ impl CacocoApp {
         self.current_statusbar_idx = 0;
         self.add_to_recent(path_str);
 
-        self.preview_state
-            .push_message(format!("Project Loaded: {}", path_str));
+        messages::log_event(
+            &mut self.preview_state,
+            EditorEvent::ProjectLoaded(path_str.to_string()),
+        );
     }
 
     /// Initializes a new empty SBARDEF project.
@@ -174,8 +177,7 @@ impl CacocoApp {
 
         self.last_selection.clear();
         self.current_statusbar_idx = 0;
-        self.preview_state
-            .push_message("Created new empty project.");
+        messages::log_event(&mut self.preview_state, EditorEvent::ProjectNew);
     }
 
     /// Applies a library template as the current project.
@@ -207,8 +209,11 @@ impl CacocoApp {
                         }
                     }
                 }
-                self.preview_state
-                    .push_message(format!("Template: {}", template.name));
+
+                messages::log_event(
+                    &mut self.preview_state,
+                    EditorEvent::TemplateApplied(template.name.to_string()),
+                );
             }
             Err(e) => eprintln!("Failed to parse template JSON: {}", e),
         }

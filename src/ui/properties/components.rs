@@ -44,6 +44,11 @@ impl PropertiesUI for ComponentDef {
             });
 
             use crate::model::ComponentType::*;
+            if matches!(self.type_, StatTotals | Coordinates) {
+                ui.add_space(4.0);
+                changed |= ui.checkbox(&mut self.vertical, "Vertical Layout").changed();
+            }
+
             if matches!(self.type_, Message | AnnounceLevelTitle) {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
