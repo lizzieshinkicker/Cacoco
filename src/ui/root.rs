@@ -282,29 +282,6 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
     });
 }
 
-/// Helper to prompt for a source port and launch the current project.
-fn handle_pick_port_and_run(app: &mut CacocoApp) {
-    let mut dialog = rfd::FileDialog::new().set_title("Select Source Port");
-
-    if cfg!(windows) {
-        dialog = dialog.add_filter("Executable", &["exe"]);
-    }
-
-    if let Some(path) = dialog.pick_file() {
-        let path_str = path.to_string_lossy().into_owned();
-        if !app.config.source_ports.contains(&path_str) {
-            app.config.source_ports.push(path_str.clone());
-            app.config.save();
-        }
-        if let Some(doc) = &app.doc {
-            if let Some(iwad) = &app.config.base_wad_path {
-                let sanitized = doc.file.to_sanitized_json(&app.assets);
-                crate::io::launch_game(&sanitized, &app.assets, &path_str, iwad, doc.file.target);
-            }
-        }
-    }
-}
-
 /// Dispatches keyboard shortcuts to application actions.
 fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui::Context) {
     use crate::document::LayerAction;
@@ -518,9 +495,6 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
         ui::MenuAction::ExportDone(path) => {
             app.add_to_recent(&path);
             messages::log_event(&mut app.preview_state, EditorEvent::ProjectExported(path));
-        }
-        ui::MenuAction::PickPortAndRun => {
-            handle_pick_port_and_run(app);
         }
         _ => {}
     }

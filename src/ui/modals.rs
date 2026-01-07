@@ -142,7 +142,7 @@ pub fn draw_confirmation_modal(
             }
             ConfirmationRequest::DeleteAssets(items) => {
                 for key in items {
-                    let id = crate::assets::AssetId::new(key);
+                    let id = AssetId::new(key);
                     app.assets.textures.remove(&id);
                     app.assets.raw_files.remove(&id);
                     app.assets.offsets.remove(&id);

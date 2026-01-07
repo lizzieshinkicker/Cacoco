@@ -1,13 +1,12 @@
 use crate::app::PendingAction;
 use crate::assets::AssetStore;
-use crate::config::AppConfig;
+use crate::config::{AppConfig, SourcePortConfig};
 use crate::document::SBarDocument;
 use crate::io::{self, LoadedProject};
 use crate::library;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
 use eframe::egui;
-use std::path::Path;
 
 /// Result of a menu interaction that requires application-level handling.
 pub enum MenuAction {
@@ -19,7 +18,6 @@ pub enum MenuAction {
     RequestDiscard(PendingAction),
     SaveDone(String),
     ExportDone(String),
-    PickPortAndRun,
     SetTarget(crate::model::ExportTarget),
 }
 
@@ -180,25 +178,24 @@ pub fn draw_menu_bar(
         ContextMenu::show(ui, menu, open_run, |ui| {
             let has_file = doc.is_some();
             if config.source_ports.is_empty() {
-                if ContextMenu::button(ui, "Add New Port...", has_file) {
-                    action = MenuAction::PickPortAndRun;
+                if ContextMenu::button(ui, "Add New Port...", true) {
+                    *settings_open = true;
                     ContextMenu::close(ui);
                 }
             } else {
-                for path_str in &config.source_ports {
-                    let name = get_port_name(path_str);
-                    if ContextMenu::button(ui, &format!("Launch in {name}"), has_file) {
+                for port in &config.source_ports {
+                    if ContextMenu::button(ui, &format!("Launch in {}", port.name), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
                             let sanitized = d.file.to_sanitized_json(assets);
-                            io::launch_game(&sanitized, assets, path_str, iwad, d.file.target);
+                            io::launch_game(&sanitized, assets, &port.command, iwad, d.file.target);
                         }
                         ContextMenu::close(ui);
                     }
                 }
                 ui.separator();
                 if ContextMenu::button(ui, "Add New Port...", true) {
-                    action = MenuAction::PickPortAndRun;
+                    *settings_open = true;
                     ContextMenu::close(ui);
                 }
             }
@@ -327,18 +324,25 @@ pub fn draw_settings_window(
             ui.horizontal(|ui| {
                 ui.heading("Source Ports");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("+ Add Command").clicked() {
+                        config.source_ports.push(SourcePortConfig {
+                            name: "New Port".to_string(),
+                            command: "flatpak run ...".to_string(),
+                        });
+                    }
+
                     if ui.button("+ Add Port").clicked() {
                         let mut dialog = rfd::FileDialog::new().set_title("Select Source Port");
-
                         if cfg!(windows) {
                             dialog = dialog.add_filter("Executable", &["exe"]);
                         }
 
                         if let Some(path) = dialog.pick_file() {
                             let path_str = path.to_string_lossy().into_owned();
-                            if !config.source_ports.contains(&path_str) {
-                                config.source_ports.push(path_str);
-                            }
+                            config.source_ports.push(SourcePortConfig {
+                                name: SourcePortConfig::infer_name(&path_str),
+                                command: path_str,
+                            });
                         }
                     }
                 });
@@ -348,21 +352,19 @@ pub fn draw_settings_window(
 
             let mut to_remove = None;
             egui::ScrollArea::vertical()
-                .max_height(240.0)
+                .max_height(300.0)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 8.0;
+                    ui.spacing_mut().item_spacing.y = 12.0;
 
-                    for (idx, command_str) in config.source_ports.iter_mut().enumerate() {
-                        let name = get_port_name(command_str);
-
+                    for (idx, port) in config.source_ports.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 4.0;
                             let total_w = ui.available_width();
                             let delete_w = 44.0;
                             let card_w = total_w - delete_w - 4.0;
 
-                            ui.allocate_ui(egui::vec2(card_w, 54.0), |ui| {
+                            ui.allocate_ui(egui::vec2(card_w, 70.0), |ui| {
                                 let frame = egui::Frame::NONE
                                     .inner_margin(8.0)
                                     .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
@@ -370,12 +372,25 @@ pub fn draw_settings_window(
 
                                 frame.show(ui, |ui| {
                                     ui.vertical(|ui| {
-                                        ui.label(egui::RichText::new(&name).strong());
-                                        ui.add(
-                                            egui::TextEdit::singleline(command_str)
-                                                .hint_text("e.g. flatpak run ...")
-                                                .desired_width(f32::INFINITY),
-                                        );
+                                        ui.horizontal(|ui| {
+                                            ui.label("Name:");
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut port.name)
+                                                    .desired_width(f32::INFINITY)
+                                                    .font(egui::FontId::proportional(14.0))
+                                                    .text_color(ui.visuals().strong_text_color()),
+                                            );
+                                        });
+                                        ui.add_space(4.0);
+                                        ui.horizontal(|ui| {
+                                            ui.label("Cmd: ");
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut port.command)
+                                                    .hint_text("Executable path or flatpak command")
+                                                    .desired_width(f32::INFINITY)
+                                                    .font(egui::FontId::monospace(11.0)),
+                                            );
+                                        });
                                     });
                                 });
                             });
@@ -451,7 +466,7 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
 }
 
 pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
-    let height = 54.0;
+    let height = 70.0;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
 
     let (bg_color, stroke_color) = if response.hovered() {
@@ -487,33 +502,6 @@ pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     );
 
     response.clicked()
-}
-
-pub fn get_port_name(command_str: &str) -> String {
-    let program_part = if Path::new(command_str).is_file() {
-        command_str.to_string()
-    } else {
-        shlex::split(command_str)
-            .unwrap_or_default()
-            .get(0)
-            .cloned()
-            .unwrap_or_else(|| command_str.to_string())
-    };
-
-    let final_stem = Path::new(&program_part)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or(&program_part);
-
-    if final_stem.is_empty() {
-        return "Unknown Port".to_string();
-    }
-
-    let mut chars = final_stem.chars();
-    match chars.next() {
-        None => "Unknown Port".to_string(),
-        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
-    }
 }
 
 fn trigger_menu(ui: &mut egui::Ui, id: egui::Id, pos: egui::Pos2) {
