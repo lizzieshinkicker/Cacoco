@@ -258,5 +258,14 @@ impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_visuals(egui::Visuals::dark());
         ui::draw_root_ui(ctx, self);
+
+        if let Some(doc) = &self.doc {
+            if doc.selection != self.last_selection {
+                self.preview_state.editor.strobe_timer = 0.5;
+                self.last_selection = doc.selection.clone();
+            }
+        } else if !self.last_selection.is_empty() {
+            self.last_selection.clear();
+        }
     }
 }

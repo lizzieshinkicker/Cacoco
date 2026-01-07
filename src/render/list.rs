@@ -12,6 +12,7 @@ pub(super) fn draw_list(
     pos: egui::Pos2,
     _alpha: f32,
     current_path: &mut Vec<usize>,
+    parent_visible: bool,
 ) {
     if def.common.children.is_empty() {
         return;
@@ -21,12 +22,15 @@ pub(super) fn draw_list(
     for (idx, child) in def.common.children.iter().enumerate() {
         current_path.push(idx);
 
-        let conditions_met =
+        let my_conditions_met =
             conditions::resolve(&child.get_common().conditions, ctx.state, ctx.assets);
-        let is_selected = ctx.selection.contains(current_path)
-            || ctx.selection.iter().any(|s| current_path.starts_with(s));
+        let visible_in_game = parent_visible && my_conditions_met;
 
-        if conditions_met || is_selected {
+        let is_selected_branch = ctx.selection.contains(current_path)
+            || ctx.selection.iter().any(|s| current_path.starts_with(s));
+        let is_ancestor_of_selection = ctx.selection.iter().any(|s| s.starts_with(current_path));
+
+        if visible_in_game || is_selected_branch || is_ancestor_of_selection {
             layout_children.push((idx, child, estimate_element_tree_size(ctx, child)));
         }
 
@@ -117,7 +121,13 @@ pub(super) fn draw_list(
 
         local_child.get_common_mut().alignment = forced_align;
 
-        draw_element_wrapper(ctx, &local_child, child_draw_pos, current_path);
+        draw_element_wrapper(
+            ctx,
+            &local_child,
+            child_draw_pos,
+            current_path,
+            parent_visible,
+        );
         current_path.pop();
     }
 }

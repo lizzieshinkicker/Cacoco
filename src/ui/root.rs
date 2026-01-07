@@ -453,6 +453,12 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 }
             }
         }
+        Action::Deselect => {
+            if let Some(doc) = &mut app.doc {
+                doc.selection.clear();
+                doc.selection_pivot = None;
+            }
+        }
     }
 }
 

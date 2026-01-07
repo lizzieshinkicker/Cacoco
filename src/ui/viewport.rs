@@ -380,6 +380,7 @@ pub fn draw_viewport(
                     child,
                     egui::pos2(proj.origin_x, root_y),
                     &mut path,
+                    true,
                 );
             }
         };
@@ -427,6 +428,7 @@ pub fn draw_viewport(
                             &preview_el,
                             egui::pos2(proj.origin_x, root_y),
                             &mut vec![],
+                            true,
                         );
                     }
 

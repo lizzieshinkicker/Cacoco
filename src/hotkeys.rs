@@ -12,6 +12,7 @@ pub enum Action {
     Paste,
     Duplicate,
     Delete,
+    Deselect,
 }
 
 pub struct HotkeyRegistry {
@@ -25,6 +26,7 @@ pub struct HotkeyRegistry {
     pub delete: KeyboardShortcut,
     pub copy: KeyboardShortcut,
     pub paste: KeyboardShortcut,
+    pub deselect: KeyboardShortcut,
 }
 
 impl Default for HotkeyRegistry {
@@ -42,6 +44,7 @@ impl Default for HotkeyRegistry {
             delete: KeyboardShortcut::new(Modifiers::NONE, Key::Delete),
             copy: KeyboardShortcut::new(cmd, Key::C),
             paste: KeyboardShortcut::new(cmd, Key::V),
+            deselect: KeyboardShortcut::new(Modifiers::NONE, Key::Escape),
         }
     }
 }
@@ -96,6 +99,9 @@ impl HotkeyRegistry {
         }
         if ctx.input_mut(|i| i.consume_shortcut(&self.delete)) {
             return Some(Action::Delete);
+        }
+        if ctx.input_mut(|i| i.consume_shortcut(&self.deselect)) {
+            return Some(Action::Deselect);
         }
 
         None
