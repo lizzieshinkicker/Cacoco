@@ -235,7 +235,8 @@ pub struct EditorContext {
     pub evil_timer: f32,
     pub pain_timer: f32,
     pub virtual_mouse_pos: eframe::egui::Pos2,
-
+    pub hovered_path: Option<Vec<usize>>,
+    pub grabbed_path: Option<Vec<usize>>,
     pub display_weapon_slot: u8,
     pub display_super_shotgun: bool,
     pub weapon_offset_y: f32,

@@ -24,17 +24,7 @@ pub fn draw_viewport(
     let mut estimate_rect = ui.available_rect_before_wrap();
     estimate_rect.min.y += 32.0;
 
-    let temp_proj = ViewportProjection::new(
-        estimate_rect,
-        preview_state.engine.widescreen_mode,
-        preview_state.engine.aspect_correction,
-        if preview_state.engine.auto_zoom {
-            None
-        } else {
-            Some(preview_state.engine.zoom_level)
-        },
-        preview_state.engine.pan_offset,
-    );
+    let temp_proj = ViewportProjection::from_engine(estimate_rect, &preview_state.engine);
 
     ui.vertical(|ui| {
         ui.add_space(2.0);
@@ -127,56 +117,21 @@ pub fn draw_viewport(
 
                     if new_zoom != old_zoom {
                         if let Some(mouse_pos) = i.pointer.latest_pos() {
-                            let calc_visual_pan = |z: i32, raw_pan: egui::Vec2| {
-                                let correction = if preview_state.engine.aspect_correction {
-                                    1.2
-                                } else {
-                                    1.0
-                                };
-                                let base_w = if preview_state.engine.widescreen_mode {
-                                    428.0
-                                } else {
-                                    320.0
-                                };
-                                let scaled_w = base_w * (z as f32);
-                                let scaled_h = 200.0 * (z as f32 * correction);
-
-                                let mut visual = raw_pan;
-                                if scaled_w <= background_rect.width() {
-                                    visual.x = 0.0;
-                                }
-                                if scaled_h <= background_rect.height() {
-                                    visual.y = 0.0;
-                                }
-                                visual
-                            };
-
-                            let current_visual_pan =
-                                calc_visual_pan(old_zoom, preview_state.engine.pan_offset);
-
-                            let old_proj = ViewportProjection::new(
+                            let old_proj = ViewportProjection::from_engine(
                                 background_rect,
-                                preview_state.engine.widescreen_mode,
-                                preview_state.engine.aspect_correction,
-                                Some(old_zoom),
-                                current_visual_pan,
+                                &preview_state.engine,
                             );
                             let virt_anchor = old_proj.to_virtual(mouse_pos);
 
                             preview_state.engine.zoom_level = new_zoom;
 
-                            let new_proj_temp = ViewportProjection::new(
+                            let new_proj_temp = ViewportProjection::from_engine(
                                 background_rect,
-                                preview_state.engine.widescreen_mode,
-                                preview_state.engine.aspect_correction,
-                                Some(new_zoom),
-                                current_visual_pan,
+                                &preview_state.engine,
                             );
 
                             let new_screen_pos = new_proj_temp.to_screen(virt_anchor);
-                            let pan_adjustment = mouse_pos - new_screen_pos;
-
-                            preview_state.engine.pan_offset = current_visual_pan + pan_adjustment;
+                            preview_state.engine.pan_offset += mouse_pos - new_screen_pos;
                         } else {
                             preview_state.engine.zoom_level = new_zoom;
                         }
@@ -186,45 +141,7 @@ pub fn draw_viewport(
         });
     }
 
-    let mut effective_pan = preview_state.engine.pan_offset;
-
-    if !preview_state.engine.auto_zoom {
-        let correction = if preview_state.engine.aspect_correction {
-            1.2
-        } else {
-            1.0
-        };
-        let base_w = if preview_state.engine.widescreen_mode {
-            crate::constants::DOOM_W_WIDE
-        } else {
-            crate::constants::DOOM_W
-        };
-        let base_h = crate::constants::DOOM_H;
-
-        let scaled_w = base_w * (preview_state.engine.zoom_level as f32);
-        let scaled_h = base_h * (preview_state.engine.zoom_level as f32 * correction);
-
-        if scaled_w <= background_rect.width() {
-            effective_pan.x = 0.0;
-        }
-        if scaled_h <= background_rect.height() {
-            effective_pan.y = 0.0;
-        }
-    }
-
-    let zoom_override = if preview_state.engine.auto_zoom {
-        None
-    } else {
-        Some(preview_state.engine.zoom_level)
-    };
-
-    let proj = ViewportProjection::new(
-        background_rect,
-        preview_state.engine.widescreen_mode,
-        preview_state.engine.aspect_correction,
-        zoom_override,
-        effective_pan,
-    );
+    let proj = ViewportProjection::from_engine(background_rect, &preview_state.engine);
 
     if is_panning {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
@@ -234,16 +151,97 @@ pub fn draw_viewport(
         }
     }
 
+    let bar_idx = current_bar_idx.min(file_ref.data.status_bars.len().saturating_sub(1));
+    let mouse_pos = ui
+        .input(|i| i.pointer.latest_pos())
+        .unwrap_or(egui::pos2(-1000.0, -1000.0));
+    preview_state.editor.virtual_mouse_pos = proj.to_virtual(mouse_pos);
+
+    let selection_mode = ui.input(|i| i.modifiers.alt || i.modifiers.command || i.modifiers.ctrl);
+    let container_mode = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
+    let primary_pressed = ui.input(|i| i.pointer.primary_pressed());
+    let primary_down = ui.input(|i| i.pointer.primary_down());
+
+    let bar = &file_ref.data.status_bars[bar_idx];
+    let root_y = if bar.fullscreen_render {
+        0.0
+    } else {
+        200.0 - bar.height as f32
+    };
+
+    if selection_mode && !is_panning {
+        let mut hit_result = None;
+        {
+            let hit_ctx = render::RenderContext {
+                painter: ui.painter(),
+                assets,
+                file: file_ref,
+                state: preview_state,
+                time: ui.input(|i| i.time),
+                fps: preview_state.editor.display_fps,
+                mouse_pos: preview_state.editor.virtual_mouse_pos,
+                selection,
+                pass: RenderPass::Background,
+                proj: &proj,
+                is_dragging: controller.is_dragging,
+                is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+            };
+
+            if viewport_res.hovered() {
+                for (idx, child) in bar.children.iter().enumerate().rev() {
+                    let mut path = vec![bar_idx, idx];
+                    if let Some(hit) = render::hit_test(
+                        &hit_ctx,
+                        child,
+                        egui::pos2(proj.origin_x, root_y),
+                        &mut path,
+                        true,
+                        container_mode,
+                    ) {
+                        hit_result = Some(hit);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if preview_state.editor.hovered_path != hit_result {
+            preview_state.editor.hovered_path = hit_result;
+        }
+
+        if primary_pressed && viewport_res.hovered() {
+            if let Some(path) = preview_state.editor.hovered_path.clone() {
+                preview_state.editor.grabbed_path = Some(path.clone());
+                if ui.input(|i| i.modifiers.shift) {
+                    actions.push(LayerAction::ToggleSelection(vec![path]));
+                } else {
+                    actions.push(LayerAction::Select(vec![path]));
+                }
+            }
+        }
+    } else {
+        preview_state.editor.hovered_path = None;
+    }
+
+    if !primary_down {
+        preview_state.editor.grabbed_path = None;
+    }
+
+    let mut effective_selection = selection.clone();
+    if let Some(grab) = &preview_state.editor.grabbed_path {
+        effective_selection.clear();
+        effective_selection.insert(grab.clone());
+    }
+
     actions.extend(controller.handle_selection_drag(
         ui,
         &proj,
-        selection,
+        &effective_selection,
         &viewport_res,
         is_panning,
     ));
 
     let final_clip_rect = proj.screen_rect.intersect(background_rect);
-
     let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(background_rect));
     screen_ui.set_clip_rect(final_clip_rect);
 
@@ -251,21 +249,8 @@ pub fn draw_viewport(
         .painter()
         .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
 
-    let bar_idx = if current_bar_idx < file_ref.data.status_bars.len() {
-        current_bar_idx
-    } else {
-        0
-    };
-
-    let mut bar_height = 0.0;
-    let mut is_fullscreen = true;
-    let mut fill_flat_name = None;
-
-    if let Some(bar) = file_ref.data.status_bars.get(bar_idx) {
-        bar_height = bar.height as f32;
-        is_fullscreen = bar.fullscreen_render;
-        fill_flat_name = bar.fill_flat.clone();
-    }
+    let bar_height = bar.height as f32;
+    let is_fullscreen = bar.fullscreen_render;
 
     let h_view = if is_fullscreen {
         200.0
@@ -298,7 +283,10 @@ pub fn draw_viewport(
     }
 
     if !is_fullscreen && bar_height > 0.0 {
-        let flat_key = fill_flat_name.unwrap_or_else(|| "GRNROCK".to_string());
+        let flat_key = bar
+            .fill_flat
+            .clone()
+            .unwrap_or_else(|| "GRNROCK".to_string());
         let id = crate::assets::AssetId::new(&flat_key);
 
         if let Some(tex) = assets.textures.get(&id) {
@@ -308,28 +296,27 @@ pub fn draw_viewport(
                     proj.screen_rect.left(),
                     proj.screen_rect.bottom() - (bar_height * proj.final_scale_y),
                 ),
-                egui::pos2(proj.screen_rect.right(), proj.screen_rect.bottom()),
+                proj.screen_rect.max,
             );
 
-            let mut y = bar_area_rect.min.y;
-            while y < bar_area_rect.max.y {
-                let mut x = bar_area_rect.min.x;
-                while x < bar_area_rect.max.x {
-                    let draw_w = (bar_area_rect.max.x - x).min(tile_size_px);
-                    let draw_h = (bar_area_rect.max.y - y).min(tile_size_px);
-
+            for y_idx in 0..((bar_area_rect.height() / tile_size_px).ceil() as i32) {
+                for x_idx in 0..((bar_area_rect.width() / tile_size_px).ceil() as i32) {
+                    let r = egui::Rect::from_min_size(
+                        bar_area_rect.min
+                            + egui::vec2(x_idx as f32 * tile_size_px, y_idx as f32 * tile_size_px),
+                        egui::vec2(tile_size_px, tile_size_px),
+                    )
+                    .intersect(bar_area_rect);
                     screen_ui.painter().image(
                         tex.id(),
-                        egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(draw_w, draw_h)),
+                        r,
                         egui::Rect::from_min_max(
                             egui::pos2(0.0, 0.0),
-                            egui::pos2(draw_w / tile_size_px, draw_h / tile_size_px),
+                            egui::pos2(r.width() / tile_size_px, r.height() / tile_size_px),
                         ),
                         egui::Color32::WHITE,
                     );
-                    x += tile_size_px;
                 }
-                y += tile_size_px;
             }
         }
     }
@@ -343,120 +330,100 @@ pub fn draw_viewport(
         render_player_weapon(&weapon_ui, preview_state, assets, &proj, y_offset_from_top);
     }
 
-    if let Some(bar) = file_ref.data.status_bars.get(bar_idx) {
-        let root_y = if is_fullscreen {
-            0.0
-        } else {
-            200.0 - bar_height
-        };
-        ui.ctx().request_repaint();
+    let time = ui.input(|i| i.time);
+    let fps = preview_state.editor.display_fps;
 
-        let mouse_pos = ui
-            .input(|i| i.pointer.latest_pos())
-            .unwrap_or(egui::pos2(-1000.0, -1000.0));
-        preview_state.editor.virtual_mouse_pos = proj.to_virtual(mouse_pos);
-
-        let ctx = render::RenderContext {
-            painter: screen_ui.painter(),
+    let draw_all = |painter: &egui::Painter, pass: RenderPass| {
+        let render_ctx = render::RenderContext {
+            painter,
             assets,
             file: file_ref,
             state: preview_state,
-            time: ui.input(|i| i.time),
-            fps: preview_state.editor.display_fps,
+            time,
+            fps,
             mouse_pos: preview_state.editor.virtual_mouse_pos,
             selection,
-            pass: RenderPass::Background,
+            pass,
             proj: &proj,
             is_dragging: controller.is_dragging,
-            is_viewport_clicked: viewport_res.contains_pointer()
-                && ui.input(|i| i.pointer.button_down(egui::PointerButton::Primary)),
+            is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
         };
 
-        let render_status_bar = |render_ctx: &render::RenderContext| {
-            for (idx, child) in bar.children.iter().enumerate() {
-                let mut path = vec![bar_idx, idx];
-                render::draw_element_wrapper(
-                    render_ctx,
-                    child,
-                    egui::pos2(proj.origin_x, root_y),
-                    &mut path,
-                    true,
-                );
-            }
-        };
-
-        render_status_bar(&ctx);
-
-        if !selection.is_empty() && preview_state.editor.strobe_timer > 0.0 {
-            let fg_ctx = render::RenderContext {
-                pass: RenderPass::Foreground,
-                ..ctx
-            };
-            render_status_bar(&fg_ctx);
+        for (idx, child) in bar.children.iter().enumerate() {
+            let mut path = vec![bar_idx, idx];
+            render::draw_element_wrapper(
+                &render_ctx,
+                child,
+                egui::pos2(proj.origin_x, root_y),
+                &mut path,
+                true,
+            );
         }
+    };
 
-        if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
-            if viewport_res.contains_pointer() {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-                screen_ui.painter().rect_stroke(
-                    proj.screen_rect,
-                    0.0,
-                    egui::Stroke::new(2.0, egui::Color32::YELLOW),
-                    egui::StrokeKind::Inside,
-                );
+    draw_all(screen_ui.painter(), RenderPass::Background);
 
-                if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
-                    let virtual_pos = proj.to_virtual(pos);
-                    let final_x = (virtual_pos.x - proj.origin_x).round() as i32;
-                    let final_y = (virtual_pos.y - root_y).round() as i32;
+    if !selection.is_empty() && preview_state.editor.strobe_timer > 0.0 {
+        draw_all(screen_ui.painter(), RenderPass::Foreground);
+    }
 
-                    for (i, key) in asset_keys.iter().enumerate() {
-                        let preview_el = ElementWrapper {
-                            data: Element::Graphic(GraphicDef {
-                                common: CommonAttrs {
-                                    x: final_x + (i as i32 * 4),
-                                    y: final_y + (i as i32 * 4),
-                                    ..Default::default()
-                                },
-                                patch: AssetStore::stem(key),
+    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
+        if viewport_res.contains_pointer() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+            if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
+                let virtual_pos = proj.to_virtual(pos);
+                let final_x = (virtual_pos.x - proj.origin_x).round() as i32;
+                let final_y = (virtual_pos.y - root_y).round() as i32;
+
+                let render_ctx = render::RenderContext {
+                    painter: screen_ui.painter(),
+                    assets,
+                    file: file_ref,
+                    state: preview_state,
+                    time,
+                    fps,
+                    mouse_pos: preview_state.editor.virtual_mouse_pos,
+                    selection,
+                    pass: RenderPass::Background,
+                    proj: &proj,
+                    is_dragging: controller.is_dragging,
+                    is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+                };
+
+                for (i, key) in asset_keys.iter().enumerate() {
+                    let preview_el = ElementWrapper {
+                        data: Element::Graphic(GraphicDef {
+                            common: CommonAttrs {
+                                x: final_x + (i as i32 * 4),
+                                y: final_y + (i as i32 * 4),
                                 ..Default::default()
-                            }),
+                            },
+                            patch: AssetStore::stem(key),
                             ..Default::default()
-                        };
-                        render::draw_element_wrapper(
-                            &ctx,
-                            &preview_el,
-                            egui::pos2(proj.origin_x, root_y),
-                            &mut vec![],
-                            true,
-                        );
-                    }
+                        }),
+                        ..Default::default()
+                    };
+                    render::draw_element_wrapper(
+                        &render_ctx,
+                        &preview_el,
+                        egui::pos2(proj.origin_x, root_y),
+                        &mut vec![],
+                        true,
+                    );
+                }
 
-                    if ui.input(|i| i.pointer.any_released()) {
-                        let (parent_path, mut insert_idx) =
-                            determine_insertion_point(file_ref, selection, bar_idx);
-                        for key in asset_keys.iter() {
-                            let new_element = ElementWrapper {
-                                data: Element::Graphic(GraphicDef {
-                                    common: CommonAttrs {
-                                        x: final_x,
-                                        y: final_y,
-                                        ..Default::default()
-                                    },
-                                    patch: AssetStore::stem(key),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            };
-                            actions.push(LayerAction::Add {
-                                parent_path: parent_path.clone(),
-                                insert_idx,
-                                element: new_element,
-                            });
-                            insert_idx += 1;
-                        }
-                        egui::DragAndDrop::clear_payload(ui.ctx());
+                if ui.input(|i| i.pointer.any_released()) {
+                    let (parent_path, mut insert_idx) =
+                        determine_insertion_point(file_ref, selection, bar_idx);
+                    for key in asset_keys.iter() {
+                        actions.push(LayerAction::Add {
+                            parent_path: parent_path.clone(),
+                            insert_idx,
+                            element: wrap_graphic(key, final_x, final_y),
+                        });
+                        insert_idx += 1;
                     }
+                    egui::DragAndDrop::clear_payload(ui.ctx());
                 }
             }
         }

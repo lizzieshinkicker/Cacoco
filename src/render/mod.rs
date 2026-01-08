@@ -96,7 +96,26 @@ pub fn draw_element_wrapper(
         alpha *= 0.5;
     }
 
-    if is_selected_branch && is_strobing {
+    let is_hovered_branch = ctx
+        .state
+        .editor
+        .hovered_path
+        .as_ref()
+        .map_or(false, |h| current_path.starts_with(h));
+    let is_grabbed_branch = ctx
+        .state
+        .editor
+        .grabbed_path
+        .as_ref()
+        .map_or(false, |g| current_path.starts_with(g));
+
+    let has_active_overlay =
+        ctx.state.editor.hovered_path.is_some() || ctx.state.editor.grabbed_path.is_some();
+
+    if is_hovered_branch || is_grabbed_branch {
+        let wave = (ctx.time * std::f64::consts::PI * 4.0).cos() as f32;
+        alpha *= 0.70 + (wave * 0.30);
+    } else if is_selected_branch && !has_active_overlay && is_strobing {
         let dur = 0.5;
         let prog = (dur - ctx.state.editor.strobe_timer) / dur;
         let wave = (prog * std::f32::consts::PI * 4.0).cos();
@@ -139,6 +158,88 @@ pub fn draw_element_wrapper(
     if !matches!(element.data, Element::List(_)) {
         recurse_children(ctx, &common.children, pos, current_path, visible_in_game);
     }
+}
+
+/// Traverses the element tree to find the topmost element at the given virtual position.
+pub fn hit_test(
+    ctx: &RenderContext,
+    element: &ElementWrapper,
+    parent_pos: egui::Pos2,
+    current_path: &mut Vec<usize>,
+    _parent_visible: bool,
+    container_mode: bool,
+) -> Option<Vec<usize>> {
+    let common = element.get_common();
+    let pos = resolve_position(ctx, common, parent_pos);
+
+    if !matches!(element.data, Element::List(_)) {
+        for (idx, child) in element.children().iter().enumerate().rev() {
+            current_path.push(idx);
+            let hit = hit_test(ctx, child, pos, current_path, true, container_mode);
+
+            if hit.is_some() {
+                if element._cacoco_text.is_some() {
+                    let my_path = current_path[..current_path.len() - 1].to_vec();
+                    current_path.pop();
+                    return Some(my_path);
+                }
+                return hit;
+            }
+            current_path.pop();
+        }
+    } else if let Element::List(l) = &element.data {
+        if let Some(hit) = list::hit_test_list(ctx, l, pos, current_path, true, container_mode) {
+            if element._cacoco_text.is_some() {
+                return Some(current_path.clone());
+            }
+            return Some(hit);
+        }
+    }
+
+    let is_atomic_text = element._cacoco_text.is_some();
+    let is_selectable = if container_mode {
+        element.is_spec_container()
+    } else {
+        !element.is_spec_container() || is_atomic_text
+    };
+
+    if is_selectable {
+        if let Some(rect) = get_element_bounds(ctx, element, pos) {
+            if rect.contains(ctx.mouse_pos) {
+                return Some(current_path.clone());
+            }
+        }
+    }
+
+    None
+}
+
+fn get_element_bounds(
+    ctx: &RenderContext,
+    element: &ElementWrapper,
+    pos: egui::Pos2,
+) -> Option<egui::Rect> {
+    let size = match &element.data {
+        Element::Graphic(g) => {
+            let id = crate::assets::AssetId::new(&g.patch);
+            ctx.assets.textures.get(&id).map(|t| t.size_vec2())?
+        }
+        Element::Number(n) | Element::Percent(n) => {
+            text::measure_text_size(ctx, "000", &n.font, true)
+        }
+        Element::String(s) => text::measure_text_size(ctx, "Sample Text", &s.font, false),
+        Element::Face(_) | Element::FaceBackground(_) => egui::vec2(24.0, 29.0),
+        Element::Component(c) => text::measure_text_size(ctx, "Sample Component", &c.font, false),
+        Element::Animation(a) => {
+            let lump = a.frames.first().map(|f| &f.lump)?;
+            let id = crate::assets::AssetId::new(lump);
+            ctx.assets.textures.get(&id).map(|t| t.size_vec2())?
+        }
+        _ => return None,
+    };
+
+    let offset = get_alignment_anchor_offset(element.get_common().alignment, size.x, size.y);
+    Some(egui::Rect::from_min_size(pos + offset, size))
 }
 
 /// Internal helper to iterate and draw child elements.
