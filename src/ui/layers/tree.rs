@@ -1,7 +1,7 @@
 use crate::assets::AssetStore;
 use crate::conditions;
 use crate::document::LayerAction;
-use crate::model::{Element, ElementWrapper, GraphicDef, SBarDefFile};
+use crate::model::{Element, ElementWrapper, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
@@ -272,8 +272,9 @@ fn handle_drop_logic(
     element: &ElementWrapper,
     actions: &mut Vec<LayerAction>,
 ) {
+    let is_dragging_anything = ui.ctx().dragged_id().is_some();
     let nesting_mode =
-        ui.input(|i| (i.modifiers.command || i.modifiers.ctrl) && i.keys_down.is_empty());
+        is_dragging_anything && ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
 
     if let Some(dragged) = egui::DragAndDrop::payload::<Vec<usize>>(ui.ctx()) {
         let is_self = &*dragged == my_path;
@@ -341,7 +342,7 @@ fn handle_drop_logic(
                                 actions.push(LayerAction::Add {
                                     parent_path: parent_path.to_vec(),
                                     insert_idx,
-                                    element: wrap_graphic(key),
+                                    element: crate::model::wrap_graphic(key, 0, 0),
                                 });
                                 insert_idx += 1;
                             }
@@ -362,7 +363,7 @@ fn handle_drop_logic(
                                 actions.push(LayerAction::Add {
                                     parent_path: my_path.to_vec(),
                                     insert_idx: append_idx,
-                                    element: wrap_graphic(key),
+                                    element: crate::model::wrap_graphic(key, 0, 0),
                                 });
                                 append_idx += 1;
                             }
@@ -372,16 +373,6 @@ fn handle_drop_logic(
                 }
             }
         }
-    }
-}
-
-fn wrap_graphic(patch: &str) -> ElementWrapper {
-    ElementWrapper {
-        data: Element::Graphic(GraphicDef {
-            patch: AssetStore::stem(patch),
-            ..Default::default()
-        }),
-        ..Default::default()
     }
 }
 
@@ -732,7 +723,7 @@ fn draw_terminal_drop_zone(
                     actions.push(LayerAction::Add {
                         parent_path: parent_path.clone(),
                         insert_idx: current_insert,
-                        element: wrap_graphic(key),
+                        element: crate::model::wrap_graphic(key, 0, 0),
                     });
                     current_insert += 1;
                 }

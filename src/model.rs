@@ -732,6 +732,19 @@ impl ElementWrapper {
 }
 
 impl SBarDefFile {
+    /// Creates a new, empty SBARDEF project targeting Extended features by default.
+    pub fn new_empty() -> Self {
+        Self {
+            type_: "statusbar".to_string(),
+            version: "1.2.0".to_string(),
+            target: ExportTarget::Extended,
+            data: StatusBarDefinition {
+                status_bars: vec![StatusBarLayout::default()],
+                ..Default::default()
+            },
+        }
+    }
+
     /// Inspects the content of the file to determine if it uses features beyond the Basic (1.0.0) spec.
     pub fn determine_target(&self) -> ExportTarget {
         if self.version != "1.0.0" {
@@ -1000,5 +1013,37 @@ impl SBarDefFile {
         for bar in &mut self.data.status_bars {
             bar.normalize();
         }
+    }
+}
+
+/// Helper to wrap a patch name into a Graphic element with the specified coordinates.
+pub fn wrap_graphic(patch: &str, x: i32, y: i32) -> ElementWrapper {
+    ElementWrapper {
+        data: Element::Graphic(GraphicDef {
+            common: CommonAttrs {
+                x,
+                y,
+                ..Default::default()
+            },
+            patch: crate::assets::AssetStore::stem(patch),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap_graphic_preserves_position() {
+        let expected_x = 123;
+        let expected_y = 456;
+        let el = wrap_graphic("STBAR", expected_x, expected_y);
+
+        let common = el.get_common();
+        assert_eq!(common.x, expected_x, "Helper failed to set X coordinate!");
+        assert_eq!(common.y, expected_y, "Helper failed to set Y coordinate!");
     }
 }

@@ -34,6 +34,19 @@ pub fn execute_tree_action(
         } => op_paste(file, selection, parent_path, insert_idx, elements),
         LayerAction::TranslateSelection { paths, dx, dy } => op_translate(file, paths, dx, dy),
         LayerAction::GroupSelection(paths) => op_group(file, selection, paths),
+        LayerAction::Select(paths) => {
+            selection.clear();
+            for path in paths {
+                selection.insert(path);
+            }
+        }
+        LayerAction::ToggleSelection(paths) => {
+            for path in paths {
+                if !selection.remove(&path) {
+                    selection.insert(path);
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -368,5 +381,56 @@ fn insert_element_and_select(
         let mut new_path = parent_path;
         new_path.push(actual_idx);
         selection.insert(new_path);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{CommonAttrs, Element, GraphicDef, SBarDefFile};
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_add_element_preserves_coordinates() {
+        let mut file = SBarDefFile {
+            type_: "statusbar".to_string(),
+            version: "1.2.0".to_string(),
+            target: crate::model::ExportTarget::Extended,
+            data: crate::model::StatusBarDefinition {
+                status_bars: vec![crate::model::StatusBarLayout::default()],
+                ..Default::default()
+            },
+        };
+        let mut selection = HashSet::new();
+
+        let expected_x = 42;
+        let expected_y = 69;
+
+        let new_element = ElementWrapper {
+            data: Element::Graphic(GraphicDef {
+                common: CommonAttrs {
+                    x: expected_x,
+                    y: expected_y,
+                    ..Default::default()
+                },
+                patch: "TEST".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        op_add(&mut file, &mut selection, vec![0], 0, new_element);
+
+        let added = &file.data.status_bars[0].children[0];
+        let common = added.get_common();
+
+        assert_eq!(
+            common.x, expected_x,
+            "X coordinate was lost during Add action!"
+        );
+        assert_eq!(
+            common.y, expected_y,
+            "Y coordinate was lost during Add action!"
+        );
     }
 }

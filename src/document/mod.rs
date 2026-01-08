@@ -54,6 +54,10 @@ pub enum LayerAction {
     PasteStatusBars(Vec<StatusBarLayout>),
     /// Wraps the current selection in a new Canvas group.
     GroupSelection(Vec<Vec<usize>>),
+    /// Replaces the current selection with a new set of paths.
+    Select(Vec<Vec<usize>>),
+    /// Toggles the selection state of specific paths (Multi-select support).
+    ToggleSelection(Vec<Vec<usize>>),
 }
 
 /// Manages a single SBARDEF project, its selection, and its modification history.

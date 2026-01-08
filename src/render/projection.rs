@@ -55,6 +55,20 @@ impl ViewportProjection {
         }
     }
 
+    pub fn from_engine(avail_rect: egui::Rect, engine: &crate::state::EngineContext) -> Self {
+        Self::new(
+            avail_rect,
+            engine.widescreen_mode,
+            engine.aspect_correction,
+            if engine.auto_zoom {
+                None
+            } else {
+                Some(engine.zoom_level)
+            },
+            engine.pan_offset,
+        )
+    }
+
     pub fn to_screen(&self, pos: egui::Pos2) -> egui::Pos2 {
         let virtual_x = pos.x.floor();
         let virtual_y = pos.y.floor();

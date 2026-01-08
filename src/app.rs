@@ -156,15 +156,7 @@ impl CacocoApp {
 
     /// Initializes a new empty SBARDEF project.
     pub fn new_project(&mut self, ctx: &egui::Context) {
-        let file = SBarDefFile {
-            type_: "statusbar".to_string(),
-            version: "1.2.0".to_string(),
-            target: crate::model::ExportTarget::Extended,
-            data: crate::model::StatusBarDefinition {
-                status_bars: vec![crate::model::StatusBarLayout::default()],
-                ..Default::default()
-            },
-        };
+        let file = SBarDefFile::new_empty();
 
         self.doc = Some(SBarDocument::new(file, None));
         self.assets = AssetStore::default();
