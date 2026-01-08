@@ -18,6 +18,9 @@ pub fn get_helper_text(element: &ElementWrapper) -> &'static str {
         Element::List(_) => {
             "A smart container that arranges its children sequentially based on the List's alignment. If anchored Bottom or Right, the list grows backwards from that point."
         }
+        Element::Native(_) => {
+            "A special container that signifies to the engine to render its content at native resolution."
+        }
         Element::String(s) => match s.type_ {
             0 => "Renders a custom, hardcoded text string using a HUD font.",
             1 => "Displays the current level's title (from UMAPINFO).",

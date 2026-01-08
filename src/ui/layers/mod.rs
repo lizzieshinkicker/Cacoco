@@ -339,6 +339,12 @@ pub fn draw_layers_panel(
                                 ..Default::default()
                             });
                         }
+                        if is_extended && ContextMenu::button(ui, "Native Container", true) {
+                            new_element = Some(ElementWrapper {
+                                data: Element::Native(CanvasDef::default()),
+                                ..Default::default()
+                            });
+                        }
                         if ContextMenu::button(ui, "Text String", has_hud) {
                             let mut el = ElementWrapper {
                                 data: Element::Canvas(CanvasDef::default()),

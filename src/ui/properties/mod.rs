@@ -54,6 +54,7 @@ impl PropertiesUI for ElementWrapper {
             Element::String(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Component(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Carousel(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Native(e) => e.draw_specific_fields(ui, fonts, assets, state),
         }
     }
 
@@ -81,6 +82,7 @@ impl PropertiesUI for ElementWrapper {
             Element::String(e) => e.get_preview_content(ui, fonts, state),
             Element::Component(e) => e.get_preview_content(ui, fonts, state),
             Element::Carousel(e) => e.get_preview_content(ui, fonts, state),
+            Element::Native(e) => e.get_preview_content(ui, fonts, state),
         }
     }
 
@@ -97,6 +99,7 @@ impl PropertiesUI for ElementWrapper {
             Element::String(e) => e.has_specific_fields(),
             Element::Component(e) => e.has_specific_fields(),
             Element::Carousel(e) => e.has_specific_fields(),
+            Element::Native(e) => e.has_specific_fields(),
         }
     }
 }

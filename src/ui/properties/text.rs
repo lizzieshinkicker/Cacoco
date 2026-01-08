@@ -297,6 +297,7 @@ pub fn draw_interactive_header(
                         Element::Animation(_) => "Animation".to_string(),
                         Element::Canvas(_) => "Canvas Group".to_string(),
                         Element::List(_) => "List Container".to_string(),
+                        Element::Native(_) => "Native Container".to_string(),
                         Element::Carousel(_) => "Carousel".to_string(),
                     }
                 };

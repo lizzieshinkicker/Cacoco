@@ -14,12 +14,6 @@ pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, mut pos: egui:
 }
 
 /// A low-level primitive for drawing a Doom patch or flat by its AssetId.
-///
-/// This handles:
-/// Doom-specific offsets (internal patch coordinates).
-/// SBARDEF image cropping logic.
-/// Virtual-to-physical screen projection.
-/// Alpha tinting and alignment anchoring.
 pub(super) fn draw_simple_graphic_patch(
     ctx: &RenderContext,
     patch_id: AssetId,
@@ -37,6 +31,13 @@ pub(super) fn draw_simple_graphic_patch(
             .get(&patch_id)
             .map(|(x, y)| (*x as f32, *y as f32))
             .unwrap_or((0.0, 0.0));
+
+        let (base_scale_x, base_scale_y) = ctx.get_native_scale_factor();
+
+        if ctx.is_native {
+            off_x /= base_scale_x;
+            off_y /= base_scale_y;
+        }
 
         if alignment.contains(Alignment::NO_LEFT_OFFSET) {
             off_x = 0.0;
@@ -67,19 +68,29 @@ pub(super) fn draw_simple_graphic_patch(
             size = egui::vec2(crop_w, crop_h);
         }
 
-        let align_offset = get_alignment_anchor_offset(alignment, size.x, size.y);
+        let mut align_offset = get_alignment_anchor_offset(alignment, size.x, size.y);
 
-        let final_pos = egui::pos2(
-            (pos.x + align_offset.x - off_x).floor(),
-            (pos.y + align_offset.y - off_y).floor(),
-        );
+        if ctx.is_native {
+            align_offset.x /= base_scale_x;
+            align_offset.y /= base_scale_y;
+        }
+
+        let final_pos = if ctx.is_native {
+            egui::pos2(
+                pos.x + align_offset.x - off_x,
+                pos.y + align_offset.y - off_y,
+            )
+        } else {
+            egui::pos2(
+                (pos.x + align_offset.x - off_x).floor(),
+                (pos.y + align_offset.y - off_y).floor(),
+            )
+        };
 
         let screen_pos = ctx.to_screen(final_pos);
+        let (sc_x, sc_y) = ctx.get_render_scale();
 
-        let screen_size = egui::vec2(
-            size.x * ctx.proj.final_scale_x,
-            size.y * ctx.proj.final_scale_y,
-        );
+        let screen_size = egui::vec2(size.x * sc_x, size.y * sc_y);
 
         let tint = egui::Color32::from_white_alpha((255.0 * alpha) as u8);
 

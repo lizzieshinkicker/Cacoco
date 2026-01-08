@@ -57,6 +57,11 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
     }
 }
 
+/// Helper to calculate the multiplier needed to convert Raw Pixels into Virtual Units
+fn get_scale_adj(ctx: &RenderContext) -> f32 {
+    1.0 / ctx.get_native_scale_factor().0
+}
+
 /// Renders the Kills/Items/Secrets block, either horizontally or vertically.
 fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, alpha: f32) {
     let p = &ctx.state.player;
@@ -67,6 +72,10 @@ fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
     ];
 
     let mut cur_pos = pos;
+    let scale_adj = get_scale_adj(ctx);
+
+    let line_height = 8.0 * scale_adj;
+    let spacing = 8.0 * scale_adj;
 
     if def.vertical {
         for part in &parts {
@@ -79,7 +88,7 @@ fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
                 false,
                 alpha,
             );
-            cur_pos.y += 8.0;
+            cur_pos.y += line_height;
         }
     } else {
         for part in &parts {
@@ -92,7 +101,8 @@ fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
                 false,
                 alpha,
             );
-            cur_pos.x += measure_text_line(ctx, part, &def.font, false) + 8.0;
+            let width = measure_text_line(ctx, part, &def.font, false) * scale_adj;
+            cur_pos.x += width + spacing;
         }
     }
 }
@@ -105,6 +115,8 @@ fn render_coordinates(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
     ];
 
     let mut cur_pos = pos;
+    let scale_adj = get_scale_adj(ctx);
+    let line_height = 8.0 * scale_adj;
 
     if def.vertical {
         for part in &parts {
@@ -117,7 +129,7 @@ fn render_coordinates(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, 
                 false,
                 alpha,
             );
-            cur_pos.y += 8.0;
+            cur_pos.y += line_height;
         }
     } else {
         let text = format!("X: {:.0} Y: {:.0} Z: 0", ctx.mouse_pos.x, ctx.mouse_pos.y);

@@ -328,6 +328,7 @@ pub struct TextHelperDef {
 #[serde(rename_all = "lowercase")]
 pub enum Element {
     Canvas(CanvasDef),
+    Native(CanvasDef),
     Graphic(GraphicDef),
     Animation(AnimationDef),
     Face(FaceDef),
@@ -610,7 +611,7 @@ impl ElementWrapper {
     pub fn is_spec_container(&self) -> bool {
         matches!(
             self.data,
-            Element::Canvas(_) | Element::List(_) | Element::Carousel(_)
+            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_)
         )
     }
 
@@ -631,6 +632,7 @@ impl ElementWrapper {
 
         match &self.data {
             Element::Canvas(_) => "Canvas Group".to_string(),
+            Element::Native(_) => "Native Container".to_string(),
             Element::List(_) => "List Container".to_string(),
             Element::Graphic(g) => format!("Graphic: {}", g.patch),
             Element::Animation(_) => "Animation".to_string(),
@@ -657,6 +659,7 @@ impl ElementWrapper {
     pub fn children(&self) -> &[ElementWrapper] {
         match &self.data {
             Element::Canvas(e) => &e.common.children,
+            Element::Native(e) => &e.common.children,
             Element::List(e) => &e.common.children,
             Element::Graphic(e) => &e.common.children,
             Element::Animation(e) => &e.common.children,
@@ -684,6 +687,7 @@ impl ElementWrapper {
             Element::String(e) => &mut e.common,
             Element::Component(e) => &mut e.common,
             Element::Carousel(e) => &mut e.common,
+            Element::Native(e) => &mut e.common,
         }
     }
 
@@ -701,6 +705,7 @@ impl ElementWrapper {
             Element::String(e) => &e.common,
             Element::Component(e) => &e.common,
             Element::Carousel(e) => &e.common,
+            Element::Native(e) => &e.common,
         }
     }
 
@@ -950,6 +955,12 @@ impl SBarDefFile {
         target: ExportTarget,
     ) {
         for el in elements.iter_mut() {
+            if target == ExportTarget::Basic {
+                if let Element::Native(def) = &el.data {
+                    el.data = Element::Canvas(def.clone());
+                }
+            }
+
             if target == ExportTarget::Basic && el._cacoco_text.is_some() {
                 crate::ui::properties::text_helper::rebake_text(el, assets, fonts);
             }

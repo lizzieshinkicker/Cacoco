@@ -185,6 +185,7 @@ pub fn draw_viewport(
                 proj: &proj,
                 is_dragging: controller.is_dragging,
                 is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+                is_native: false,
             };
 
             if viewport_res.hovered() {
@@ -347,6 +348,7 @@ pub fn draw_viewport(
             proj: &proj,
             is_dragging: controller.is_dragging,
             is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+            is_native: false,
         };
 
         for (idx, child) in bar.children.iter().enumerate() {
@@ -388,6 +390,7 @@ pub fn draw_viewport(
                     proj: &proj,
                     is_dragging: controller.is_dragging,
                     is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+                    is_native: false,
                 };
 
                 for (i, key) in asset_keys.iter().enumerate() {

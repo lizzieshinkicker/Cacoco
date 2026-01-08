@@ -6,7 +6,7 @@ use crate::render::{RenderContext, draw_element_wrapper, hit_test};
 use eframe::egui;
 
 /// Internal helper to calculate the layout positions for list children.
-fn get_list_layout(
+pub(super) fn get_list_layout(
     ctx: &RenderContext,
     def: &ListDef,
     pos: egui::Pos2,
@@ -172,6 +172,15 @@ pub fn hit_test_list(
 
 /// Recursively calculates the visual bounds of an element tree.
 fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> egui::Vec2 {
+    if let Element::List(l) = &element.data {
+        let (size, _) = get_list_layout(ctx, l, egui::Pos2::ZERO, true, &mut Vec::new());
+        return size;
+    }
+
+    let (base_sc_x, base_sc_y) = ctx.get_native_scale_factor();
+    let scale_factor_x = 1.0 / base_sc_x;
+    let scale_factor_y = 1.0 / base_sc_y;
+
     let mut size = match &element.data {
         Element::Graphic(g) => {
             let id = AssetId::new(&g.patch);
@@ -204,14 +213,25 @@ fn estimate_element_tree_size(ctx: &RenderContext, element: &ElementWrapper) -> 
         Element::String(s) => measure_text_size(ctx, "Sample Text", &s.font, false),
         Element::Face(_) | Element::FaceBackground(_) => egui::vec2(24.0, 29.0),
         Element::Component(c) => measure_text_size(ctx, "Sample Text", &c.font, false),
-        Element::Canvas(_) | Element::List(_) | Element::Carousel(_) => egui::Vec2::ZERO,
+        Element::Canvas(_) | Element::Native(_) | Element::Carousel(_) => egui::Vec2::ZERO,
+        Element::List(_) => unreachable!(),
     };
+
+    if ctx.is_native {
+        size.x *= scale_factor_x;
+        size.y *= scale_factor_y;
+    }
 
     for child in element.children() {
         let child_size = estimate_element_tree_size(ctx, child);
         let common = child.get_common();
-        let end_x = common.x as f32 + child_size.x;
-        let end_y = common.y as f32 + child_size.y;
+
+        let offset_x = common.x as f32 * scale_factor_x;
+        let offset_y = common.y as f32 * scale_factor_y;
+
+        let end_x = offset_x + child_size.x;
+        let end_y = offset_y + child_size.y;
+
         size.x = size.x.max(end_x);
         size.y = size.y.max(end_y);
     }

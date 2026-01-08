@@ -9,6 +9,7 @@ pub fn get_layer_color(element: &ElementWrapper) -> Option<Color32> {
     match &element.data {
         Element::Canvas(_) | Element::Carousel(_) => None,
         Element::List(_) => Some(Color32::from_rgb(255, 165, 0)),
+        Element::Native(_) => Some(Color32::from_rgb(84, 255, 159)),
         Element::Graphic(_) => Some(Color32::from_rgb(100, 180, 255)),
         Element::Animation(_) => Some(Color32::from_rgb(180, 100, 255)),
         Element::Face(_) => Some(Color32::from_rgb(50, 205, 50)),

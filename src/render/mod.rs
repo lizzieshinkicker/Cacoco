@@ -45,12 +45,44 @@ pub struct RenderContext<'a> {
     pub is_dragging: bool,
     /// True if the primary mouse button is currently held down over the viewport.
     pub is_viewport_clicked: bool,
+    pub is_native: bool,
 }
 
 impl<'a> RenderContext<'a> {
     /// Maps a virtual coordinate (Doom space) to a physical screen pixel.
     pub fn to_screen(&self, pos: egui::Pos2) -> egui::Pos2 {
-        self.proj.to_screen(pos)
+        if self.is_native {
+            self.proj.to_screen_subpixel(pos)
+        } else {
+            self.proj.to_screen(pos)
+        }
+    }
+
+    pub fn to_screen_rect(&self, rect: egui::Rect) -> egui::Rect {
+        egui::Rect::from_min_max(self.to_screen(rect.min), self.to_screen(rect.max))
+    }
+
+    /// Returns the scale to use for drawing actual pixels (patches, characters).
+    pub fn get_render_scale(&self) -> (f32, f32) {
+        if self.is_native {
+            let zoom = (self.state.engine.zoom_level as f32).max(1.0);
+            (zoom, zoom)
+        } else {
+            (self.proj.final_scale_x, self.proj.final_scale_y)
+        }
+    }
+
+    /// Returns the ratio used to convert Raw Pixels into Virtual Units.
+    pub fn get_native_scale_factor(&self) -> (f32, f32) {
+        if self.is_native {
+            let zoom = (self.state.engine.zoom_level as f32).max(1.0);
+            (
+                self.proj.final_scale_x / zoom,
+                self.proj.final_scale_y / zoom,
+            )
+        } else {
+            (1.0, 1.0)
+        }
     }
 }
 
@@ -68,7 +100,6 @@ pub fn draw_element_wrapper(
         || ctx.selection.iter().any(|s| current_path.starts_with(s));
 
     let is_ancestor_of_selection = ctx.selection.iter().any(|s| s.starts_with(current_path));
-
     let is_strobing = ctx.state.editor.strobe_timer > 0.0;
 
     match ctx.pass {
@@ -109,13 +140,10 @@ pub fn draw_element_wrapper(
         .as_ref()
         .map_or(false, |g| current_path.starts_with(g));
 
-    let has_active_overlay =
-        ctx.state.editor.hovered_path.is_some() || ctx.state.editor.grabbed_path.is_some();
-
     if is_hovered_branch || is_grabbed_branch {
         let wave = (ctx.time * std::f64::consts::PI * 4.0).cos() as f32;
         alpha *= 0.70 + (wave * 0.30);
-    } else if is_selected_branch && !has_active_overlay && is_strobing {
+    } else if is_selected_branch && is_strobing {
         let dur = 0.5;
         let prog = (dur - ctx.state.editor.strobe_timer) / dur;
         let wave = (prog * std::f32::consts::PI * 4.0).cos();
@@ -124,6 +152,29 @@ pub fn draw_element_wrapper(
 
     let pos = resolve_position(ctx, common, parent_pos);
 
+    let is_native_container = matches!(element.data, Element::Native(_));
+    let local_ctx = RenderContext {
+        is_native: ctx.is_native || is_native_container,
+        ..*ctx
+    };
+
+    if is_native_container && ctx.pass == RenderPass::Background {
+        let mut child_path = current_path.clone();
+        let bounds = get_container_recursive_bounds(&local_ctx, element, pos, &mut child_path);
+        let screen_rect = ctx.to_screen_rect(bounds);
+        ctx.painter.rect_stroke(
+            screen_rect,
+            0.0,
+            egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 255, 0)),
+            egui::StrokeKind::Middle,
+        );
+    }
+
+    let local_ctx = RenderContext {
+        is_native: ctx.is_native || matches!(element.data, Element::Native(_)),
+        ..*ctx
+    };
+
     let should_render_content = match ctx.pass {
         RenderPass::Background => true,
         RenderPass::Foreground => is_selected_branch,
@@ -131,32 +182,40 @@ pub fn draw_element_wrapper(
 
     if should_render_content {
         match &element.data {
-            Element::Canvas(c) => canvas::draw_canvas(ctx, c, pos, alpha),
-            Element::List(l) => list::draw_list(ctx, l, pos, alpha, current_path, visible_in_game),
-            Element::Graphic(g) => graphic::draw_graphic(ctx, g, pos, alpha),
-            Element::Animation(a) => animation::draw_animation(ctx, a, pos, alpha),
+            Element::Canvas(c) | Element::Native(c) => {
+                canvas::draw_canvas(&local_ctx, c, pos, alpha)
+            }
+            Element::List(l) => {
+                list::draw_list(&local_ctx, l, pos, alpha, current_path, visible_in_game)
+            }
+            Element::Graphic(g) => graphic::draw_graphic(&local_ctx, g, pos, alpha),
+            Element::Animation(a) => animation::draw_animation(&local_ctx, a, pos, alpha),
             Element::Face(f) => face::draw_face(
-                ctx,
+                &local_ctx,
                 f,
                 pos,
                 alpha,
                 is_selected_branch && (ctx.is_dragging || ctx.is_viewport_clicked),
             ),
-            Element::FaceBackground(fb) => face::draw_face_background(ctx, fb, pos, alpha),
-            Element::Number(n) => text::draw_number(ctx, n, pos, false, alpha),
-            Element::Percent(p) => text::draw_number(ctx, p, pos, true, alpha),
-            Element::String(s) => text::draw_string(ctx, s, pos, alpha),
-            Element::Component(c) => components::draw_component(ctx, c, pos, alpha),
+            Element::FaceBackground(fb) => face::draw_face_background(&local_ctx, fb, pos, alpha),
+            Element::Number(n) => text::draw_number(&local_ctx, n, pos, false, alpha),
+            Element::Percent(p) => text::draw_number(&local_ctx, p, pos, true, alpha),
+            Element::String(s) => text::draw_string(&local_ctx, s, pos, alpha),
+            Element::Component(c) => components::draw_component(&local_ctx, c, pos, alpha),
             Element::Carousel(_) => {}
         }
-    } else {
-        if let Element::List(l) = &element.data {
-            list::draw_list(ctx, l, pos, alpha, current_path, visible_in_game);
-        }
+    } else if let Element::List(l) = &element.data {
+        list::draw_list(&local_ctx, l, pos, alpha, current_path, visible_in_game);
     }
 
     if !matches!(element.data, Element::List(_)) {
-        recurse_children(ctx, &common.children, pos, current_path, visible_in_game);
+        recurse_children(
+            &local_ctx,
+            &common.children,
+            pos,
+            current_path,
+            visible_in_game,
+        );
     }
 }
 
@@ -170,12 +229,18 @@ pub fn hit_test(
     container_mode: bool,
 ) -> Option<Vec<usize>> {
     let common = element.get_common();
-    let pos = resolve_position(ctx, common, parent_pos);
+
+    let local_ctx = RenderContext {
+        is_native: ctx.is_native || matches!(element.data, Element::Native(_)),
+        ..*ctx
+    };
+
+    let pos = resolve_position(&local_ctx, common, parent_pos);
 
     if !matches!(element.data, Element::List(_)) {
         for (idx, child) in element.children().iter().enumerate().rev() {
             current_path.push(idx);
-            let hit = hit_test(ctx, child, pos, current_path, true, container_mode);
+            let hit = hit_test(&local_ctx, child, pos, current_path, true, container_mode);
 
             if hit.is_some() {
                 if element._cacoco_text.is_some() {
@@ -188,7 +253,9 @@ pub fn hit_test(
             current_path.pop();
         }
     } else if let Element::List(l) = &element.data {
-        if let Some(hit) = list::hit_test_list(ctx, l, pos, current_path, true, container_mode) {
+        if let Some(hit) =
+            list::hit_test_list(&local_ctx, l, pos, current_path, true, container_mode)
+        {
             if element._cacoco_text.is_some() {
                 return Some(current_path.clone());
             }
@@ -204,7 +271,7 @@ pub fn hit_test(
     };
 
     if is_selectable {
-        if let Some(rect) = get_element_bounds(ctx, element, pos) {
+        if let Some(rect) = get_element_bounds(&local_ctx, element, pos) {
             if rect.contains(ctx.mouse_pos) {
                 return Some(current_path.clone());
             }
@@ -219,7 +286,7 @@ fn get_element_bounds(
     element: &ElementWrapper,
     pos: egui::Pos2,
 ) -> Option<egui::Rect> {
-    let size = match &element.data {
+    let mut size = match &element.data {
         Element::Graphic(g) => {
             let id = crate::assets::AssetId::new(&g.patch);
             ctx.assets.textures.get(&id).map(|t| t.size_vec2())?
@@ -237,6 +304,14 @@ fn get_element_bounds(
         }
         _ => return None,
     };
+
+    if ctx.is_native {
+        let zoom = (ctx.state.engine.zoom_level as f32).max(1.0);
+        let base_scale_x = ctx.proj.final_scale_x / zoom;
+        let base_scale_y = ctx.proj.final_scale_y / zoom;
+        size.x /= base_scale_x;
+        size.y /= base_scale_y;
+    }
 
     let offset = get_alignment_anchor_offset(element.get_common().alignment, size.x, size.y);
     Some(egui::Rect::from_min_size(pos + offset, size))
@@ -264,15 +339,21 @@ pub(super) fn resolve_position(
     common: &CommonAttrs,
     parent_pos: egui::Pos2,
 ) -> egui::Pos2 {
-    let mut pos = egui::pos2(
-        parent_pos.x + common.x as f32,
-        parent_pos.y + common.y as f32,
-    );
+    let mut offset_x = common.x as f32;
+    let mut offset_y = common.y as f32;
+
+    if ctx.is_native {
+        let base_scale_x = ctx.proj.final_scale_x / (ctx.state.engine.zoom_level as f32).max(1.0);
+        let base_scale_y = ctx.proj.final_scale_y / (ctx.state.engine.zoom_level as f32).max(1.0);
+        offset_x /= base_scale_x;
+        offset_y /= base_scale_y;
+    }
+
+    let mut pos = egui::pos2(parent_pos.x + offset_x, parent_pos.y + offset_y);
 
     if ctx.proj.origin_x > 0.0 {
         let wl = common.alignment.contains(Alignment::WIDESCREEN_LEFT);
         let wr = common.alignment.contains(Alignment::WIDESCREEN_RIGHT);
-
         if wl && !wr {
             pos.x -= ctx.proj.origin_x;
         } else if wr && !wl {
@@ -280,7 +361,12 @@ pub(super) fn resolve_position(
         }
     }
 
-    egui::pos2(pos.x.floor(), pos.y.floor())
+    if !ctx.is_native {
+        pos.x = pos.x.floor();
+        pos.y = pos.y.floor();
+    }
+
+    pos
 }
 
 /// Returns a pixel offset vector based on the alignment flags and provided dimensions.
@@ -299,4 +385,34 @@ pub fn get_alignment_anchor_offset(align: Alignment, w: f32, h: f32) -> egui::Ve
         calc(w, Alignment::RIGHT, Alignment::H_CENTER),
         calc(h, Alignment::BOTTOM, Alignment::V_CENTER),
     )
+}
+
+/// Helper to calculate the combined bounds of a container and all its children.
+fn get_container_recursive_bounds(
+    ctx: &RenderContext,
+    element: &ElementWrapper,
+    pos: egui::Pos2,
+    path: &mut Vec<usize>,
+) -> egui::Rect {
+    let mut rect = get_element_bounds(ctx, element, pos)
+        .unwrap_or(egui::Rect::from_center_size(pos, egui::Vec2::ZERO));
+
+    if let Element::List(l) = &element.data {
+        let (_, layout) = list::get_list_layout(ctx, l, pos, true, path);
+        for (idx, child_pos, _) in layout {
+            path.push(idx);
+            let child = &l.common.children[idx];
+            rect = rect.union(get_container_recursive_bounds(ctx, child, child_pos, path));
+            path.pop();
+        }
+    } else {
+        for (idx, child) in element.children().iter().enumerate() {
+            path.push(idx);
+            let child_pos = resolve_position(ctx, child.get_common(), pos);
+            rect = rect.union(get_container_recursive_bounds(ctx, child, child_pos, path));
+            path.pop();
+        }
+    }
+
+    rect
 }

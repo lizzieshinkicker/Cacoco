@@ -136,7 +136,11 @@ pub fn draw_text_line(
         }
     };
 
-    let off = get_alignment_anchor_offset(align, layout.size.x, layout.size.y);
+    let (base_sc_x, _) = ctx.get_native_scale_factor();
+    let scale_adjustment = 1.0 / base_sc_x;
+
+    let scaled_size = layout.size * scale_adjustment;
+    let off = get_alignment_anchor_offset(align, scaled_size.x, scaled_size.y);
     let mut cur_x = pos.x + off.x;
     let start_y = pos.y + off.y;
 
@@ -145,17 +149,21 @@ pub fn draw_text_line(
 
     for glyph in layout.glyphs {
         if let Some(tex) = glyph.texture {
-            let char_pos = egui::pos2(cur_x.floor(), (start_y + glyph.y_offset).floor());
+            let y_adj = glyph.y_offset * scale_adjustment;
+            let char_pos = if ctx.is_native {
+                egui::pos2(cur_x, start_y + y_adj)
+            } else {
+                egui::pos2(cur_x.floor(), (start_y + y_adj).floor())
+            };
 
             let s_pos = ctx.to_screen(char_pos);
-            let s_size = egui::vec2(
-                glyph.tex_w * ctx.proj.final_scale_x,
-                glyph.h * ctx.proj.final_scale_y,
-            );
+            let (sc_x, sc_y) = ctx.get_render_scale();
+
+            let s_size = egui::vec2(glyph.tex_w * sc_x, glyph.h * sc_y);
             ctx.painter
                 .image(tex.id(), egui::Rect::from_min_size(s_pos, s_size), uv, tint);
         }
-        cur_x += glyph.advance;
+        cur_x += glyph.advance * scale_adjustment;
     }
 }
 

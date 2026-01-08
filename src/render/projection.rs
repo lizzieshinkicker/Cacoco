@@ -84,4 +84,13 @@ impl ViewportProjection {
         let local_y = (pos.y - self.screen_rect.min.y) / self.final_scale_y;
         egui::pos2(local_x, local_y)
     }
+
+    /// Converts virtual coordinates to screen space without snapping to the virtual grid.
+    /// Used for native rendering where 1 virtual unit != 1 screen pixel.
+    pub fn to_screen_subpixel(&self, pos: egui::Pos2) -> egui::Pos2 {
+        let x = pos.x * self.final_scale_x;
+        let y = pos.y * self.final_scale_y;
+
+        (self.screen_rect.min + egui::vec2(x, y)).round()
+    }
 }
