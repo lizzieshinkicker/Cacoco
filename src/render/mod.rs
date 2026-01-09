@@ -150,13 +150,15 @@ pub fn draw_element_wrapper(
         alpha *= 0.70 + (wave * 0.30);
     }
 
-    let pos = resolve_position(ctx, common, parent_pos);
+    let mut pos = resolve_position(ctx, common, parent_pos);
 
     let is_native_container = matches!(element.data, Element::Native(_));
     let local_ctx = RenderContext {
         is_native: ctx.is_native || is_native_container,
         ..*ctx
     };
+
+    pos += get_container_pivot_offset(&local_ctx, element, current_path);
 
     if is_native_container && ctx.pass == RenderPass::Background {
         let mut child_path = current_path.clone();
@@ -169,11 +171,6 @@ pub fn draw_element_wrapper(
             egui::StrokeKind::Middle,
         );
     }
-
-    let local_ctx = RenderContext {
-        is_native: ctx.is_native || matches!(element.data, Element::Native(_)),
-        ..*ctx
-    };
 
     let should_render_content = match ctx.pass {
         RenderPass::Background => true,
@@ -235,7 +232,9 @@ pub fn hit_test(
         ..*ctx
     };
 
-    let pos = resolve_position(&local_ctx, common, parent_pos);
+    let mut pos = resolve_position(&local_ctx, common, parent_pos);
+
+    pos += get_container_pivot_offset(&local_ctx, element, current_path);
 
     if !matches!(element.data, Element::List(_)) {
         for (idx, child) in element.children().iter().enumerate().rev() {
@@ -343,8 +342,7 @@ pub(super) fn resolve_position(
     let mut offset_y = common.y as f32;
 
     if ctx.is_native {
-        let base_scale_x = ctx.proj.final_scale_x / (ctx.state.engine.zoom_level as f32).max(1.0);
-        let base_scale_y = ctx.proj.final_scale_y / (ctx.state.engine.zoom_level as f32).max(1.0);
+        let (base_scale_x, base_scale_y) = ctx.get_native_scale_factor();
         offset_x /= base_scale_x;
         offset_y /= base_scale_y;
     }
@@ -354,6 +352,7 @@ pub(super) fn resolve_position(
     if ctx.proj.origin_x > 0.0 {
         let wl = common.alignment.contains(Alignment::WIDESCREEN_LEFT);
         let wr = common.alignment.contains(Alignment::WIDESCREEN_RIGHT);
+
         if wl && !wr {
             pos.x -= ctx.proj.origin_x;
         } else if wr && !wl {
@@ -413,6 +412,24 @@ fn get_container_recursive_bounds(
             path.pop();
         }
     }
-
     rect
+}
+
+fn get_container_pivot_offset(
+    ctx: &RenderContext,
+    element: &ElementWrapper,
+    current_path: &[usize],
+) -> egui::Vec2 {
+    if matches!(element.data, Element::Native(_) | Element::Canvas(_)) {
+        let mut temp_path = current_path.to_vec();
+        let bounds = get_container_recursive_bounds(ctx, element, egui::Pos2::ZERO, &mut temp_path);
+
+        get_alignment_anchor_offset(
+            element.get_common().alignment,
+            bounds.width(),
+            bounds.height(),
+        )
+    } else {
+        egui::Vec2::ZERO
+    }
 }
