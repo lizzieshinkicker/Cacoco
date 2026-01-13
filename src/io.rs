@@ -329,7 +329,7 @@ pub fn launch_game(
     let extension = if target == ExportTarget::Basic {
         "wad"
     } else {
-        "pk3"
+        "zip"
     };
     temp_path.push(format!("cacotest.{}", extension));
     let temp_path_str = temp_path.to_string_lossy().into_owned();

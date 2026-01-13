@@ -133,11 +133,17 @@ pub fn draw_confirmation_modal(
     if confirmed {
         match request {
             ConfirmationRequest::DeleteStatusBar(idx) => {
-                app.execute_actions(vec![document::LayerAction::DeleteStatusBar(*idx)]);
+                app.execute_actions(vec![
+                    document::LayerAction::UndoSnapshot,
+                    document::LayerAction::DeleteStatusBar(*idx),
+                ]);
                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
             ConfirmationRequest::DeleteLayers(paths) => {
-                app.execute_actions(vec![document::LayerAction::DeleteSelection(paths.clone())]);
+                app.execute_actions(vec![
+                    document::LayerAction::UndoSnapshot,
+                    document::LayerAction::DeleteSelection(paths.clone()),
+                ]);
                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
             ConfirmationRequest::DeleteAssets(items) => {
@@ -172,6 +178,7 @@ pub fn draw_confirmation_modal(
             }
             ConfirmationRequest::DowngradeTarget(t) => {
                 if let Some(doc) = &mut app.doc {
+                    doc.execute_actions(vec![document::LayerAction::UndoSnapshot]);
                     doc.file.target = *t;
                     doc.file.normalize_for_target();
                     doc.dirty = true;

@@ -371,12 +371,16 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                 messages::log_event(&mut app.preview_state, EditorEvent::ClipboardCopy(count));
             }
         }
+
         Action::Paste => {
             if let Some(doc) = &mut app.doc {
                 if !doc.history.bar_clipboard.is_empty() {
                     let count = doc.history.bar_clipboard.len();
                     let pasted = doc.history.prepare_bar_clipboard_for_paste();
-                    doc.execute_actions(vec![LayerAction::PasteStatusBars(pasted)]);
+                    doc.execute_actions(vec![
+                        LayerAction::UndoSnapshot,
+                        LayerAction::PasteStatusBars(pasted),
+                    ]);
                     messages::log_event(&mut app.preview_state, EditorEvent::ClipboardPaste(count));
                 } else if !doc.history.clipboard.is_empty() {
                     let count = doc.history.clipboard.len();
@@ -388,11 +392,14 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         app.current_statusbar_idx,
                     );
 
-                    doc.execute_actions(vec![LayerAction::Paste {
-                        parent_path: p,
-                        insert_idx: i,
-                        elements: pasted,
-                    }]);
+                    doc.execute_actions(vec![
+                        LayerAction::UndoSnapshot,
+                        LayerAction::Paste {
+                            parent_path: p,
+                            insert_idx: i,
+                            elements: pasted,
+                        },
+                    ]);
                     messages::log_event(&mut app.preview_state, EditorEvent::ClipboardPaste(count));
                 }
             }
@@ -447,7 +454,10 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     } else if needs_conf {
                         app.confirmation_modal = Some(ConfirmationRequest::DeleteLayers(paths));
                     } else {
-                        doc.execute_actions(vec![LayerAction::DeleteSelection(paths)]);
+                        doc.execute_actions(vec![
+                            LayerAction::UndoSnapshot,
+                            LayerAction::DeleteSelection(paths),
+                        ]);
                         messages::log_event(&mut app.preview_state, EditorEvent::Delete);
                     }
                 }
@@ -483,6 +493,7 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
                     }
                 }
 
+                doc.execute_actions(vec![document::LayerAction::UndoSnapshot]);
                 doc.file.target = t;
                 doc.file.normalize_for_target();
                 doc.dirty = true;

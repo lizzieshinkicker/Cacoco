@@ -901,20 +901,22 @@ impl SBarDefFile {
                 }
                 Self::scrub_elements(&mut bar.children, assets, &fonts, ExportTarget::Basic);
             }
+
+            if let Ok(mut data_val) = serde_json::to_value(&clone.data) {
+                Self::prune_json_value(&mut data_val, clone.target);
+                let export = KexExport {
+                    type_: &clone.type_,
+                    version: &clone.version,
+                    metadata: None,
+                    data: data_val,
+                };
+                return serde_json::to_string_pretty(&export).unwrap_or_default();
+            }
         } else {
             clone.version = "1.2.0".to_string();
+            return serde_json::to_string_pretty(&clone).unwrap_or_default();
         }
 
-        if let Ok(mut data_val) = serde_json::to_value(&clone.data) {
-            Self::prune_json_value(&mut data_val, clone.target);
-            let export = KexExport {
-                type_: &clone.type_,
-                version: &clone.version,
-                metadata: None,
-                data: data_val,
-            };
-            return serde_json::to_string_pretty(&export).unwrap_or_default();
-        }
         String::new()
     }
 

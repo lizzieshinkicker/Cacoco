@@ -442,7 +442,7 @@ fn render_player_weapon(
     proj: &ViewportProjection,
     v_shift: f32,
 ) {
-    let (weapon_lump_name, constant_offset) = match state.selected_weapon_slot {
+    let (weapon_lump_name, constant_offset) = match state.editor.display_weapon_slot {
         1 => (
             Some(
                 if state.inventory.has_chainsaw
@@ -458,7 +458,7 @@ fn render_player_weapon(
         2 => (Some("PISGA0"), 0.0),
         3 => (
             Some(
-                if state.use_super_shotgun
+                if state.editor.display_super_shotgun
                     && state.engine.slot_mapping == crate::state::SlotMapping::Vanilla
                 {
                     "SHT2A0"
