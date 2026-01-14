@@ -47,8 +47,9 @@ impl PropertiesUI for FaceDef {
             DOOM_W
         };
 
+        let screen_rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(screen_w, 0.0));
         let anchor_x =
-            -crate::render::get_alignment_anchor_offset(self.common.alignment, screen_w, 0.0).x;
+            -crate::render::get_alignment_anchor_offset(self.common.alignment, screen_rect).x;
 
         let face_center_x = anchor_x + (self.common.x as f32) + 12.0;
         let dx = state.editor.virtual_mouse_pos.x - face_center_x;

@@ -140,7 +140,9 @@ pub fn draw_text_line(
     let scale_adjustment = 1.0 / base_sc_x;
 
     let scaled_size = layout.size * scale_adjustment;
-    let off = get_alignment_anchor_offset(align, scaled_size.x, scaled_size.y);
+    let self_rect = egui::Rect::from_min_size(egui::Pos2::ZERO, scaled_size);
+    let off = get_alignment_anchor_offset(align, self_rect);
+
     let mut cur_x = pos.x + off.x;
     let start_y = pos.y + off.y;
 
@@ -159,7 +161,10 @@ pub fn draw_text_line(
             let s_pos = ctx.to_screen(char_pos);
             let (sc_x, sc_y) = ctx.get_render_scale();
 
-            let s_size = egui::vec2(glyph.tex_w * sc_x, glyph.h * sc_y);
+            let s_size = egui::vec2(
+                glyph.tex_w * sc_x * scale_adjustment,
+                glyph.h * sc_y * scale_adjustment,
+            );
             ctx.painter
                 .image(tex.id(), egui::Rect::from_min_size(s_pos, s_size), uv, tint);
         }

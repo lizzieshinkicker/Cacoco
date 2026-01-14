@@ -62,27 +62,14 @@ impl<'a> RenderContext<'a> {
         egui::Rect::from_min_max(self.to_screen(rect.min), self.to_screen(rect.max))
     }
 
-    /// Returns the scale to use for drawing actual pixels (patches, characters).
+    /// Returns the actual scale to use for drawing pixels (handles Aspect Correction).
     pub fn get_render_scale(&self) -> (f32, f32) {
-        if self.is_native {
-            let zoom = (self.state.engine.zoom_level as f32).max(1.0);
-            (zoom, zoom)
-        } else {
-            (self.proj.final_scale_x, self.proj.final_scale_y)
-        }
+        (self.proj.final_scale_x, self.proj.final_scale_y)
     }
 
     /// Returns the ratio used to convert Raw Pixels into Virtual Units.
     pub fn get_native_scale_factor(&self) -> (f32, f32) {
-        if self.is_native {
-            let zoom = (self.state.engine.zoom_level as f32).max(1.0);
-            (
-                self.proj.final_scale_x / zoom,
-                self.proj.final_scale_y / zoom,
-            )
-        } else {
-            (1.0, 1.0)
-        }
+        (1.0, 1.0)
     }
 }
 
@@ -161,15 +148,15 @@ pub fn draw_element_wrapper(
     pos += get_container_pivot_offset(&local_ctx, element, current_path);
 
     if is_native_container && ctx.pass == RenderPass::Background {
-        let mut child_path = current_path.clone();
-        let bounds = get_container_recursive_bounds(&local_ctx, element, pos, &mut child_path);
-        let screen_rect = ctx.to_screen_rect(bounds);
-        ctx.painter.rect_stroke(
-            screen_rect,
-            0.0,
-            egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 255, 0)),
-            egui::StrokeKind::Middle,
-        );
+        if let Some(bounds) = get_element_bounds(&local_ctx, element, pos) {
+            let screen_rect = ctx.to_screen_rect(bounds);
+            ctx.painter.rect_stroke(
+                screen_rect,
+                0.0,
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 255, 0)),
+                egui::StrokeKind::Middle,
+            );
+        }
     }
 
     let should_render_content = match ctx.pass {
@@ -285,35 +272,70 @@ fn get_element_bounds(
     element: &ElementWrapper,
     pos: egui::Pos2,
 ) -> Option<egui::Rect> {
+    Some(get_element_footprint(ctx, element).translate(pos.to_vec2()))
+}
+
+fn get_element_footprint(ctx: &RenderContext, element: &ElementWrapper) -> egui::Rect {
     let mut size = match &element.data {
         Element::Graphic(g) => {
             let id = crate::assets::AssetId::new(&g.patch);
-            ctx.assets.textures.get(&id).map(|t| t.size_vec2())?
+            ctx.assets
+                .textures
+                .get(&id)
+                .map(|t| t.size_vec2())
+                .unwrap_or(egui::vec2(16.0, 16.0))
         }
         Element::Number(n) | Element::Percent(n) => {
             text::measure_text_size(ctx, "000", &n.font, true)
         }
-        Element::String(s) => text::measure_text_size(ctx, "Sample Text", &s.font, false),
+        Element::String(s) => text::measure_text_size(ctx, "Sample", &s.font, false),
         Element::Face(_) | Element::FaceBackground(_) => egui::vec2(24.0, 29.0),
-        Element::Component(c) => text::measure_text_size(ctx, "Sample Component", &c.font, false),
+        Element::Component(c) => text::measure_text_size(ctx, "Component", &c.font, false),
         Element::Animation(a) => {
-            let lump = a.frames.first().map(|f| &f.lump)?;
-            let id = crate::assets::AssetId::new(lump);
-            ctx.assets.textures.get(&id).map(|t| t.size_vec2())?
+            let lump = a.frames.first().map(|f| &f.lump);
+            lump.and_then(|l| {
+                let id = crate::assets::AssetId::new(l);
+                ctx.assets.textures.get(&id).map(|t| t.size_vec2())
+            })
+            .unwrap_or(egui::vec2(16.0, 16.0))
         }
-        _ => return None,
+        _ => egui::Vec2::ZERO,
     };
 
     if ctx.is_native {
-        let zoom = (ctx.state.engine.zoom_level as f32).max(1.0);
-        let base_scale_x = ctx.proj.final_scale_x / zoom;
-        let base_scale_y = ctx.proj.final_scale_y / zoom;
-        size.x /= base_scale_x;
-        size.y /= base_scale_y;
+        let (base_sc_x, base_sc_y) = ctx.get_native_scale_factor();
+        size.x /= base_sc_x;
+        size.y /= base_sc_y;
     }
 
-    let offset = get_alignment_anchor_offset(element.get_common().alignment, size.x, size.y);
-    Some(egui::Rect::from_min_size(pos + offset, size))
+    let self_rect = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+    let self_pivot = get_alignment_anchor_offset(element.get_common().alignment, self_rect);
+    let mut footprint = self_rect.translate(self_pivot);
+
+    if !matches!(element.data, Element::List(_)) {
+        for child in element.children() {
+            let child_rel_anchor =
+                egui::vec2(child.get_common().x as f32, child.get_common().y as f32);
+            let child_fp = get_element_footprint(ctx, child);
+
+            let child_container_pivot =
+                if matches!(child.data, Element::Native(_) | Element::Canvas(_)) {
+                    get_alignment_anchor_offset(child.get_common().alignment, child_fp)
+                } else {
+                    egui::Vec2::ZERO
+                };
+
+            footprint =
+                footprint.union(child_fp.translate(child_rel_anchor + child_container_pivot));
+        }
+    } else if let Element::List(l) = &element.data {
+        let (list_size, _) = list::get_list_layout(ctx, l, egui::Pos2::ZERO, true, &mut Vec::new());
+        let list_rect = egui::Rect::from_min_size(egui::Pos2::ZERO, list_size);
+        let list_pivot = get_alignment_anchor_offset(l.common.alignment, list_rect);
+        footprint = footprint.union(list_rect.translate(list_pivot));
+    }
+
+    footprint
 }
 
 /// Internal helper to iterate and draw child elements.
@@ -338,16 +360,10 @@ pub(super) fn resolve_position(
     common: &CommonAttrs,
     parent_pos: egui::Pos2,
 ) -> egui::Pos2 {
-    let mut offset_x = common.x as f32;
-    let mut offset_y = common.y as f32;
-
-    if ctx.is_native {
-        let (base_scale_x, base_scale_y) = ctx.get_native_scale_factor();
-        offset_x /= base_scale_x;
-        offset_y /= base_scale_y;
-    }
-
-    let mut pos = egui::pos2(parent_pos.x + offset_x, parent_pos.y + offset_y);
+    let mut pos = egui::pos2(
+        parent_pos.x + common.x as f32,
+        parent_pos.y + common.y as f32,
+    );
 
     if ctx.proj.origin_x > 0.0 {
         let wl = common.alignment.contains(Alignment::WIDESCREEN_LEFT);
@@ -369,21 +385,24 @@ pub(super) fn resolve_position(
 }
 
 /// Returns a pixel offset vector based on the alignment flags and provided dimensions.
-pub fn get_alignment_anchor_offset(align: Alignment, w: f32, h: f32) -> egui::Vec2 {
-    let calc = |size: f32, max_bit: Alignment, mid_bit: Alignment| {
-        if align.contains(max_bit) {
-            -size
-        } else if align.contains(mid_bit) {
-            -(size / 2.0).floor()
-        } else {
-            0.0
-        }
+pub fn get_alignment_anchor_offset(align: Alignment, footprint: egui::Rect) -> egui::Vec2 {
+    let x = if align.contains(Alignment::RIGHT) {
+        -footprint.max.x
+    } else if align.contains(Alignment::H_CENTER) {
+        -footprint.center().x.floor()
+    } else {
+        -footprint.min.x
     };
 
-    egui::vec2(
-        calc(w, Alignment::RIGHT, Alignment::H_CENTER),
-        calc(h, Alignment::BOTTOM, Alignment::V_CENTER),
-    )
+    let y = if align.contains(Alignment::BOTTOM) {
+        -footprint.max.y
+    } else if align.contains(Alignment::V_CENTER) {
+        -footprint.center().y.floor()
+    } else {
+        -footprint.min.y
+    };
+
+    egui::vec2(x, y)
 }
 
 /// Helper to calculate the combined bounds of a container and all its children.
@@ -418,18 +437,11 @@ fn get_container_recursive_bounds(
 fn get_container_pivot_offset(
     ctx: &RenderContext,
     element: &ElementWrapper,
-    current_path: &[usize],
+    _current_path: &[usize],
 ) -> egui::Vec2 {
     if matches!(element.data, Element::Native(_) | Element::Canvas(_)) {
-        let mut temp_path = current_path.to_vec();
-        let bounds = get_container_recursive_bounds(ctx, element, egui::Pos2::ZERO, &mut temp_path);
-
-        get_alignment_anchor_offset(
-            element.get_common().alignment,
-            bounds.width(),
-            bounds.height(),
-        )
-    } else {
-        egui::Vec2::ZERO
+        let footprint = get_element_footprint(ctx, element);
+        return get_alignment_anchor_offset(element.get_common().alignment, footprint);
     }
+    egui::Vec2::ZERO
 }

@@ -413,20 +413,26 @@ pub fn draw_settings_window(
 
             ui.vertical_centered(|ui| {
                 ui.label(egui::RichText::new("Cacoco").strong());
-                ui.label(egui::RichText::new("Created by Florina Mushin (lizzieshinkicker)").size(11.0));
+                ui.label(
+                    egui::RichText::new("Created by Florina Mushin (lizzieshinkicker)").size(11.0),
+                );
 
                 ui.add_space(8.0);
 
                 ui.label(egui::RichText::new("External Contributions").strong());
                 ui.label(
-                    egui::RichText::new("NightFright2k19 - 'SBARDEF Hud Mod for Woof!' (Assets & Inspiration)")
-                        .size(11.0)
-                        .weak()
+                    egui::RichText::new(
+                        "NightFright2k19 - 'SBARDEF Hud Mod for Woof!' (Assets & Inspiration)",
+                    )
+                    .size(11.0)
+                    .weak(),
                 );
                 ui.label(
-                    egui::RichText::new("Team Eternity - Eternity Engine HUD Assets (GPL Section 7 Addendum)")
-                        .size(11.0)
-                        .weak()
+                    egui::RichText::new(
+                        "Team Eternity - Eternity Engine HUD Assets (GPL Section 7 Addendum)",
+                    )
+                    .size(11.0)
+                    .weak(),
                 );
             });
 
