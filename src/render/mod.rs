@@ -405,35 +405,6 @@ pub fn get_alignment_anchor_offset(align: Alignment, footprint: egui::Rect) -> e
     egui::vec2(x, y)
 }
 
-/// Helper to calculate the combined bounds of a container and all its children.
-fn get_container_recursive_bounds(
-    ctx: &RenderContext,
-    element: &ElementWrapper,
-    pos: egui::Pos2,
-    path: &mut Vec<usize>,
-) -> egui::Rect {
-    let mut rect = get_element_bounds(ctx, element, pos)
-        .unwrap_or(egui::Rect::from_center_size(pos, egui::Vec2::ZERO));
-
-    if let Element::List(l) = &element.data {
-        let (_, layout) = list::get_list_layout(ctx, l, pos, true, path);
-        for (idx, child_pos, _) in layout {
-            path.push(idx);
-            let child = &l.common.children[idx];
-            rect = rect.union(get_container_recursive_bounds(ctx, child, child_pos, path));
-            path.pop();
-        }
-    } else {
-        for (idx, child) in element.children().iter().enumerate() {
-            path.push(idx);
-            let child_pos = resolve_position(ctx, child.get_common(), pos);
-            rect = rect.union(get_container_recursive_bounds(ctx, child, child_pos, path));
-            path.pop();
-        }
-    }
-    rect
-}
-
 fn get_container_pivot_offset(
     ctx: &RenderContext,
     element: &ElementWrapper,
