@@ -391,7 +391,7 @@ pub fn get_alignment_anchor_offset(align: Alignment, footprint: egui::Rect) -> e
     } else if align.contains(Alignment::H_CENTER) {
         -footprint.center().x.floor()
     } else {
-        -footprint.min.x
+        0.0
     };
 
     let y = if align.contains(Alignment::BOTTOM) {
@@ -399,7 +399,7 @@ pub fn get_alignment_anchor_offset(align: Alignment, footprint: egui::Rect) -> e
     } else if align.contains(Alignment::V_CENTER) {
         -footprint.center().y.floor()
     } else {
-        -footprint.min.y
+        0.0
     };
 
     egui::vec2(x, y)
