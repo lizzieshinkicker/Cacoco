@@ -406,7 +406,7 @@ pub fn draw_settings_window(
 
                                                 if let Some(path) = dialog.pick_file() {
                                                     let path_str = path.to_string_lossy().into_owned();
-                                                    if (port.name.is_empty())
+                                                    if port.name.is_empty()
                                                     {
                                                         port.name = SourcePortConfig::infer_name(&path_str);
                                                     }
