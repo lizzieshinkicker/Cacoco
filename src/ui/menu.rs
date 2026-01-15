@@ -324,26 +324,11 @@ pub fn draw_settings_window(
             ui.horizontal(|ui| {
                 ui.heading("Source Ports");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("+ Add Command").clicked() {
-                        config.source_ports.push(SourcePortConfig {
-                            name: "New Port".to_string(),
-                            command: "flatpak run ...".to_string(),
-                        });
-                    }
-
                     if ui.button("+ Add Port").clicked() {
-                        let mut dialog = rfd::FileDialog::new().set_title("Select Source Port");
-                        if cfg!(windows) {
-                            dialog = dialog.add_filter("Executable", &["exe"]);
-                        }
-
-                        if let Some(path) = dialog.pick_file() {
-                            let path_str = path.to_string_lossy().into_owned();
-                            config.source_ports.push(SourcePortConfig {
-                                name: SourcePortConfig::infer_name(&path_str),
-                                command: path_str,
-                            });
-                        }
+                        config.source_ports.push(SourcePortConfig {
+                            name: "".to_string(),
+                            command: "".to_string(),
+                        });
                     }
                 });
             });
@@ -357,12 +342,13 @@ pub fn draw_settings_window(
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 12.0;
 
+                    let total_w = ui.available_width();
+                    let delete_w = 44.0;
+                    let card_w = total_w - delete_w - 4.0;
+
                     for (idx, port) in config.source_ports.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 4.0;
-                            let total_w = ui.available_width();
-                            let delete_w = 44.0;
-                            let card_w = total_w - delete_w - 4.0;
 
                             ui.allocate_ui(egui::vec2(card_w, 70.0), |ui| {
                                 let frame = egui::Frame::NONE
@@ -372,24 +358,61 @@ pub fn draw_settings_window(
 
                                 frame.show(ui, |ui| {
                                     ui.vertical(|ui| {
+                                        let mut label_width: f32 = 0.0;
+                                        let row_width =
                                         ui.horizontal(|ui| {
-                                            ui.label("Name:");
+                                            label_width = ui.label("Name:").rect.width();
                                             ui.add(
                                                 egui::TextEdit::singleline(&mut port.name)
+                                                    .hint_text("Port name")
                                                     .desired_width(f32::INFINITY)
                                                     .font(egui::FontId::proportional(14.0))
                                                     .text_color(ui.visuals().strong_text_color()),
                                             );
-                                        });
+                                        }).response.rect.width();
                                         ui.add_space(4.0);
                                         ui.horizontal(|ui| {
-                                            ui.label("Cmd: ");
+                                            ui.horizontal(|ui| {
+                                                ui.set_min_width(label_width);
+                                                ui.label("Cmd:")
+                                            });
+                                            let browse_button_width = ui
+                                                .ctx().fonts_mut(|f| {
+                                                    f.layout_no_wrap(
+                                                        "Browse...".to_owned(),
+                                                        ui.style().text_styles[&egui::TextStyle::Button].clone(),
+                                                        ui.visuals().text_color(),
+                                                    )
+                                                    .size()
+                                                    .x
+                                                })
+                                                + ui.spacing().button_padding.x * 2.0;
+                                            let cmd_input_w = row_width
+                                                - label_width
+                                                - browse_button_width
+                                                - ui.spacing().item_spacing.x
+                                                - 16.0; // frame margin
                                             ui.add(
                                                 egui::TextEdit::singleline(&mut port.command)
-                                                    .hint_text("Executable path or flatpak command")
-                                                    .desired_width(f32::INFINITY)
+                                                    .hint_text("Executable path or command")
+                                                    .desired_width(cmd_input_w)
                                                     .font(egui::FontId::monospace(11.0)),
                                             );
+                                            if ui.button("Browse...").clicked() {
+                                                let mut dialog = rfd::FileDialog::new().set_title("Select Port Executable");
+                                                if cfg!(windows) {
+                                                    dialog = dialog.add_filter("Executable", &["exe"]);
+                                                }
+
+                                                if let Some(path) = dialog.pick_file() {
+                                                    let path_str = path.to_string_lossy().into_owned();
+                                                    if (port.name.is_empty())
+                                                    {
+                                                        port.name = SourcePortConfig::infer_name(&path_str);
+                                                    }
+                                                    port.command = path_str;
+                                                }
+                                            }
                                         });
                                     });
                                 });
