@@ -164,12 +164,14 @@ pub fn draw_confirmation_modal(
                     doc.dirty = false;
                 }
                 match pending {
-                    PendingAction::New => app.new_project(
-                        ctx,
-                        crate::models::ProjectData::StatusBar(
-                            crate::models::sbardef::SBarDefFile::new_empty(),
-                        ),
-                    ),
+                    PendingAction::New => {
+                        ctx.data_mut(|d: &mut egui::util::IdTypeMap| {
+                            d.insert_temp(
+                                egui::Id::new("creation_modal_type"),
+                                crate::app::CreationModal::LumpSelector,
+                            )
+                        });
+                    }
                     PendingAction::Load(path) => {
                         if path.is_empty() {
                             app.open_project_ui(ctx);
@@ -182,9 +184,11 @@ pub fn draw_confirmation_modal(
             }
             ConfirmationRequest::DowngradeTarget(t) => {
                 if let Some(doc) = &mut app.doc {
-                    doc.execute_actions(vec![document::LayerAction::UndoSnapshot]);
-                    doc.file.set_target(*t);
-                    doc.file.normalize_for_target();
+                    doc.execute_actions(vec![document::LayerAction::UndoSnapshot], app.active_mode);
+                    if let Some(lump) = doc.get_lump_mut(app.active_mode) {
+                        lump.set_target(*t);
+                        lump.normalize_for_target();
+                    }
                     doc.dirty = true;
                 }
             }

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
 pub enum FinaleType {
     #[default]
     ArtScreen = 0,
@@ -11,15 +13,20 @@ pub enum FinaleType {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FinaleDefFile {
     pub version: String,
+    pub metadata: serde_json::Value,
+    pub data: FinaleDefinition,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct FinaleDefinition {
     #[serde(rename = "type")]
     pub finale_type: FinaleType,
     pub music: String,
     pub background: String,
     #[serde(default)]
     pub donextmap: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub bunny: Option<BunnyDef>,
-    #[serde(rename = "castrollcall", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "castrollcall")]
     pub cast_roll_call: Option<CastRollCallDef>,
 }
 
@@ -27,10 +34,13 @@ impl FinaleDefFile {
     pub fn new_empty() -> Self {
         Self {
             version: "1.0.0".to_string(),
-            finale_type: FinaleType::ArtScreen,
-            music: "D_VICTO".to_string(),
-            background: "INTERPIC".to_string(),
-            ..Default::default()
+            metadata: serde_json::json!({}),
+            data: FinaleDefinition {
+                finale_type: FinaleType::ArtScreen,
+                music: "D_VICTO".to_string(),
+                background: "INTERPIC".to_string(),
+                ..Default::default()
+            },
         }
     }
 }

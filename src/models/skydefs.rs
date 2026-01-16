@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
 pub enum SkyType {
     #[default]
     Normal = 0,
@@ -11,17 +13,25 @@ pub enum SkyType {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct SkyDefsFile {
     pub version: String,
+    pub metadata: serde_json::Value,
+    pub data: SkyDefsDefinition,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct SkyDefsDefinition {
     pub skies: Vec<SkyDef>,
-    #[serde(default)]
-    pub flatmapping: Vec<FlatMap>,
+    pub flatmapping: Option<Vec<FlatMap>>,
 }
 
 impl SkyDefsFile {
     pub fn new_empty() -> Self {
         Self {
             version: "1.0.0".to_string(),
-            skies: vec![],
-            flatmapping: vec![],
+            metadata: serde_json::json!({}),
+            data: SkyDefsDefinition {
+                skies: vec![],
+                flatmapping: None,
+            },
         }
     }
 }
@@ -38,7 +48,6 @@ pub struct SkyDef {
     pub scaley: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fire: Option<FireSkyDef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub foregroundtex: Option<ForegroundTexDef>,
 }
 

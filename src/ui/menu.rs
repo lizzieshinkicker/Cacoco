@@ -1,4 +1,4 @@
-use crate::app::PendingAction;
+use crate::app::{CreationModal, PendingAction, ProjectMode};
 use crate::assets::AssetStore;
 use crate::config::{AppConfig, SourcePortConfig};
 use crate::io::{self, LoadedProject};
@@ -18,6 +18,9 @@ pub enum MenuAction {
 }
 
 /// Draws the primary application menu bar (File, Run, Target).
+///
+/// This function manages the top-level navigation and dispatches actions
+/// for project management, engine launching, and target switching.
 pub fn draw_menu_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
@@ -27,6 +30,11 @@ pub fn draw_menu_bar(
     settings_open: &mut bool,
 ) -> MenuAction {
     let mut action = MenuAction::None;
+
+    let active_mode = ui.ctx().data(|d| {
+        d.get_temp::<ProjectMode>(egui::Id::new("active_mode"))
+            .unwrap_or_default()
+    });
 
     let file_id = ui.make_persistent_id("file_menu_area");
     let run_id = ui.make_persistent_id("run_menu_area");
@@ -38,11 +46,15 @@ pub fn draw_menu_bar(
 
     let dirty = doc.as_ref().map_or(false, |d| d.dirty);
 
-    let current_target = doc
-        .as_ref()
-        .map_or(crate::models::sbardef::ExportTarget::Extended, |d| {
-            d.file.target()
-        });
+    let current_target = if let Some(d) = doc {
+        d.lumps
+            .first()
+            .map_or(crate::models::sbardef::ExportTarget::Extended, |l| {
+                l.target()
+            })
+    } else {
+        crate::models::sbardef::ExportTarget::Extended
+    };
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
@@ -91,7 +103,7 @@ pub fn draw_menu_bar(
                     ui.data_mut(|d| {
                         d.insert_temp(
                             egui::Id::new("creation_modal_type"),
-                            crate::app::CreationModal::SBarDef,
+                            CreationModal::LumpSelector,
                         )
                     });
                 }
@@ -132,9 +144,11 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(sbar) = d.file.as_sbar() {
-                        if let Some(path) = io::save_pk3_dialog(sbar, assets, d.path.clone()) {
-                            action = MenuAction::SaveDone(path);
+                    if let Some(lump) = d.lumps.first() {
+                        if let Some(sbar) = lump.as_sbar() {
+                            if let Some(path) = io::save_pk3_dialog(sbar, assets, d.path.clone()) {
+                                action = MenuAction::SaveDone(path);
+                            }
                         }
                     }
                 }
@@ -142,18 +156,23 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Export JSON...", doc.is_some()) {
                 if let Some(d) = doc {
-                    let sanitized = d.file.to_sanitized_json(assets);
-                    if let Some(path) = io::save_json_dialog(&sanitized, d.path.clone()) {
-                        action = MenuAction::ExportDone(path);
+                    if let Some(lump) = d.get_lump(active_mode) {
+                        let sanitized = lump.to_sanitized_json(assets);
+                        if let Some(path) = io::save_json_dialog(&sanitized, d.path.clone()) {
+                            action = MenuAction::ExportDone(path);
+                        }
                     }
                 }
                 ContextMenu::close(ui);
             }
             if ContextMenu::button(ui, "Export WAD...", doc.is_some()) {
                 if let Some(d) = doc {
-                    let sanitized = d.file.to_sanitized_json(assets);
-                    if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone()) {
-                        action = MenuAction::ExportDone(path);
+                    if let Some(lump) = d.get_lump(active_mode) {
+                        let sanitized = lump.to_sanitized_json(assets);
+                        if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone())
+                        {
+                            action = MenuAction::ExportDone(path);
+                        }
                     }
                 }
                 ContextMenu::close(ui);
@@ -189,14 +208,16 @@ pub fn draw_menu_bar(
                     if ContextMenu::button(ui, &format!("Launch in {}", port.name), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
-                            let sanitized = d.file.to_sanitized_json(assets);
-                            io::launch_game(
-                                &sanitized,
-                                assets,
-                                &port.command,
-                                iwad,
-                                d.file.target(),
-                            );
+                            if let Some(lump) = d.get_lump(active_mode) {
+                                let sanitized = lump.to_sanitized_json(assets);
+                                io::launch_game(
+                                    &sanitized,
+                                    assets,
+                                    &port.command,
+                                    iwad,
+                                    lump.target(),
+                                );
+                            }
                         }
                         ContextMenu::close(ui);
                     }
@@ -240,6 +261,7 @@ pub fn draw_menu_bar(
     action
 }
 
+/// Renders the specialized Settings window for application-wide configuration.
 pub fn draw_settings_window(
     ctx: &egui::Context,
     settings_open: &mut bool,
@@ -433,6 +455,7 @@ pub fn draw_settings_window(
     }
 }
 
+/// Renders a card-style button used in settings and project selection.
 pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     let width = ui.available_width();
     let height = 54.0;
@@ -474,6 +497,7 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     response.clicked()
 }
 
+/// Renders a specialized delete button for use in list views.
 pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     let height = 70.0;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
@@ -513,14 +537,17 @@ pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     response.clicked()
 }
 
+/// Renders the multistep wizard for creating new project lumps.
 pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp) {
-    let mut is_open = app.creation_modal != crate::app::CreationModal::None;
+    let mut is_open = app.creation_modal != CreationModal::None;
+
     let title = match app.creation_modal {
-        crate::app::CreationModal::SBarDef => "Create SBARDEF Lump",
-        crate::app::CreationModal::SkyDefs => "Create SKYDEFS Lump",
-        crate::app::CreationModal::Interlevel => "Create INTERLEVEL Lump",
-        crate::app::CreationModal::Finale => "Create FINALE Lump",
-        _ => "Create New Lump",
+        CreationModal::LumpSelector => "New ID24 Project",
+        CreationModal::SBarDef => "Create SBARDEF Lump",
+        CreationModal::SkyDefs => "Create SKYDEFS Lump",
+        CreationModal::Interlevel => "Create INTERLEVEL Lump",
+        CreationModal::Finale => "Create FINALE Lump",
+        _ => "Create New Project",
     };
 
     egui::Window::new(title)
@@ -538,35 +565,81 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
 
-                    if draw_menu_card(ui, "Empty", "Start from scratch.") {
-                        use crate::models::*;
-                        let new_data = match app.creation_modal {
-                            crate::app::CreationModal::SBarDef => {
-                                ProjectData::StatusBar(sbardef::SBarDefFile::new_empty())
-                            }
-                            crate::app::CreationModal::SkyDefs => {
-                                ProjectData::Sky(skydefs::SkyDefsFile::new_empty())
-                            }
-                            crate::app::CreationModal::Interlevel => {
-                                ProjectData::Interlevel(interlevel::InterlevelDefFile::new_empty())
-                            }
-                            crate::app::CreationModal::Finale => {
-                                ProjectData::Finale(finale::FinaleDefFile::new_empty())
-                            }
-                            _ => ProjectData::StatusBar(sbardef::SBarDefFile::new_empty()),
-                        };
-                        app.new_project(ctx, new_data);
-                        app.creation_modal = crate::app::CreationModal::None;
-                    }
+                    match app.creation_modal {
+                        CreationModal::LumpSelector => {
+                            ui.label(
+                                egui::RichText::new("Choose the ID24 lump type to create:").weak(),
+                            );
+                            ui.add_space(4.0);
 
-                    if app.creation_modal == crate::app::CreationModal::SBarDef {
-                        ui.add_space(4.0);
-                        ui.label(egui::RichText::new("Templates").weak().italics().size(11.0));
+                            if draw_menu_card(
+                                ui,
+                                "Status Bar (SBARDEF)",
+                                "Recursive HUD and UI layouts.",
+                            ) {
+                                app.creation_modal = CreationModal::SBarDef;
+                            }
+                            if draw_menu_card(
+                                ui,
+                                "Sky Definitions (SKYDEFS)",
+                                "Custom panoramas, Hexen skies, and Fire effects.",
+                            ) {
+                                app.creation_modal = CreationModal::SkyDefs;
+                            }
+                            if draw_menu_card(
+                                ui,
+                                "Interlevel Animations",
+                                "Victory screens, score tallies, and map transitions.",
+                            ) {
+                                app.creation_modal = CreationModal::Interlevel;
+                            }
+                            if draw_menu_card(
+                                ui,
+                                "Finale Definitions",
+                                "Art screens, bunny scrollers, and cast calls.",
+                            ) {
+                                app.creation_modal = CreationModal::Finale;
+                            }
+                        }
+                        _ => {
+                            if draw_menu_card(ui, "Empty Project", "Start from a clean slate.") {
+                                use crate::models::*;
+                                let new_data = match app.creation_modal {
+                                    CreationModal::SBarDef => {
+                                        ProjectData::StatusBar(sbardef::SBarDefFile::new_empty())
+                                    }
+                                    CreationModal::SkyDefs => {
+                                        ProjectData::Sky(skydefs::SkyDefsFile::new_empty())
+                                    }
+                                    CreationModal::Interlevel => ProjectData::Interlevel(
+                                        interlevel::InterlevelDefFile::new_empty(),
+                                    ),
+                                    CreationModal::Finale => {
+                                        ProjectData::Finale(finale::FinaleDefFile::new_empty())
+                                    }
+                                    _ => ProjectData::StatusBar(sbardef::SBarDefFile::new_empty()),
+                                };
 
-                        for template in crate::library::TEMPLATES {
-                            if draw_menu_card(ui, template.name, template.description) {
-                                app.apply_template(ctx, template);
-                                app.creation_modal = crate::app::CreationModal::None;
+                                if app.doc.is_some() {
+                                    app.add_lump_to_project(new_data);
+                                } else {
+                                    app.new_project(ctx, new_data);
+                                }
+                                app.creation_modal = CreationModal::None;
+                            }
+
+                            if app.creation_modal == CreationModal::SBarDef {
+                                ui.add_space(4.0);
+                                ui.label(
+                                    egui::RichText::new("Templates").weak().italics().size(11.0),
+                                );
+
+                                for template in crate::library::TEMPLATES {
+                                    if draw_menu_card(ui, template.name, template.description) {
+                                        app.apply_template(ctx, template);
+                                        app.creation_modal = CreationModal::None;
+                                    }
+                                }
                             }
                         }
                     }
@@ -575,17 +648,24 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
             ui.add_space(12.0);
             ui.separator();
 
-            ui.vertical_centered(|ui| {
-                ui.add_space(8.0);
-                if ui.button("  Cancel  ").clicked() {
-                    app.creation_modal = crate::app::CreationModal::None;
+            ui.horizontal(|ui| {
+                if app.creation_modal != CreationModal::LumpSelector {
+                    if ui.button("  Back  ").clicked() {
+                        app.creation_modal = CreationModal::LumpSelector;
+                    }
                 }
-                ui.add_space(8.0);
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("  Cancel  ").clicked() {
+                        app.creation_modal = CreationModal::None;
+                    }
+                });
             });
+            ui.add_space(4.0);
         });
 
     if !is_open {
-        app.creation_modal = crate::app::CreationModal::None;
+        app.creation_modal = CreationModal::None;
     }
 }
 

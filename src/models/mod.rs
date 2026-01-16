@@ -18,8 +18,8 @@ pub enum ProjectData {
     Interlevel(interlevel::InterlevelDefFile),
 }
 
+#[allow(dead_code)]
 impl ProjectData {
-    #[allow(dead_code)]
     pub fn version(&self) -> &str {
         match self {
             ProjectData::StatusBar(f) => &f.version,
@@ -56,33 +56,57 @@ impl ProjectData {
     }
 
     pub fn as_sbar(&self) -> Option<&sbardef::SBarDefFile> {
-        match self {
-            ProjectData::StatusBar(s) => Some(s),
-            _ => None,
+        if let ProjectData::StatusBar(s) = self {
+            Some(s)
+        } else {
+            None
         }
     }
 
     pub fn as_sbar_mut(&mut self) -> Option<&mut sbardef::SBarDefFile> {
-        match self {
-            ProjectData::StatusBar(s) => Some(s),
-            _ => None,
+        if let ProjectData::StatusBar(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_sky(&self) -> Option<&skydefs::SkyDefsFile> {
+        if let ProjectData::Sky(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_sky_mut(&mut self) -> Option<&mut skydefs::SkyDefsFile> {
+        if let ProjectData::Sky(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_interlevel(&self) -> Option<&interlevel::InterlevelDefFile> {
+        if let ProjectData::Interlevel(i) = self {
+            Some(i)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_finale(&self) -> Option<&finale::FinaleDefFile> {
+        if let ProjectData::Finale(f) = self {
+            Some(f)
+        } else {
+            None
         }
     }
 
     pub fn to_sanitized_json(&self, assets: &crate::assets::AssetStore) -> String {
         match self {
             ProjectData::StatusBar(f) => f.to_sanitized_json(assets),
-            _ => "{}".to_string(),
+            _ => serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string()),
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_element(&self, path: &[usize]) -> Option<&sbardef::ElementWrapper> {
-        self.as_sbar().and_then(|s| s.get_element(path))
-    }
-
-    #[allow(dead_code)]
-    pub fn get_element_mut(&mut self, path: &[usize]) -> Option<&mut sbardef::ElementWrapper> {
-        self.as_sbar_mut().and_then(|s| s.get_element_mut(path))
     }
 }

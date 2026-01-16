@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InterlevelDefFile {
     pub version: String,
+    pub metadata: serde_json::Value,
+    pub data: InterlevelDefinition,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct InterlevelDefinition {
     pub music: String,
     pub backgroundimage: String,
     #[serde(default)]
@@ -13,9 +19,12 @@ impl InterlevelDefFile {
     pub fn new_empty() -> Self {
         Self {
             version: "1.0.0".to_string(),
-            music: "D_INTER".to_string(),
-            backgroundimage: "INTERPIC".to_string(),
-            layers: vec![],
+            metadata: serde_json::json!({}),
+            data: InterlevelDefinition {
+                music: "D_INTER".to_string(),
+                backgroundimage: "INTERPIC".to_string(),
+                layers: vec![],
+            },
         }
     }
 }

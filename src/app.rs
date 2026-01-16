@@ -13,7 +13,9 @@ use std::collections::HashSet;
 
 const MAX_RECENT_FILES: usize = 5;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum ProjectMode {
     #[default]
     SBarDef,
@@ -37,6 +39,7 @@ impl ProjectMode {
 pub enum CreationModal {
     #[default]
     None,
+    LumpSelector,
     SBarDef,
     SkyDefs,
     Interlevel,
@@ -53,6 +56,7 @@ pub enum PendingAction {
 
 /// Requests for user confirmation before performing destructive operations.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
     DeleteLayers(Vec<Vec<usize>>),
@@ -111,7 +115,7 @@ impl Default for CacocoApp {
             confirmation_modal: None,
             hotkeys: crate::hotkeys::HotkeyRegistry::default(),
             iwad_verified: false,
-            active_mode: ProjectMode::default(),
+            active_mode: ProjectMode::SBarDef,
             creation_modal: CreationModal::default(),
         }
     }
@@ -191,7 +195,7 @@ impl CacocoApp {
         );
     }
 
-    /// Initializes a new empty SBARDEF project.
+    /// Initializes a new empty project.
     pub fn new_project(&mut self, ctx: &egui::Context, data: crate::models::ProjectData) {
         self.active_mode = ProjectMode::from_data(&data);
         self.doc = Some(ProjectDocument::new(data, None));
@@ -207,6 +211,19 @@ impl CacocoApp {
         self.current_statusbar_idx = 0;
 
         messages::log_event(&mut self.preview_state, EditorEvent::ProjectNew);
+    }
+
+    /// Appends a new lump to the current project or switches to it if it exists.
+    pub fn add_lump_to_project(&mut self, data: crate::models::ProjectData) {
+        if let Some(doc) = &mut self.doc {
+            let mode = ProjectMode::from_data(&data);
+            if doc.get_lump(mode).is_none() {
+                doc.lumps.push(data);
+                doc.dirty = true;
+            }
+            self.active_mode = mode;
+            self.last_selection.clear();
+        }
     }
 
     /// Applies a library template as the current project.
@@ -254,7 +271,7 @@ impl CacocoApp {
     pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
         if let Some(doc) = &mut self.doc {
             let old_selection = doc.selection.clone();
-            doc.execute_actions(actions);
+            doc.execute_actions(actions, self.active_mode);
 
             if doc.selection != old_selection {
                 self.preview_state.editor.strobe_timer = 0.5;
@@ -262,16 +279,8 @@ impl CacocoApp {
 
             if doc.selection.len() == 1 {
                 let path = doc.selection.iter().next().unwrap();
-                if path.len() == 1 {
+                if path.len() == 1 && self.active_mode == ProjectMode::SBarDef {
                     self.current_statusbar_idx = path[0];
-                }
-            }
-        }
-
-        if let Some(doc) = &self.doc {
-            if let Some(sbar) = doc.file.as_sbar() {
-                if self.current_statusbar_idx >= sbar.data.status_bars.len() {
-                    self.current_statusbar_idx = sbar.data.status_bars.len().saturating_sub(1);
                 }
             }
         }

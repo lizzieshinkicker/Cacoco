@@ -1,5 +1,6 @@
 use crate::assets::AssetStore;
-use crate::models::sbardef::{Element, ElementWrapper, ExportTarget, SBarDefFile};
+use crate::models::ProjectData;
+use crate::models::sbardef::{Element, ElementWrapper, ExportTarget};
 use crate::state::PreviewState;
 use crate::ui::layers::colors;
 use crate::ui::shared;
@@ -107,13 +108,13 @@ impl PropertiesUI for ElementWrapper {
 /// Renders the entire properties sidebar panel.
 pub fn draw_properties_panel(
     ui: &mut egui::Ui,
-    file: &mut Option<SBarDefFile>,
+    file: &mut Option<ProjectData>,
     selection: &HashSet<Vec<usize>>,
     assets: &AssetStore,
     state: &PreviewState,
 ) -> bool {
     let mut changed = false;
-    let target = file.as_ref().map_or(ExportTarget::Basic, |f| f.target);
+    let target = file.as_ref().map_or(ExportTarget::Basic, |f| f.target());
 
     ui.data_mut(|d| d.insert_temp(egui::Id::new("cacoco_current_target"), target));
 
@@ -124,39 +125,54 @@ pub fn draw_properties_panel(
             .unwrap_or(PropertyTab::Properties)
     });
 
-    let mut header_title = "Properties".to_string();
-    let mut header_desc = "Select a layer or layout to view properties.".to_string();
+    let mut header_title = "Cacoco Editor".to_string();
+    let mut header_desc = "No project file loaded. Open or create a new SBARDEF.".to_string();
     let mut header_color = ui.visuals().widgets.noninteractive.bg_fill;
     let mut show_tabs = false;
     let mut is_layout = false;
 
     if let Some(f) = file {
+        header_desc = "Select a layer or layout to view properties.".to_string();
+
         if selection.len() == 1 {
             let path = selection.iter().next().unwrap();
             if path.len() > 1 {
-                show_tabs = true;
-                if let Some(el) = f.get_element(path) {
-                    header_title = if el._cacoco_text.is_some() {
-                        "Text String".to_string()
-                    } else {
-                        match &el.data {
-                            Element::Number(n) => text::number_type_name(n.type_).to_string(),
-                            Element::Percent(p) => text::number_type_name(p.type_).to_string(),
-                            Element::Component(c) => format!("{:?}", c.type_),
-                            Element::List(_) => "List Container".to_string(),
-                            Element::String(_) => "Dynamic String".to_string(),
-                            _ => el.display_name(),
-                        }
-                    };
-                    header_desc = descriptions::get_helper_text(el).to_string();
-                    header_color = colors::get_layer_color(el)
-                        .map(|c| c.linear_multiply(0.05))
-                        .unwrap_or(header_color);
+                if let Some(sbar) = f.as_sbar() {
+                    if let Some(el) = sbar.get_element(path) {
+                        show_tabs = true;
+                        header_title = if el._cacoco_text.is_some() {
+                            "Text String".to_string()
+                        } else {
+                            match &el.data {
+                                Element::Number(n) => text::number_type_name(n.type_).to_string(),
+                                Element::Percent(p) => text::number_type_name(p.type_).to_string(),
+                                Element::Component(c) => format!("{:?}", c.type_),
+                                Element::List(_) => "List Container".to_string(),
+                                Element::String(_) => "Dynamic String".to_string(),
+                                _ => el.display_name(),
+                            }
+                        };
+                        header_desc = descriptions::get_helper_text(el).to_string();
+                        header_color = colors::get_layer_color(el)
+                            .map(|c| c.linear_multiply(0.05))
+                            .unwrap_or(header_color);
+                    }
                 }
             } else {
-                header_title = format!("Layout #{}", path[0]);
-                header_desc = "Root configuration for a HUD layout.".to_string();
-                is_layout = true;
+                match f {
+                    ProjectData::StatusBar(_) => {
+                        header_title = format!("Layout #{}", path[0]);
+                        header_desc = "Root configuration for a HUD layout.".to_string();
+                        is_layout = true;
+                    }
+                    ProjectData::Sky(sky) => {
+                        if let Some(s) = sky.data.skies.get(path[0]) {
+                            header_title = format!("Sky: {}", s.name);
+                            header_desc = "Configuration for this sky definition.".to_string();
+                        }
+                    }
+                    _ => {}
+                }
             }
         } else if selection.len() > 1 {
             header_title = "Bulk Selection".to_string();
@@ -165,9 +181,6 @@ pub fn draw_properties_panel(
                 selection.len()
             );
         }
-    } else {
-        header_title = "Cacoco Editor".to_string();
-        header_desc = "No project file loaded. Open or create a new SBARDEF.".to_string();
     }
 
     let mut preview_content = None;
@@ -175,10 +188,12 @@ pub fn draw_properties_panel(
     if let Some(f) = file {
         if let Some(path) = selection.iter().next() {
             if path.len() > 1 {
-                let font_cache = FontCache::new(f);
-                if let Some(el) = f.get_element(path) {
-                    preview_content = el.get_preview_content(ui, &font_cache, state);
-                    is_incompatible = !compatibility::is_compatible(el, f.target);
+                let font_cache = FontCache::new_from_proj(f);
+                if let Some(sbar) = f.as_sbar() {
+                    if let Some(el) = sbar.get_element(path) {
+                        preview_content = el.get_preview_content(ui, &font_cache, state);
+                        is_incompatible = !compatibility::is_compatible(el, f.target());
+                    }
                 }
             }
         }
@@ -214,8 +229,11 @@ pub fn draw_properties_panel(
     if let Some(f) = file {
         if let Some(path) = selection.iter().next() {
             if path.len() > 1 {
-                if let Some(el) = f.get_element_mut(path) {
-                    changed |= text::draw_interactive_header(ui, el, &header_desc, header_color);
+                if let Some(sbar) = f.as_sbar_mut() {
+                    if let Some(el) = sbar.get_element_mut(path) {
+                        changed |=
+                            text::draw_interactive_header(ui, el, &header_desc, header_color);
+                    }
                 }
             } else {
                 draw_static_header(ui, &header_title, &header_desc, header_color);
@@ -262,89 +280,145 @@ pub fn draw_properties_panel(
             ui.add_space(4.0);
 
             if let Some(f) = file {
-                let font_cache = FontCache::new(f);
+                let font_cache = FontCache::new_from_proj(f);
 
                 if let Some(path) = selection.iter().next() {
                     if path.len() > 1 {
-                        if let Some(el) = f.get_element_mut(path) {
-                            match current_tab {
-                                PropertyTab::Properties => {
-                                    ui.vertical_centered(|ui| {
-                                        if el._cacoco_text.is_none() {
-                                            ui.horizontal(|ui| {
-                                                ui.add_space(
-                                                    (ui.available_width() - 210.0).max(0.0) / 2.0,
-                                                );
-                                                ui.label("Name:");
-                                                let mut name =
-                                                    el._cacoco_name.clone().unwrap_or_default();
-                                                let edit = egui::TextEdit::singleline(&mut name)
-                                                    .desired_width(150.0);
+                        if let Some(sbar) = f.as_sbar_mut() {
+                            if let Some(el) = sbar.get_element_mut(path) {
+                                match current_tab {
+                                    PropertyTab::Properties => {
+                                        ui.vertical_centered(|ui| {
+                                            if el._cacoco_text.is_none() {
+                                                ui.horizontal(|ui| {
+                                                    ui.add_space(
+                                                        (ui.available_width() - 210.0).max(0.0) / 2.0,
+                                                    );
+                                                    ui.label("Name:");
+                                                    let mut name =
+                                                        el._cacoco_name.clone().unwrap_or_default();
+                                                    let edit = egui::TextEdit::singleline(&mut name)
+                                                        .desired_width(150.0);
 
-                                                if ui.add(edit).changed() {
-                                                    el._cacoco_name = if name.is_empty() {
-                                                        None
-                                                    } else {
-                                                        Some(name)
-                                                    };
-                                                    changed = true;
-                                                }
-                                            });
+                                                    if ui.add(edit).changed() {
+                                                        el._cacoco_name = if name.is_empty() {
+                                                            None
+                                                        } else {
+                                                            Some(name)
+                                                        };
+                                                        changed = true;
+                                                    }
+                                                });
+                                                ui.add_space(4.0);
+                                            }
+                                            changed |= common::draw_transform_editor(ui, el, target);
                                             ui.add_space(4.0);
-                                        }
-                                        changed |= common::draw_transform_editor(ui, el, target);
-                                        ui.add_space(4.0);
-                                        if el._cacoco_text.is_some() || el.has_specific_fields() {
                                             if el._cacoco_text.is_some() {
                                                 changed |= text_helper::draw_text_helper_editor(
-                                                    ui,
-                                                    el,
-                                                    &font_cache,
-                                                    assets,
+                                                    ui, el, &font_cache, assets,
                                                 );
-                                            } else {
+                                            } else if el.has_specific_fields() {
                                                 changed |= el.draw_specific_fields(
-                                                    ui,
-                                                    &font_cache,
-                                                    assets,
-                                                    state,
+                                                    ui, &font_cache, assets, state,
                                                 );
                                             }
-                                        }
-                                    });
-                                }
-                                PropertyTab::Conditions => {
-                                    changed |=
-                                        conditions::draw_conditions_editor(ui, el, assets, state);
+                                        });
+                                    }
+                                    PropertyTab::Conditions => {
+                                        changed |=
+                                            conditions::draw_conditions_editor(ui, el, assets, state);
+                                    }
                                 }
                             }
                         }
                     } else if is_layout {
-                        let bar_idx = path[0];
+                        if let Some(sbar) = f.as_sbar_mut() {
+                            if let Some(bar) = sbar.data.status_bars.get_mut(path[0]) {
+                                if let Some(reason) = &bar._cacoco_system_locked {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(20.0);
+                                        ui.label(
+                                            egui::RichText::new("Managed Slot.")
+                                                .color(egui::Color32::from_rgb(200, 100, 100))
+                                                .strong(),
+                                        );
+                                        ui.add_space(4.0);
+                                        ui.label(egui::RichText::new(reason).weak());
+                                        ui.add_space(8.0);
 
-                        if let Some(bar) = f.data.status_bars.get_mut(bar_idx) {
-                            if let Some(reason) = &bar._cacoco_system_locked {
+                                        if path[0] == 0 {
+                                            ui.horizontal(|ui| {
+                                                ui.add_space(
+                                                    (ui.available_width() - 150.0).max(0.0) / 2.0,
+                                                );
+                                                ui.label("Bar Height:");
+                                                changed |= ui
+                                                    .add(
+                                                        egui::DragValue::new(&mut bar.height)
+                                                            .range(0..=200),
+                                                    )
+                                                    .changed();
+                                            });
+                                            ui.add_space(8.0);
+                                            ui.label(
+                                                egui::RichText::new(
+                                                    "You can adjust the height, but this slot must remain Non-Fullscreen for KEX compatibility.",
+                                                )
+                                                    .italics()
+                                                    .weak(),
+                                            );
+                                        } else {
+                                            ui.label(
+                                                egui::RichText::new(
+                                                    "This specific slot must remain blank and fullscreen for KEX demo compatibility.",
+                                                )
+                                                    .italics()
+                                                    .weak(),
+                                            );
+                                        }
+                                    });
+                                } else {
+                                    changed |= common::draw_root_statusbar_fields(ui, bar);
+                                }
+                            }
+                        }
+                    } else {
+                        match f {
+                            ProjectData::Sky(sky) => {
+                                if let Some(s) = sky.data.skies.get_mut(path[0]) {
+                                    ui.vertical_centered(|ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label("Sky Name:");
+                                            let mut buf = s.name.clone();
+                                            if ui.text_edit_singleline(&mut buf).changed() {
+                                                s.name = buf;
+                                                changed = true;
+                                            }
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label("Mid Texel:");
+                                            changed |= ui.add(egui::DragValue::new(&mut s.mid)).changed();
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label("Scroll X:");
+                                            changed |= ui.add(egui::DragValue::new(&mut s.scrollx)).changed();
+                                            ui.label("Scroll Y:");
+                                            changed |= ui.add(egui::DragValue::new(&mut s.scrolly)).changed();
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label("Scale X:");
+                                            changed |= ui.add(egui::DragValue::new(&mut s.scalex)).changed();
+                                            ui.label("Scale Y:");
+                                            changed |= ui.add(egui::DragValue::new(&mut s.scaley)).changed();
+                                        });
+                                    });
+                                }
+                            }
+                            _ => {
                                 ui.vertical_centered(|ui| {
                                     ui.add_space(20.0);
-                                    ui.label(egui::RichText::new("Managed Slot.").color(egui::Color32::from_rgb(200, 100, 100)).strong());
-                                    ui.add_space(4.0);
-                                    ui.label(egui::RichText::new(reason).weak());
-                                    ui.add_space(8.0);
-
-                                    if bar_idx == 0 {
-                                        ui.horizontal(|ui| {
-                                            ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
-                                            ui.label("Bar Height:");
-                                            changed |= ui.add(egui::DragValue::new(&mut bar.height).range(0..=200)).changed();
-                                        });
-                                        ui.add_space(8.0);
-                                        ui.label(egui::RichText::new("You can adjust the height, but this slot must remain Non-Fullscreen for KEX compatibility.").italics().weak());
-                                    } else {
-                                        ui.label(egui::RichText::new("This specific slot must remain blank and fullscreen for KEX demo compatibility.").italics().weak());
-                                    }
+                                    ui.label(egui::RichText::new("No selection logic for this type yet.").weak());
                                 });
-                            } else {
-                                changed |= common::draw_root_statusbar_fields(ui, bar);
                             }
                         }
                     }
