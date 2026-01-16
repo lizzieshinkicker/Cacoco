@@ -1,6 +1,6 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::constants::{DOOM_W, DOOM_W_WIDE};
-use crate::model::{ExportTarget, FaceDef};
+use crate::models::sbardef::{ExportTarget, FaceDef};
 use crate::state::PreviewState;
 use crate::ui::shared::VIEWPORT_RECT_ID;
 use eframe::egui;

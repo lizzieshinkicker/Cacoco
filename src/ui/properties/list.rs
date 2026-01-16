@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::ListDef;
+use crate::models::sbardef::ListDef;
 use crate::state::PreviewState;
 use eframe::egui;
 

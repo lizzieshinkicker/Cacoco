@@ -1,5 +1,5 @@
 use crate::assets::{AssetId, AssetStore};
-use crate::model::ConditionDef;
+use crate::models::sbardef::ConditionDef;
 use crate::state::PreviewState;
 
 /// Resolves a set of SBARDEF conditions against the current simulated game state.
@@ -19,7 +19,7 @@ pub fn resolve(conditions: &[ConditionDef], state: &PreviewState, assets: &Asset
 
 /// Evaluates a single SBARDEF condition logic block.
 fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetStore) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     match condition.condition {
         WeaponOwned
         | WeaponNotOwned
@@ -83,7 +83,7 @@ fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetSt
 
 /// Evaluation for conditions involving weapons, slots, and ownership.
 fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     let inv = &state.inventory;
     let map = state.engine.slot_mapping;
 
@@ -180,7 +180,7 @@ fn check_weapon_condition(condition: &ConditionDef, state: &PreviewState) -> boo
 
 /// Evaluation for conditions involving general inventory items and keycards.
 fn check_item_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     let inv = &state.inventory;
 
     match condition.condition {
@@ -215,7 +215,7 @@ fn check_item_condition(condition: &ConditionDef, state: &PreviewState) -> bool 
 
 /// Evaluation for conditions involving Player vitals and precise ammo counts.
 fn check_vitals_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     let param = condition.param;
     let param2 = condition.param2;
     let p = &state.player;
@@ -276,7 +276,7 @@ fn check_vitals_condition(condition: &ConditionDef, state: &PreviewState) -> boo
 
 /// Evaluation for conditions involving global engine status and HUD configuration.
 fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     let param = condition.param;
     let world = &state.world;
     let engine = &state.engine;
@@ -329,7 +329,7 @@ fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) ->
 
 /// Evaluation for conditions involving map indices.
 fn check_map_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     match condition.condition {
         EpisodeEq => state.world.episode == condition.param,
         LevelGe => state.world.level >= condition.param,
@@ -340,7 +340,7 @@ fn check_map_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
 
 /// Evaluation for conditions involving cumulative level statistics.
 fn check_stats_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     let p = &state.player;
     let param = condition.param;
     match condition.condition {
@@ -362,7 +362,7 @@ fn check_stats_condition(condition: &ConditionDef, state: &PreviewState) -> bool
 
 /// Evaluation for conditions involving powerup duration countdowns.
 fn check_powerup_condition(condition: &ConditionDef, state: &PreviewState) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     let duration = state
         .player
         .powerup_durations

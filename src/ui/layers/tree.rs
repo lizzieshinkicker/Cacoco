@@ -1,7 +1,7 @@
 use crate::assets::AssetStore;
 use crate::conditions;
 use crate::document::LayerAction;
-use crate::model::{Element, ElementWrapper, SBarDefFile};
+use crate::models::sbardef::{Element, ElementWrapper, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
@@ -342,7 +342,7 @@ fn handle_drop_logic(
                                 actions.push(LayerAction::Add {
                                     parent_path: parent_path.to_vec(),
                                     insert_idx,
-                                    element: crate::model::wrap_graphic(key, 0, 0),
+                                    element: crate::models::sbardef::wrap_graphic(key, 0, 0),
                                 });
                                 insert_idx += 1;
                             }
@@ -363,7 +363,7 @@ fn handle_drop_logic(
                                 actions.push(LayerAction::Add {
                                     parent_path: my_path.to_vec(),
                                     insert_idx: append_idx,
-                                    element: crate::model::wrap_graphic(key, 0, 0),
+                                    element: crate::models::sbardef::wrap_graphic(key, 0, 0),
                                 });
                                 append_idx += 1;
                             }
@@ -723,7 +723,7 @@ fn draw_terminal_drop_zone(
                     actions.push(LayerAction::Add {
                         parent_path: parent_path.clone(),
                         insert_idx: current_insert,
-                        element: crate::model::wrap_graphic(key, 0, 0),
+                        element: crate::models::sbardef::wrap_graphic(key, 0, 0),
                     });
                     current_insert += 1;
                 }

@@ -1,6 +1,6 @@
 use crate::assets::AssetStore;
 use crate::document::{LayerAction, determine_insertion_point};
-use crate::model::*;
+use crate::models::sbardef::*;
 use crate::render::projection::ViewportProjection;
 use crate::render::{self, RenderPass};
 use crate::state::PreviewState;
@@ -18,6 +18,7 @@ pub fn draw_viewport(
     controller: &mut ViewportController,
     selection: &HashSet<Vec<usize>>,
     current_bar_idx: usize,
+    active_mode: &mut crate::app::ProjectMode,
 ) -> Vec<LayerAction> {
     let mut actions = Vec::new();
 
@@ -27,8 +28,95 @@ pub fn draw_viewport(
     let temp_proj = ViewportProjection::from_engine(estimate_rect, &preview_state.engine);
 
     ui.vertical(|ui| {
-        ui.add_space(2.0);
+        ui.add_space(-1.0);
         ui.horizontal(|ui| {
+            let mode_id = ui.make_persistent_id("viewport_mode_dropdown");
+            let mode_label = match active_mode {
+                crate::app::ProjectMode::SBarDef => "SBARDEF",
+                crate::app::ProjectMode::SkyDefs => "SKYDEFS",
+                crate::app::ProjectMode::Interlevel => "INTERLEVEL",
+                crate::app::ProjectMode::Finale => "FINALE",
+            };
+
+            let mode_res = ui.add_sized([110.0, 28.0], |ui: &mut egui::Ui| {
+                crate::ui::shared::section_header_button(
+                    ui,
+                    mode_label,
+                    None,
+                    crate::ui::context_menu::ContextMenu::get(ui, mode_id).is_some(),
+                )
+            });
+
+            if mode_res.clicked() {
+                crate::ui::context_menu::ContextMenu::open(
+                    ui,
+                    mode_id,
+                    mode_res.rect.left_bottom(),
+                );
+            }
+
+            if let Some(menu) = crate::ui::context_menu::ContextMenu::get(ui, mode_id) {
+                crate::ui::context_menu::ContextMenu::show(ui, menu, mode_res.clicked(), |ui| {
+                    use crate::app::{CreationModal, ProjectMode};
+
+                    ui.label(egui::RichText::new("In Project").weak().size(10.0));
+                    let active_label = match active_mode {
+                        ProjectMode::SBarDef => "SBARDEF",
+                        ProjectMode::SkyDefs => "SKYDEFS",
+                        ProjectMode::Interlevel => "INTERLEVEL",
+                        ProjectMode::Finale => "FINALE",
+                    };
+                    crate::ui::context_menu::ContextMenu::button(
+                        ui,
+                        &format!("✔ {}", active_label),
+                        true,
+                    );
+
+                    ui.separator();
+
+                    ui.label(egui::RichText::new("Add to Project").weak().size(10.0));
+
+                    if crate::ui::context_menu::ContextMenu::button(ui, "+ SBARDEF", true) {
+                        ui.data_mut(|d| {
+                            d.insert_temp(
+                                egui::Id::new("creation_modal_type"),
+                                CreationModal::SBarDef,
+                            )
+                        });
+                        crate::ui::context_menu::ContextMenu::close(ui);
+                    }
+                    if crate::ui::context_menu::ContextMenu::button(ui, "+ SKYDEFS", true) {
+                        ui.data_mut(|d| {
+                            d.insert_temp(
+                                egui::Id::new("creation_modal_type"),
+                                CreationModal::SkyDefs,
+                            )
+                        });
+                        crate::ui::context_menu::ContextMenu::close(ui);
+                    }
+                    if crate::ui::context_menu::ContextMenu::button(ui, "+ INTERLEVEL", true) {
+                        ui.data_mut(|d| {
+                            d.insert_temp(
+                                egui::Id::new("creation_modal_type"),
+                                CreationModal::Interlevel,
+                            )
+                        });
+                        crate::ui::context_menu::ContextMenu::close(ui);
+                    }
+                    if crate::ui::context_menu::ContextMenu::button(ui, "+ FINALE", true) {
+                        ui.data_mut(|d| {
+                            d.insert_temp(
+                                egui::Id::new("creation_modal_type"),
+                                CreationModal::Finale,
+                            )
+                        });
+                        crate::ui::context_menu::ContextMenu::close(ui);
+                    }
+                });
+            }
+
+            ui.add_space(8.0);
+
             ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

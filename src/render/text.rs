@@ -1,6 +1,6 @@
 use super::{RenderContext, get_alignment_anchor_offset};
 use crate::constants::{DEFAULT_GLYPH_H, DEFAULT_GLYPH_W};
-use crate::model::*;
+use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Renders a numeric player statistic.

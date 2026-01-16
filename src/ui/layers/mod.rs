@@ -1,6 +1,6 @@
 use crate::assets::AssetStore;
 use crate::document::{self, LayerAction};
-use crate::model::{
+use crate::models::sbardef::{
     AnimationDef, CanvasDef, ComponentDef, ComponentType, Element, ElementWrapper, ExportTarget,
     FaceDef, GraphicDef, ListDef, NumberDef, NumberType, SBarDefFile, StringDef, TextHelperDef,
 };
@@ -415,7 +415,8 @@ pub fn draw_layers_panel(
                                 data: Element::Number(NumberDef {
                                     font: default_num_font.clone().unwrap(),
                                     type_: NumberType::AmmoSelected,
-                                    common: crate::model::CommonAttrs::selected_ammo_check(),
+                                    common:
+                                        crate::models::sbardef::CommonAttrs::selected_ammo_check(),
                                     ..Default::default()
                                 }),
                                 ..Default::default()
@@ -436,7 +437,8 @@ pub fn draw_layers_panel(
                                 data: Element::Percent(NumberDef {
                                     font: default_num_font.unwrap(),
                                     type_: NumberType::AmmoSelected,
-                                    common: crate::model::CommonAttrs::selected_ammo_check(),
+                                    common:
+                                        crate::models::sbardef::CommonAttrs::selected_ammo_check(),
                                     ..Default::default()
                                 }),
                                 ..Default::default()

@@ -1,4 +1,4 @@
-use crate::model::{Element, ElementWrapper};
+use crate::models::sbardef::{Element, ElementWrapper};
 use eframe::egui::Color32;
 
 pub fn get_layer_color(element: &ElementWrapper) -> Option<Color32> {

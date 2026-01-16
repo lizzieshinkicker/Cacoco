@@ -1,6 +1,6 @@
 use crate::assets::AssetStore;
 use crate::conditions;
-use crate::model::*;
+use crate::models::sbardef::*;
 use crate::state::PreviewState;
 use eframe::egui;
 use std::collections::HashSet;

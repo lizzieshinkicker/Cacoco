@@ -1,5 +1,5 @@
 use crate::assets::{AssetId, AssetStore};
-use crate::model::{CanvasDef, CarouselDef, CropDef, ExportTarget, GraphicDef};
+use crate::models::sbardef::{CanvasDef, CarouselDef, CropDef, ExportTarget, GraphicDef};
 use crate::state::PreviewState;
 use eframe::egui;
 

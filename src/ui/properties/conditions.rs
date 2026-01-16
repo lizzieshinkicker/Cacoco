@@ -2,7 +2,7 @@ use super::common;
 use super::common::paint_thumb_content;
 use super::lookups;
 use crate::assets::{AssetId, AssetStore};
-use crate::model::{
+use crate::models::sbardef::{
     ConditionDef, ConditionType, Element, ElementWrapper, ExportTarget, NumberType,
 };
 use crate::ui::context_menu::ContextMenu;
@@ -346,7 +346,7 @@ fn draw_params_for_type(
     assets: &AssetStore,
     my_idx: usize,
 ) -> bool {
-    use crate::model::ConditionType::*;
+    use crate::models::sbardef::ConditionType::*;
     use lookups::*;
 
     let mut changed = false;

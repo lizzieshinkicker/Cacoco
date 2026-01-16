@@ -1,5 +1,5 @@
 use crate::document::LayerAction;
-use crate::model::{CanvasDef, CommonAttrs, Element, ElementWrapper, SBarDefFile};
+use crate::models::sbardef::{CanvasDef, CommonAttrs, Element, ElementWrapper, SBarDefFile};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
@@ -387,7 +387,7 @@ fn insert_element_and_select(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{CommonAttrs, Element, GraphicDef, SBarDefFile};
+    use crate::models::sbardef::{CommonAttrs, Element, GraphicDef, SBarDefFile};
     use std::collections::HashSet;
 
     #[test]
@@ -395,9 +395,9 @@ mod tests {
         let mut file = SBarDefFile {
             type_: "statusbar".to_string(),
             version: "1.2.0".to_string(),
-            target: crate::model::ExportTarget::Extended,
-            data: crate::model::StatusBarDefinition {
-                status_bars: vec![crate::model::StatusBarLayout::default()],
+            target: crate::models::sbardef::ExportTarget::Extended,
+            data: crate::models::sbardef::StatusBarDefinition {
+                status_bars: vec![crate::models::sbardef::StatusBarLayout::default()],
                 ..Default::default()
             },
         };

@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::{Element, ElementWrapper, ExportTarget, SBarDefFile};
+use crate::models::sbardef::{Element, ElementWrapper, ExportTarget, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::layers::colors;
 use crate::ui::shared;

@@ -1,6 +1,6 @@
 use super::RenderContext;
 use super::text::{draw_text_line, measure_text_line};
-use crate::model::*;
+use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Entry point for rendering specialized engine components (Clock, FPS, etc.).

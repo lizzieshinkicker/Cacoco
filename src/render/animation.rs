@@ -1,7 +1,7 @@
 use super::RenderContext;
 use super::graphic::draw_simple_graphic_patch;
 use crate::assets::AssetId;
-use crate::model::*;
+use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Renders an animation sequence by selecting a frame based on elapsed time.

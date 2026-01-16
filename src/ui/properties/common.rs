@@ -1,6 +1,6 @@
 use super::lookups;
 use crate::assets::AssetStore;
-use crate::model::{Alignment, ElementWrapper, ExportTarget};
+use crate::models::sbardef::{Alignment, ElementWrapper, ExportTarget};
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::layers::thumbnails;
 use eframe::egui;
@@ -127,7 +127,7 @@ fn draw_alignment_selector(ui: &mut egui::Ui, align: &mut Alignment) -> bool {
 /// Renders the root-level Status Bar configuration fields.
 pub fn draw_root_statusbar_fields(
     ui: &mut egui::Ui,
-    bar: &mut crate::model::StatusBarLayout,
+    bar: &mut crate::models::sbardef::StatusBarLayout,
 ) -> bool {
     let mut changed = false;
 

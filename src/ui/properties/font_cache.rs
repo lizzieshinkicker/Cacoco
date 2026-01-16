@@ -1,4 +1,4 @@
-use crate::model::SBarDefFile;
+use crate::models::sbardef::SBarDefFile;
 use std::collections::HashMap;
 
 pub struct FontCache {

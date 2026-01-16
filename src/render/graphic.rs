@@ -1,6 +1,6 @@
 use super::{RenderContext, get_alignment_anchor_offset};
 use crate::assets::AssetId;
-use crate::model::*;
+use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Renders a single static Graphic element into the viewport.

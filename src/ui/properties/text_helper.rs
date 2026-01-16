@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::{CommonAttrs, Element, ElementWrapper, GraphicDef};
+use crate::models::sbardef::{CommonAttrs, Element, ElementWrapper, GraphicDef};
 use crate::ui::properties::common;
 use crate::ui::properties::font_cache::FontCache;
 use eframe::egui;

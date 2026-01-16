@@ -2,7 +2,7 @@ mod layout;
 mod tree;
 
 use crate::history::HistoryManager;
-use crate::model::{ElementWrapper, SBarDefFile, StatusBarLayout};
+use crate::models::sbardef::{ElementWrapper, StatusBarLayout};
 use std::collections::HashSet;
 
 /// Actions that can be performed on the document's layer hierarchy or layouts.
@@ -60,10 +60,10 @@ pub enum LayerAction {
     ToggleSelection(Vec<Vec<usize>>),
 }
 
-/// Manages a single SBARDEF project, its selection, and its modification history.
-pub struct SBarDocument {
-    /// The actual SBARDEF project data.
-    pub file: SBarDefFile,
+/// Manages a single ID24 project, its selection, and its modification history.
+pub struct ProjectDocument {
+    /// The actual project data (any lump type).
+    pub file: ProjectData,
     /// The filesystem path where this document is saved.
     pub path: Option<String>,
     /// The set of tree-paths currently selected by the user.
@@ -76,9 +76,9 @@ pub struct SBarDocument {
     pub dirty: bool,
 }
 
-impl SBarDocument {
-    /// Creates a new document from a file and optional path.
-    pub fn new(file: SBarDefFile, path: Option<String>) -> Self {
+impl ProjectDocument {
+    /// Creates a new document from data and optional path.
+    pub fn new(file: ProjectData, path: Option<String>) -> Self {
         Self {
             file,
             path,
@@ -89,44 +89,49 @@ impl SBarDocument {
         }
     }
 
-    /// The central hub for executing modifications.
-    /// Ensures that mutations, selection updates, and history are kept in sync.
     pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
         for action in actions {
             match action {
                 LayerAction::UndoSnapshot => {
                     self.history.take_snapshot(&self.file, &self.selection);
                 }
-                LayerAction::AddStatusBar
-                | LayerAction::DuplicateStatusBar(_)
-                | LayerAction::MoveStatusBar { .. }
-                | LayerAction::DeleteStatusBar(_)
-                | LayerAction::PasteStatusBars(_) => {
-                    self.dirty = true;
-                    layout::execute_layout_action(&mut self.file, action, &mut self.selection);
-                }
                 _ => {
-                    self.dirty = true;
-                    tree::execute_tree_action(&mut self.file, action, &mut self.selection);
+                    if let ProjectData::StatusBar(ref mut sbar) = self.file {
+                        match action {
+                            LayerAction::AddStatusBar
+                            | LayerAction::DuplicateStatusBar(_)
+                            | LayerAction::MoveStatusBar { .. }
+                            | LayerAction::DeleteStatusBar(_)
+                            | LayerAction::PasteStatusBars(_) => {
+                                self.dirty = true;
+                                layout::execute_layout_action(sbar, action, &mut self.selection);
+                            }
+                            _ => {
+                                self.dirty = true;
+                                tree::execute_tree_action(sbar, action, &mut self.selection);
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        self.file.normalize_for_target();
+        if let ProjectData::StatusBar(ref mut sbar) = self.file {
+            sbar.normalize_for_target();
+        }
     }
 
-    /// Performs an undo operation on the document state.
     pub fn undo(&mut self) {
         self.history.undo(&mut self.file, &mut self.selection);
         self.dirty = true;
     }
 
-    /// Performs a redo operation on the document state.
     pub fn redo(&mut self) {
         self.history.redo(&mut self.file, &mut self.selection);
         self.dirty = true;
     }
 }
 
+use crate::models::ProjectData;
 /// Re-export helper for external UI components.
 pub use tree::determine_insertion_point;

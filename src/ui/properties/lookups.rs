@@ -1,4 +1,4 @@
-use crate::model::{ConditionDef, ConditionType};
+use crate::models::sbardef::{ConditionDef, ConditionType};
 
 /// Represents a selectable item in a property dropdown menu.
 #[derive(Clone, Copy)]

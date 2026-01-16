@@ -12,7 +12,7 @@ mod history;
 mod hotkeys;
 mod io;
 mod library;
-mod model;
+mod models;
 mod render;
 mod state;
 mod ui;

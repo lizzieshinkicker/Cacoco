@@ -1,11 +1,11 @@
-use crate::model::{ElementWrapper, SBarDefFile, StatusBarLayout};
+use crate::models::{ProjectData, sbardef::ElementWrapper, sbardef::StatusBarLayout};
 use std::collections::{HashSet, VecDeque};
 
 const MAX_UNDO: usize = 50;
 
 #[derive(Clone)]
 pub struct Snapshot {
-    pub file: SBarDefFile,
+    pub file: ProjectData,
     pub selection: HashSet<Vec<usize>>,
 }
 
@@ -30,7 +30,7 @@ impl Default for HistoryManager {
 impl HistoryManager {
     pub fn take_snapshot(
         &mut self,
-        current_file: &SBarDefFile,
+        current_file: &ProjectData,
         current_selection: &HashSet<Vec<usize>>,
     ) {
         self.undo_stack.push_back(Snapshot {
@@ -46,7 +46,7 @@ impl HistoryManager {
 
     pub fn undo(
         &mut self,
-        current_file: &mut SBarDefFile,
+        current_file: &mut ProjectData,
         current_selection: &mut HashSet<Vec<usize>>,
     ) {
         if let Some(prev) = self.undo_stack.pop_back() {
@@ -62,7 +62,7 @@ impl HistoryManager {
 
     pub fn redo(
         &mut self,
-        current_file: &mut SBarDefFile,
+        current_file: &mut ProjectData,
         current_selection: &mut HashSet<Vec<usize>>,
     ) {
         if let Some(next) = self.redo_stack.pop_back() {

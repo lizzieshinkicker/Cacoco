@@ -67,16 +67,16 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                     }
 
                     if let Some(doc) = &mut app.doc {
-                        let mut file_clone = Some(doc.file.clone());
+                        let mut sbar_opt = doc.file.as_sbar().cloned();
                         if ui::draw_properties_panel(
                             ui,
-                            &mut file_clone,
+                            &mut sbar_opt,
                             &doc.selection,
                             &app.assets,
                             &app.preview_state,
                         ) {
-                            if let Some(updated) = file_clone {
-                                doc.file = updated;
+                            if let Some(updated) = sbar_opt {
+                                doc.file = crate::models::ProjectData::StatusBar(updated);
                                 doc.dirty = true;
                             }
                         }
@@ -97,10 +97,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         .exact_width(320.0)
         .show(ctx, |ui| {
             if let Some(doc) = &mut app.doc {
-                let mut file_clone = Some(doc.file.clone());
+                let mut sbar_opt = doc.file.as_sbar().cloned();
                 let (actions, layers_changed) = ui::draw_layers_panel(
                     ui,
-                    &mut file_clone,
+                    &mut sbar_opt,
                     &mut doc.selection,
                     &mut doc.selection_pivot,
                     &mut app.assets,
@@ -110,8 +110,8 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                     &mut app.confirmation_modal,
                 );
 
-                if let Some(updated) = file_clone {
-                    doc.file = updated;
+                if let Some(updated) = sbar_opt {
+                    doc.file = crate::models::ProjectData::StatusBar(updated);
                 }
                 if layers_changed {
                     doc.dirty = true;
@@ -133,18 +133,19 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         });
 
     egui::CentralPanel::default().show(ctx, |ui| {
-        let file_opt = app.doc.as_ref().map(|d| d.file.clone());
+        let sbar_opt = app.doc.as_ref().and_then(|d| d.file.as_sbar().cloned());
         let empty_selection = HashSet::new();
         let selection = app.doc.as_ref().map_or(&empty_selection, |d| &d.selection);
 
         let actions = ui::draw_viewport(
             ui,
-            &file_opt,
+            &sbar_opt,
             &app.assets,
             &mut app.preview_state,
             &mut app.viewport_ctrl,
             selection,
             app.current_statusbar_idx,
+            &mut app.active_mode,
         );
         app.execute_actions(actions);
     });
@@ -159,13 +160,28 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     }
 
     if let Some(doc) = &mut app.doc {
-        if font_wizard::draw_font_wizard(ctx, &mut app.font_wizard, &mut doc.file, &app.assets) {
-            doc.dirty = true;
+        if let Some(sbar) = doc.file.as_sbar_mut() {
+            if font_wizard::draw_font_wizard(ctx, &mut app.font_wizard, sbar, &app.assets) {
+                doc.dirty = true;
+            }
         }
     }
 
     if let Some(request) = app.confirmation_modal.clone() {
         ui::modals::draw_confirmation_modal(ctx, app, &request);
+    }
+
+    if let Some(target) =
+        ctx.data(|d| d.get_temp::<crate::app::CreationModal>(egui::Id::new("creation_modal_type")))
+    {
+        app.creation_modal = target;
+        ctx.data_mut(|d| {
+            d.remove::<crate::app::CreationModal>(egui::Id::new("creation_modal_type"))
+        });
+    }
+
+    if app.creation_modal != crate::app::CreationModal::None {
+        ui::menu::draw_creation_wizard(ctx, app);
     }
 }
 
@@ -312,27 +328,32 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Save => {
             if let Some(doc) = &mut app.doc {
-                let needs_dialog = match &doc.path {
-                    Some(p) => !Path::new(p).is_absolute(),
-                    None => true,
-                };
-                if needs_dialog {
-                    if let Some(p) =
-                        crate::io::save_pk3_dialog(&doc.file, &app.assets, doc.path.clone())
-                    {
-                        doc.path = Some(p.clone());
-                        doc.dirty = false;
-                        app.add_to_recent(&p);
-                        messages::log_event(&mut app.preview_state, EditorEvent::ProjectSaved(p));
-                    }
-                } else {
-                    let p = doc.path.as_ref().unwrap();
-                    if crate::io::save_pk3_silent(&doc.file, &app.assets, p).is_ok() {
-                        doc.dirty = false;
-                        messages::log_event(
-                            &mut app.preview_state,
-                            EditorEvent::ProjectSaved(p.clone()),
-                        );
+                if let Some(sbar) = doc.file.as_sbar() {
+                    let needs_dialog = match &doc.path {
+                        Some(p) => !Path::new(p).is_absolute(),
+                        None => true,
+                    };
+                    if needs_dialog {
+                        if let Some(p) =
+                            crate::io::save_pk3_dialog(sbar, &app.assets, doc.path.clone())
+                        {
+                            doc.path = Some(p.clone());
+                            doc.dirty = false;
+                            app.add_to_recent(&p);
+                            messages::log_event(
+                                &mut app.preview_state,
+                                EditorEvent::ProjectSaved(p),
+                            );
+                        }
+                    } else {
+                        let p = doc.path.as_ref().unwrap();
+                        if crate::io::save_pk3_silent(sbar, &app.assets, p).is_ok() {
+                            doc.dirty = false;
+                            messages::log_event(
+                                &mut app.preview_state,
+                                EditorEvent::ProjectSaved(p.clone()),
+                            );
+                        }
                     }
                 }
             }
@@ -348,59 +369,69 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Copy => {
             if let Some(doc) = &mut app.doc {
-                doc.history.clipboard.clear();
-                doc.history.bar_clipboard.clear();
-                let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
-                let mut roots: Vec<Vec<usize>> = paths
-                    .iter()
-                    .filter(|p| !paths.iter().any(|o| p.len() > o.len() && p.starts_with(o)))
-                    .cloned()
-                    .collect();
-                roots.sort();
+                if let Some(sbar) = doc.file.as_sbar() {
+                    doc.history.clipboard.clear();
+                    doc.history.bar_clipboard.clear();
+                    let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
+                    let mut roots: Vec<Vec<usize>> = paths
+                        .iter()
+                        .filter(|p| !paths.iter().any(|o| p.len() > o.len() && p.starts_with(o)))
+                        .cloned()
+                        .collect();
+                    roots.sort();
 
-                for path in roots {
-                    if path.len() == 1 {
-                        if let Some(bar) = doc.file.data.status_bars.get(path[0]) {
-                            doc.history.bar_clipboard.push(bar.clone());
+                    for path in roots {
+                        if path.len() == 1 {
+                            if let Some(bar) = sbar.data.status_bars.get(path[0]) {
+                                doc.history.bar_clipboard.push(bar.clone());
+                            }
+                        } else if let Some(el) = sbar.get_element(&path) {
+                            doc.history.clipboard.push(el.clone());
                         }
-                    } else if let Some(el) = doc.file.get_element_mut(&path) {
-                        doc.history.clipboard.push(el.clone());
                     }
+                    let count = doc.history.clipboard.len() + doc.history.bar_clipboard.len();
+                    messages::log_event(&mut app.preview_state, EditorEvent::ClipboardCopy(count));
                 }
-                let count = doc.history.clipboard.len() + doc.history.bar_clipboard.len();
-                messages::log_event(&mut app.preview_state, EditorEvent::ClipboardCopy(count));
             }
         }
 
         Action::Paste => {
             if let Some(doc) = &mut app.doc {
-                if !doc.history.bar_clipboard.is_empty() {
-                    let count = doc.history.bar_clipboard.len();
-                    let pasted = doc.history.prepare_bar_clipboard_for_paste();
-                    doc.execute_actions(vec![
-                        LayerAction::UndoSnapshot,
-                        LayerAction::PasteStatusBars(pasted),
-                    ]);
-                    messages::log_event(&mut app.preview_state, EditorEvent::ClipboardPaste(count));
-                } else if !doc.history.clipboard.is_empty() {
-                    let count = doc.history.clipboard.len();
-                    let pasted = doc.history.prepare_clipboard_for_paste();
+                if let Some(sbar) = doc.file.as_sbar() {
+                    if !doc.history.bar_clipboard.is_empty() {
+                        let count = doc.history.bar_clipboard.len();
+                        let pasted = doc.history.prepare_bar_clipboard_for_paste();
+                        doc.execute_actions(vec![
+                            LayerAction::UndoSnapshot,
+                            LayerAction::PasteStatusBars(pasted),
+                        ]);
+                        messages::log_event(
+                            &mut app.preview_state,
+                            EditorEvent::ClipboardPaste(count),
+                        );
+                    } else if !doc.history.clipboard.is_empty() {
+                        let count = doc.history.clipboard.len();
+                        let pasted = doc.history.prepare_clipboard_for_paste();
 
-                    let (p, i) = document::determine_insertion_point(
-                        &doc.file,
-                        &doc.selection,
-                        app.current_statusbar_idx,
-                    );
+                        let (p, i) = document::determine_insertion_point(
+                            sbar,
+                            &doc.selection,
+                            app.current_statusbar_idx,
+                        );
 
-                    doc.execute_actions(vec![
-                        LayerAction::UndoSnapshot,
-                        LayerAction::Paste {
-                            parent_path: p,
-                            insert_idx: i,
-                            elements: pasted,
-                        },
-                    ]);
-                    messages::log_event(&mut app.preview_state, EditorEvent::ClipboardPaste(count));
+                        doc.execute_actions(vec![
+                            LayerAction::UndoSnapshot,
+                            LayerAction::Paste {
+                                parent_path: p,
+                                insert_idx: i,
+                                elements: pasted,
+                            },
+                        ]);
+                        messages::log_event(
+                            &mut app.preview_state,
+                            EditorEvent::ClipboardPaste(count),
+                        );
+                    }
                 }
             }
         }
@@ -430,35 +461,37 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Delete => {
             if let Some(doc) = &mut app.doc {
-                if !doc.selection.is_empty() {
-                    let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
-                    let mut bar_del = None;
-                    let mut needs_conf = false;
-                    for path in &paths {
-                        if path.len() == 1 {
-                            bar_del = Some(path[0]);
-                        } else if let Some(el) = doc.file.get_element(path) {
-                            if !el.children().is_empty() {
-                                needs_conf = true;
+                if let Some(sbar) = doc.file.as_sbar() {
+                    if !doc.selection.is_empty() {
+                        let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
+                        let mut bar_del = None;
+                        let mut needs_conf = false;
+                        for path in &paths {
+                            if path.len() == 1 {
+                                bar_del = Some(path[0]);
+                            } else if let Some(el) = sbar.get_element(path) {
+                                if !el.children().is_empty() {
+                                    needs_conf = true;
+                                }
                             }
                         }
-                    }
-                    if let Some(idx) = bar_del {
-                        if !doc.file.data.status_bars[idx].children.is_empty() {
-                            app.confirmation_modal =
-                                Some(ConfirmationRequest::DeleteStatusBar(idx));
-                        } else if doc.file.data.status_bars.len() > 1 {
-                            doc.execute_actions(vec![LayerAction::DeleteStatusBar(idx)]);
+                        if let Some(idx) = bar_del {
+                            if !sbar.data.status_bars[idx].children.is_empty() {
+                                app.confirmation_modal =
+                                    Some(ConfirmationRequest::DeleteStatusBar(idx));
+                            } else if sbar.data.status_bars.len() > 1 {
+                                doc.execute_actions(vec![LayerAction::DeleteStatusBar(idx)]);
+                                messages::log_event(&mut app.preview_state, EditorEvent::Delete);
+                            }
+                        } else if needs_conf {
+                            app.confirmation_modal = Some(ConfirmationRequest::DeleteLayers(paths));
+                        } else {
+                            doc.execute_actions(vec![
+                                LayerAction::UndoSnapshot,
+                                LayerAction::DeleteSelection(paths),
+                            ]);
                             messages::log_event(&mut app.preview_state, EditorEvent::Delete);
                         }
-                    } else if needs_conf {
-                        app.confirmation_modal = Some(ConfirmationRequest::DeleteLayers(paths));
-                    } else {
-                        doc.execute_actions(vec![
-                            LayerAction::UndoSnapshot,
-                            LayerAction::DeleteSelection(paths),
-                        ]);
-                        messages::log_event(&mut app.preview_state, EditorEvent::Delete);
                     }
                 }
             }
@@ -476,17 +509,15 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
 fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::Context) {
     match action {
         ui::MenuAction::LoadProject(loaded, path) => app.load_project(ctx, loaded, &path),
-        ui::MenuAction::LoadTemplate(template) => app.apply_template(ctx, template),
-        ui::MenuAction::NewEmpty => app.new_project(ctx),
         ui::MenuAction::Open => app.open_project_ui(ctx),
         ui::MenuAction::RequestDiscard(pending) => {
             app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));
         }
         ui::MenuAction::SetTarget(t) => {
             if let Some(doc) = &mut app.doc {
-                use crate::model::ExportTarget::*;
+                use crate::models::sbardef::ExportTarget::*;
 
-                if doc.file.target == Extended && t == Basic {
+                if doc.file.target() == Extended && t == Basic {
                     if doc.file.determine_target() == Extended {
                         app.confirmation_modal = Some(ConfirmationRequest::DowngradeTarget(t));
                         return;
@@ -494,7 +525,7 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
                 }
 
                 doc.execute_actions(vec![document::LayerAction::UndoSnapshot]);
-                doc.file.target = t;
+                doc.file.set_target(t);
                 doc.file.normalize_for_target();
                 doc.dirty = true;
             }

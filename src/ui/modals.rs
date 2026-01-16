@@ -164,7 +164,12 @@ pub fn draw_confirmation_modal(
                     doc.dirty = false;
                 }
                 match pending {
-                    PendingAction::New => app.new_project(ctx),
+                    PendingAction::New => app.new_project(
+                        ctx,
+                        crate::models::ProjectData::StatusBar(
+                            crate::models::sbardef::SBarDefFile::new_empty(),
+                        ),
+                    ),
                     PendingAction::Load(path) => {
                         if path.is_empty() {
                             app.open_project_ui(ctx);
@@ -172,14 +177,13 @@ pub fn draw_confirmation_modal(
                             app.load_project(ctx, loaded, &path);
                         }
                     }
-                    PendingAction::Template(t) => app.apply_template(ctx, t),
                     PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
                 }
             }
             ConfirmationRequest::DowngradeTarget(t) => {
                 if let Some(doc) = &mut app.doc {
                     doc.execute_actions(vec![document::LayerAction::UndoSnapshot]);
-                    doc.file.target = *t;
+                    doc.file.set_target(*t);
                     doc.file.normalize_for_target();
                     doc.dirty = true;
                 }
