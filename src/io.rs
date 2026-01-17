@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::{ExportTarget, SBarDefFile};
+use crate::models::sbardef::{ExportTarget, SBarDefFile};
 use crate::wad;
 use eframe::egui;
 use rfd::FileDialog;
@@ -11,9 +11,9 @@ use std::process::Command;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-/// Container for a successfully loaded SBARDEF project and its assets.
+/// Container for a successfully loaded project and its assets.
 pub struct LoadedProject {
-    pub file: SBarDefFile,
+    pub file: crate::models::ProjectData,
     pub assets: AssetStore,
 }
 
@@ -52,12 +52,14 @@ pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<Loa
 
 fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
     match fs::read_to_string(path) {
-        Ok(json_content) => match serde_json::from_str::<SBarDefFile>(&json_content) {
+        Ok(json_content) => match serde_json::from_str::<crate::models::ProjectData>(&json_content)
+        {
             Ok(mut parsed_file) => {
-                parsed_file.normalize_paths();
-
-                parsed_file.target = parsed_file.determine_target();
-                parsed_file.normalize_for_target();
+                if let crate::models::ProjectData::StatusBar(ref mut sbar) = parsed_file {
+                    sbar.normalize_paths();
+                    sbar.target = sbar.determine_target();
+                    sbar.normalize_for_target();
+                }
 
                 Some(LoadedProject {
                     file: parsed_file,
@@ -102,13 +104,13 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
         return None;
     }
 
-    let parsed_file = match serde_json::from_str::<SBarDefFile>(&sbardef_content) {
+    let parsed_file = match serde_json::from_str::<crate::models::ProjectData>(&sbardef_content) {
         Ok(mut f) => {
-            f.normalize_paths();
-
-            f.target = f.determine_target();
-            f.normalize_for_target();
-
+            if let crate::models::ProjectData::StatusBar(ref mut sbar) = f {
+                sbar.normalize_paths();
+                sbar.target = sbar.determine_target();
+                sbar.normalize_for_target();
+            }
             f
         }
         Err(e) => {
@@ -502,6 +504,34 @@ mod tests {
         assert!(
             zip.by_name("graphics/patch.png").is_ok(),
             "Explicit path failed to preserve correctly"
+        );
+    }
+}
+
+#[cfg(test)]
+mod sniffer_tests {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct LumpSniffer {
+        #[serde(rename = "type")]
+        lump_type: String,
+    }
+
+    #[test]
+    fn test_lump_sniffing() {
+        let sbardef_json = r#"{ "type": "statusbar", "version": "1.2.0", "data": {} }"#;
+        let finale_json = r#"{ "type": "finale", "version": "1.0.0", "music": "D_VICTO" }"#;
+
+        let sniff_sbar: LumpSniffer = serde_json::from_str(sbardef_json).unwrap();
+        let sniff_fin: LumpSniffer = serde_json::from_str(finale_json).unwrap();
+
+        assert_eq!(sniff_sbar.lump_type, "statusbar");
+        assert_eq!(sniff_fin.lump_type, "finale");
+
+        println!(
+            "Sniffer successfully identified: {} and {}",
+            sniff_sbar.lump_type, sniff_fin.lump_type
         );
     }
 }

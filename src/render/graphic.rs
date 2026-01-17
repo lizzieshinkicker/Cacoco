@@ -1,6 +1,6 @@
 use super::{RenderContext, get_alignment_anchor_offset};
 use crate::assets::AssetId;
-use crate::model::*;
+use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Renders a single static Graphic element into the viewport.
@@ -73,8 +73,8 @@ pub(super) fn draw_simple_graphic_patch(
         let align_offset = get_alignment_anchor_offset(alignment, self_rect);
 
         let final_pos = egui::pos2(
-            pos.x + align_offset.x + final_off_x,
-            pos.y + align_offset.y + final_off_y,
+            pos.x + align_offset.x - final_off_x,
+            pos.y + align_offset.y - final_off_y,
         );
 
         let screen_pos = ctx.to_screen(final_pos);

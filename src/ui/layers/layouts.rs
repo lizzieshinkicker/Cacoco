@@ -1,5 +1,5 @@
 use crate::document::LayerAction;
-use crate::model::SBarDefFile;
+use crate::models::sbardef::SBarDefFile;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::layers::thumbnails::ListRow;
 use crate::ui::shared;

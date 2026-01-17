@@ -1,8 +1,9 @@
 use crate::assets::AssetStore;
 use crate::document::{self, LayerAction};
-use crate::model::{
+use crate::models::ProjectData;
+use crate::models::sbardef::{
     AnimationDef, CanvasDef, ComponentDef, ComponentType, Element, ElementWrapper, ExportTarget,
-    FaceDef, GraphicDef, ListDef, NumberDef, NumberType, SBarDefFile, StringDef, TextHelperDef,
+    FaceDef, GraphicDef, ListDef, NumberDef, NumberType, StringDef, TextHelperDef,
 };
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
@@ -33,12 +34,9 @@ enum BrowserTab {
 }
 
 /// Draws the entire right-side panel, including the asset browser and layer hierarchy.
-///
-/// This panel uses an animated vertical split to show/hide the asset browser while
-/// keeping the layer tree accessible at the bottom.
 pub fn draw_layers_panel(
     ui: &mut egui::Ui,
-    file: &mut Option<SBarDefFile>,
+    file: &mut Option<ProjectData>,
     selection: &mut HashSet<Vec<usize>>,
     selection_pivot: &mut Option<Vec<usize>>,
     assets: &mut AssetStore,
@@ -142,10 +140,10 @@ pub fn draw_layers_panel(
                 .auto_shrink([false, false])
                 .show(ui, |ui| match active_tab {
                     BrowserTab::Layouts => {
-                        if let Some(f) = file {
+                        if let Some(ProjectData::StatusBar(sbar)) = file {
                             changed |= layouts::draw_layouts_browser(
                                 ui,
-                                f,
+                                sbar,
                                 selection,
                                 current_bar_idx,
                                 &mut actions,
@@ -156,38 +154,50 @@ pub fn draw_layers_panel(
                         }
                     }
                     BrowserTab::Fonts => {
-                        if let Some(f) = file {
-                            changed |= browser::draw_fonts_content(ui, f, assets);
+                        if let Some(ProjectData::StatusBar(sbar)) = file {
+                            changed |= browser::draw_fonts_content(ui, sbar, assets);
                         } else {
                             shared::draw_no_file_placeholder(ui);
                         }
                     }
                     BrowserTab::Graphics => {
+                        let mut sbar_opt = file.as_mut().and_then(|f| f.as_sbar_mut().cloned());
                         changed |= browser::draw_filtered_browser(
                             ui,
                             assets,
-                            file,
+                            &mut sbar_opt,
                             zoom,
                             true,
                             wizard_state,
                             confirmation_modal,
                             show_fonts,
                         );
+                        if let (Some(f), Some(updated)) = (file.as_mut(), sbar_opt) {
+                            *f = ProjectData::StatusBar(updated);
+                        }
                     }
                     BrowserTab::IWAD => {
+                        let mut sbar_opt = file.as_mut().and_then(|f| f.as_sbar_mut().cloned());
                         changed |= browser::draw_filtered_browser(
                             ui,
                             assets,
-                            file,
+                            &mut sbar_opt,
                             zoom,
                             false,
                             wizard_state,
                             confirmation_modal,
                             show_fonts,
                         );
+                        if let (Some(f), Some(updated)) = (file.as_mut(), sbar_opt) {
+                            *f = ProjectData::StatusBar(updated);
+                        }
                     }
                     BrowserTab::Library => {
-                        changed |= browser::draw_library_browser(ui, assets, file, zoom);
+                        let mut sbar_opt = file.as_mut().and_then(|f| f.as_sbar_mut().cloned());
+                        changed |= browser::draw_library_browser(ui, assets, &mut sbar_opt, zoom);
+                        if let (Some(f), Some(updated)) = (file.as_mut(), sbar_opt) {
+                            *f = ProjectData::StatusBar(updated);
+                        }
                     }
                 });
         });
@@ -274,226 +284,269 @@ pub fn draw_layers_panel(
     }
 
     if let Some(f) = file {
-        let bar_count = f.data.status_bars.len();
-        let is_demo_bar = f.target == ExportTarget::Basic && *current_bar_idx == bar_count - 1;
+        match f {
+            ProjectData::StatusBar(sbar) => {
+                let bar_count = sbar.data.status_bars.len();
+                let is_demo_bar =
+                    sbar.target == ExportTarget::Basic && *current_bar_idx == bar_count - 1;
 
-        if is_demo_bar {
-            bottom_ui.vertical_centered(|ui| {
-                ui.add_space(40.0);
-                ui.label(
-                    egui::RichText::new("Not Editable.")
-                        .color(egui::Color32::from_rgb(200, 100, 100))
-                        .strong(),
-                );
-                ui.add_space(10.0);
-                ui.label(
-                    egui::RichText::new("The KEX Demo Slot must remain empty.")
-                        .weak()
-                        .italics(),
-                );
-                ui.add_space(4.0);
-                ui.label(egui::RichText::new(
-                    "Switch to another layout to add layers.",
-                ));
-            });
-        } else {
-            let layers_menu_id = bottom_ui.make_persistent_id("layers_header_new_menu");
-            let is_menu_open = ContextMenu::get(&bottom_ui, layers_menu_id).is_some();
-            let header_res = shared::heading_action_button(
-                &mut bottom_ui,
-                "Layers",
-                Some("New Layer..."),
-                is_menu_open,
-            );
-
-            if header_res.clicked() {
-                ContextMenu::open(&bottom_ui, layers_menu_id, header_res.rect.left_bottom());
-            }
-
-            if let Some(menu) = ContextMenu::get(&bottom_ui, layers_menu_id) {
-                ContextMenu::show(
-                    &bottom_ui,
-                    menu,
-                    header_res.clicked(),
-                    |ui: &mut egui::Ui| {
-                        let mut new_element = None;
-                        let target = f.target;
-                        let is_extended = target == ExportTarget::Extended;
-
-                        let default_hud_font =
-                            f.data.hud_fonts.first().map(|font| font.name.clone());
-                        let default_num_font =
-                            f.data.number_fonts.first().map(|font| font.name.clone());
-                        let has_hud = default_hud_font.is_some();
-                        let has_num = default_num_font.is_some();
-
-                        if ContextMenu::button(ui, "Canvas Group", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Canvas(CanvasDef::default()),
-                                ..Default::default()
-                            });
-                        }
-                        if is_extended && ContextMenu::button(ui, "List Container", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::List(ListDef::default()),
-                                ..Default::default()
-                            });
-                        }
-                        if is_extended && ContextMenu::button(ui, "Native Container", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Native(CanvasDef::default()),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Text String", has_hud) {
-                            let mut el = ElementWrapper {
-                                data: Element::Canvas(CanvasDef::default()),
-                                _cacoco_text: Some(TextHelperDef {
-                                    text: "NEW TEXT".to_string(),
-                                    font: default_hud_font.clone().unwrap(),
-                                    spacing: 0,
-                                }),
-                                ..Default::default()
-                            };
-                            let fonts = crate::ui::properties::font_cache::FontCache::new(f);
-                            crate::ui::properties::text_helper::rebake_text(
-                                &mut el, assets, &fonts,
-                            );
-                            new_element = Some(el);
-                        }
-                        ui.separator();
-                        if ContextMenu::button(ui, "Graphic", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Graphic(GraphicDef {
-                                    patch: "HICACOCO".to_string(),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Animation", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Animation(AnimationDef::default()),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Doomguy", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Face(FaceDef::default()),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Face Background", true) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::FaceBackground(FaceDef::default()),
-                                ..Default::default()
-                            });
-                        }
-                        ui.separator();
-                        if is_extended && ContextMenu::button(ui, "Dynamic String", has_hud) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::String(StringDef {
-                                    font: default_hud_font.clone().unwrap(),
-                                    type_: 1,
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Number", has_num) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Number(NumberDef {
-                                    font: default_num_font.clone().unwrap(),
-                                    type_: NumberType::Health,
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Selected Ammo", has_num) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Number(NumberDef {
-                                    font: default_num_font.clone().unwrap(),
-                                    type_: NumberType::AmmoSelected,
-                                    common: crate::model::CommonAttrs::selected_ammo_check(),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Percent", has_num) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Percent(NumberDef {
-                                    font: default_num_font.clone().unwrap(),
-                                    type_: NumberType::Health,
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-                        if ContextMenu::button(ui, "Selected Ammo %", has_num) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Percent(NumberDef {
-                                    font: default_num_font.unwrap(),
-                                    type_: NumberType::AmmoSelected,
-                                    common: crate::model::CommonAttrs::selected_ammo_check(),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-                        ui.separator();
-                        if is_extended && ContextMenu::button(ui, "Component", has_hud) {
-                            new_element = Some(ElementWrapper {
-                                data: Element::Component(ComponentDef {
-                                    font: default_hud_font.unwrap(),
-                                    type_: ComponentType::Time,
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            });
-                        }
-
-                        if let Some(element) = new_element {
-                            let (parent_path, insert_idx) =
-                                document::determine_insertion_point(f, selection, *current_bar_idx);
-                            actions.push(LayerAction::UndoSnapshot);
-                            actions.push(LayerAction::Add {
-                                parent_path,
-                                insert_idx,
-                                element,
-                            });
-                            ContextMenu::close(ui);
-                        }
-                    },
-                );
-            }
-
-            if !f.data.status_bars.is_empty() {
-                if *current_bar_idx >= f.data.status_bars.len() {
-                    *current_bar_idx = 0;
-                }
-                egui::ScrollArea::vertical()
-                    .id_salt("layers_scroll")
-                    .auto_shrink([false, false])
-                    .show(&mut bottom_ui, |ui| {
-                        egui::Frame::NONE
-                            .inner_margin(egui::Margin::symmetric(2, 0))
-                            .show(ui, |ui| {
-                                tree::draw_layer_tree_root(
-                                    ui,
-                                    f,
-                                    *current_bar_idx,
-                                    selection,
-                                    selection_pivot,
-                                    assets,
-                                    state,
-                                    &mut actions,
-                                    confirmation_modal,
-                                );
-                            });
-                        ui.add_space(2.0);
+                if is_demo_bar {
+                    bottom_ui.vertical_centered(|ui| {
+                        ui.add_space(40.0);
+                        ui.label(
+                            egui::RichText::new("Not Editable.")
+                                .color(egui::Color32::from_rgb(200, 100, 100))
+                                .strong(),
+                        );
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new("The KEX Demo Slot must remain empty.")
+                                .weak()
+                                .italics(),
+                        );
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new(
+                            "Switch to another layout to add layers.",
+                        ));
                     });
+                } else {
+                    let layers_menu_id = bottom_ui.make_persistent_id("layers_header_new_menu");
+                    let is_menu_open = ContextMenu::get(&bottom_ui, layers_menu_id).is_some();
+                    let header_res = shared::heading_action_button(
+                        &mut bottom_ui,
+                        "Layers",
+                        Some("New Layer..."),
+                        is_menu_open,
+                    );
+
+                    if header_res.clicked() {
+                        ContextMenu::open(
+                            &bottom_ui,
+                            layers_menu_id,
+                            header_res.rect.left_bottom(),
+                        );
+                    }
+
+                    if let Some(menu) = ContextMenu::get(&bottom_ui, layers_menu_id) {
+                        ContextMenu::show(
+                            &bottom_ui,
+                            menu,
+                            header_res.clicked(),
+                            |ui: &mut egui::Ui| {
+                                let mut new_element = None;
+                                let target = sbar.target;
+                                let is_extended = target == ExportTarget::Extended;
+
+                                let default_hud_font =
+                                    sbar.data.hud_fonts.first().map(|font| font.name.clone());
+                                let default_num_font =
+                                    sbar.data.number_fonts.first().map(|font| font.name.clone());
+                                let has_hud = default_hud_font.is_some();
+                                let has_num = default_num_font.is_some();
+
+                                if ContextMenu::button(ui, "Canvas Group", true) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Canvas(CanvasDef::default()),
+                                        ..Default::default()
+                                    });
+                                }
+                                if is_extended && ContextMenu::button(ui, "List Container", true) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::List(ListDef::default()),
+                                        ..Default::default()
+                                    });
+                                }
+                                if is_extended && ContextMenu::button(ui, "Native Container", true)
+                                {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Native(CanvasDef::default()),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Text String", has_hud) {
+                                    let mut el = ElementWrapper {
+                                        data: Element::Canvas(CanvasDef::default()),
+                                        _cacoco_text: Some(TextHelperDef {
+                                            text: "NEW TEXT".to_string(),
+                                            font: default_hud_font.clone().unwrap(),
+                                            spacing: 0,
+                                        }),
+                                        ..Default::default()
+                                    };
+                                    let fonts =
+                                        crate::ui::properties::font_cache::FontCache::new(sbar);
+                                    crate::ui::properties::text_helper::rebake_text(
+                                        &mut el, assets, &fonts,
+                                    );
+                                    new_element = Some(el);
+                                }
+                                ui.separator();
+                                if ContextMenu::button(ui, "Graphic", true) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Graphic(GraphicDef {
+                                            patch: "HICACOCO".to_string(),
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Animation", true) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Animation(AnimationDef::default()),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Doomguy", true) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Face(FaceDef::default()),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Face Background", true) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::FaceBackground(FaceDef::default()),
+                                        ..Default::default()
+                                    });
+                                }
+                                ui.separator();
+                                if is_extended && ContextMenu::button(ui, "Dynamic String", has_hud)
+                                {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::String(StringDef {
+                                            font: default_hud_font.clone().unwrap(),
+                                            type_: 1,
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Number", has_num) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Number(NumberDef {
+                                            font: default_num_font.clone().unwrap(),
+                                            type_: NumberType::Health,
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Selected Ammo", has_num) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Number(NumberDef {
+                                            font: default_num_font.clone().unwrap(),
+                                            type_: NumberType::AmmoSelected,
+                                            common:
+                                            crate::models::sbardef::CommonAttrs::selected_ammo_check(),
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Percent", has_num) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Percent(NumberDef {
+                                            font: default_num_font.clone().unwrap(),
+                                            type_: NumberType::Health,
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+                                if ContextMenu::button(ui, "Selected Ammo %", has_num) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Percent(NumberDef {
+                                            font: default_num_font.unwrap(),
+                                            type_: NumberType::AmmoSelected,
+                                            common:
+                                            crate::models::sbardef::CommonAttrs::selected_ammo_check(),
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+                                ui.separator();
+                                if is_extended && ContextMenu::button(ui, "Component", has_hud) {
+                                    new_element = Some(ElementWrapper {
+                                        data: Element::Component(ComponentDef {
+                                            font: default_hud_font.unwrap(),
+                                            type_: ComponentType::Time,
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    });
+                                }
+
+                                if let Some(element) = new_element {
+                                    let (parent_path, insert_idx) =
+                                        document::determine_insertion_point(
+                                            sbar,
+                                            selection,
+                                            *current_bar_idx,
+                                        );
+                                    actions.push(LayerAction::UndoSnapshot);
+                                    actions.push(LayerAction::Add {
+                                        parent_path,
+                                        insert_idx,
+                                        element,
+                                    });
+                                    ContextMenu::close(ui);
+                                }
+                            },
+                        );
+                    }
+
+                    if !sbar.data.status_bars.is_empty() {
+                        let bar_idx = *current_bar_idx;
+                        egui::ScrollArea::vertical()
+                            .id_salt("layers_scroll")
+                            .auto_shrink([false, false])
+                            .show(&mut bottom_ui, |ui| {
+                                egui::Frame::NONE
+                                    .inner_margin(egui::Margin::symmetric(2, 0))
+                                    .show(ui, |ui| {
+                                        tree::draw_layer_tree_root(
+                                            ui,
+                                            sbar,
+                                            bar_idx,
+                                            selection,
+                                            selection_pivot,
+                                            assets,
+                                            state,
+                                            &mut actions,
+                                            confirmation_modal,
+                                        );
+                                    });
+                                ui.add_space(2.0);
+                            });
+                    }
+                }
+            }
+            ProjectData::Sky(sky) => {
+                shared::heading_action_button(&mut bottom_ui, "Skies", Some("Add Sky"), false);
+                egui::ScrollArea::vertical()
+                    .id_salt("sky_scroll")
+                    .show(&mut bottom_ui, |ui| {
+                        for (i, def) in sky.data.skies.iter().enumerate() {
+                            let is_selected = selection.contains(&vec![i]);
+                            let res = thumbnails::ListRow::new(&def.name)
+                                .subtitle(format!("Type: {:?}", def.sky_type))
+                                .selected(is_selected)
+                                .show(ui);
+                            if res.clicked() {
+                                selection.clear();
+                                selection.insert(vec![i]);
+                            }
+                        }
+                    });
+            }
+            _ => {
+                shared::heading_action_button(&mut bottom_ui, "Tree", None, false);
+                bottom_ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    ui.label(
+                        egui::RichText::new("Layer tree not yet supported for this lump.").weak(),
+                    );
+                });
             }
         }
     } else {

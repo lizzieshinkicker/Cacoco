@@ -1,5 +1,5 @@
 use crate::conditions;
-use crate::model::*;
+use crate::models::sbardef::*;
 use crate::render::{RenderContext, draw_element_wrapper, hit_test};
 use eframe::egui;
 

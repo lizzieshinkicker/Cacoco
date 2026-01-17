@@ -1,6 +1,7 @@
-use crate::assets::AssetStore;
+use crate::assets::{AssetId, AssetStore};
 use crate::document::{LayerAction, determine_insertion_point};
-use crate::model::*;
+use crate::models::ProjectData;
+use crate::models::sbardef::*;
 use crate::render::projection::ViewportProjection;
 use crate::render::{self, RenderPass};
 use crate::state::PreviewState;
@@ -9,15 +10,16 @@ use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
 
-/// Draws the main HUD viewport, handling rendering and delegating interaction logic.
+/// Draws the main ID24 viewport, handling background rendering and interaction logic.
 pub fn draw_viewport(
     ui: &mut egui::Ui,
-    file: &Option<SBarDefFile>,
+    project: &Option<ProjectData>,
     assets: &AssetStore,
     preview_state: &mut PreviewState,
     controller: &mut ViewportController,
     selection: &HashSet<Vec<usize>>,
     current_bar_idx: usize,
+    active_mode: &mut crate::app::ProjectMode,
 ) -> Vec<LayerAction> {
     let mut actions = Vec::new();
 
@@ -27,8 +29,94 @@ pub fn draw_viewport(
     let temp_proj = ViewportProjection::from_engine(estimate_rect, &preview_state.engine);
 
     ui.vertical(|ui| {
-        ui.add_space(2.0);
+        ui.add_space(-1.0);
         ui.horizontal(|ui| {
+            let mode_id = ui.make_persistent_id("viewport_mode_dropdown");
+            let mode_label = match active_mode {
+                crate::app::ProjectMode::SBarDef => "SBARDEF",
+                crate::app::ProjectMode::SkyDefs => "SKYDEFS",
+                crate::app::ProjectMode::Interlevel => "INTERLEVEL",
+                crate::app::ProjectMode::Finale => "FINALE",
+            };
+
+            let mode_res = ui.add_sized([110.0, 28.0], |ui: &mut egui::Ui| {
+                crate::ui::shared::section_header_button(
+                    ui,
+                    mode_label,
+                    None,
+                    crate::ui::context_menu::ContextMenu::get(ui, mode_id).is_some(),
+                )
+            });
+
+            if mode_res.clicked() {
+                crate::ui::context_menu::ContextMenu::open(
+                    ui,
+                    mode_id,
+                    mode_res.rect.left_bottom(),
+                );
+            }
+
+            if let Some(menu) = crate::ui::context_menu::ContextMenu::get(ui, mode_id) {
+                crate::ui::context_menu::ContextMenu::show(ui, menu, mode_res.clicked(), |ui| {
+                    use crate::app::{CreationModal, ProjectMode};
+
+                    let modes_in_project: HashSet<ProjectMode> = ui.ctx().data(|d| {
+                        d.get_temp(egui::Id::new("modes_in_project"))
+                            .unwrap_or_default()
+                    });
+
+                    ui.label(egui::RichText::new("Lumps in Project").weak().size(10.0));
+
+                    let all_modes = [
+                        (ProjectMode::SBarDef, "SBARDEF"),
+                        (ProjectMode::SkyDefs, "SKYDEFS"),
+                        (ProjectMode::Interlevel, "INTERLEVEL"),
+                        (ProjectMode::Finale, "FINALE"),
+                    ];
+
+                    for (m, lbl) in all_modes {
+                        if modes_in_project.contains(&m) {
+                            let is_active = *active_mode == m;
+                            let prefix = if is_active { "✔ " } else { "  " };
+                            if crate::ui::context_menu::ContextMenu::button(
+                                ui,
+                                &format!("{}{}", prefix, lbl),
+                                true,
+                            ) {
+                                *active_mode = m;
+                                crate::ui::context_menu::ContextMenu::close(ui);
+                            }
+                        }
+                    }
+
+                    ui.separator();
+                    ui.label(egui::RichText::new("Add to Project").weak().size(10.0));
+
+                    let mut add_lump_row = |lbl: &str, m: ProjectMode, target: CreationModal| {
+                        let already_exists = modes_in_project.contains(&m);
+                        if !already_exists {
+                            if crate::ui::context_menu::ContextMenu::button(ui, lbl, true) {
+                                ui.data_mut(|d| {
+                                    d.insert_temp(egui::Id::new("creation_modal_type"), target)
+                                });
+                                crate::ui::context_menu::ContextMenu::close(ui);
+                            }
+                        }
+                    };
+
+                    add_lump_row("+ SBARDEF", ProjectMode::SBarDef, CreationModal::SBarDef);
+                    add_lump_row("+ SKYDEFS", ProjectMode::SkyDefs, CreationModal::SkyDefs);
+                    add_lump_row(
+                        "+ INTERLEVEL",
+                        ProjectMode::Interlevel,
+                        CreationModal::Interlevel,
+                    );
+                    add_lump_row("+ FINALE", ProjectMode::Finale, CreationModal::Finale);
+                });
+            }
+
+            ui.add_space(8.0);
+
             ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -82,17 +170,14 @@ pub fn draw_viewport(
     ui.painter()
         .rect_filled(background_rect, 0.0, egui::Color32::from_rgb(15, 15, 15));
 
-    let file_ref = match file {
-        Some(f) => f,
-        None => {
-            ui.scope_builder(egui::UiBuilder::new().max_rect(background_rect), |ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.label("No file loaded.");
-                });
+    if project.is_none() {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(background_rect), |ui| {
+            ui.centered_and_justified(|ui| {
+                ui.label("Lump not present in project.");
             });
-            return actions;
-        }
-    };
+        });
+        return actions;
+    }
 
     let viewport_res = ui.interact(
         background_rect,
@@ -151,7 +236,6 @@ pub fn draw_viewport(
         }
     }
 
-    let bar_idx = current_bar_idx.min(file_ref.data.status_bars.len().saturating_sub(1));
     let mouse_pos = ui
         .input(|i| i.pointer.latest_pos())
         .unwrap_or(egui::pos2(-1000.0, -1000.0));
@@ -162,66 +246,129 @@ pub fn draw_viewport(
     let primary_pressed = ui.input(|i| i.pointer.primary_pressed());
     let primary_down = ui.input(|i| i.pointer.primary_down());
 
-    let bar = &file_ref.data.status_bars[bar_idx];
-    let root_y = if bar.fullscreen_render {
-        0.0
-    } else {
-        200.0 - bar.height as f32
-    };
+    let final_clip_rect = proj.screen_rect.intersect(background_rect);
+    let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(background_rect));
+    viewport_ui.set_clip_rect(final_clip_rect);
 
-    if selection_mode && !is_panning {
-        let mut hit_result = None;
-        {
-            let hit_ctx = render::RenderContext {
-                painter: ui.painter(),
-                assets,
-                file: file_ref,
-                state: preview_state,
-                time: ui.input(|i| i.time),
-                fps: preview_state.editor.display_fps,
-                mouse_pos: preview_state.editor.virtual_mouse_pos,
-                selection,
-                pass: RenderPass::Background,
-                proj: &proj,
-                is_dragging: controller.is_dragging,
-                is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
-                is_native: false,
+    match project {
+        Some(ProjectData::StatusBar(sbar)) => {
+            let bar_idx = current_bar_idx.min(sbar.data.status_bars.len().saturating_sub(1));
+            let bar = &sbar.data.status_bars[bar_idx];
+
+            render_statusbar_workspace(&mut viewport_ui, bar, assets, preview_state, &proj);
+
+            if selection_mode && !is_panning {
+                let mut hit_result = None;
+                let root_y = if bar.fullscreen_render {
+                    0.0
+                } else {
+                    200.0 - bar.height as f32
+                };
+
+                let hit_ctx = render::RenderContext {
+                    painter: viewport_ui.painter(),
+                    assets,
+                    file: sbar,
+                    state: preview_state,
+                    time: ui.input(|i| i.time),
+                    fps: preview_state.editor.display_fps,
+                    mouse_pos: preview_state.editor.virtual_mouse_pos,
+                    selection,
+                    pass: RenderPass::Background,
+                    proj: &proj,
+                    is_dragging: controller.is_dragging,
+                    is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+                    is_native: false,
+                };
+
+                if viewport_res.hovered() {
+                    for (idx, child) in bar.children.iter().enumerate().rev() {
+                        let mut path = vec![bar_idx, idx];
+                        if let Some(hit) = render::hit_test(
+                            &hit_ctx,
+                            child,
+                            egui::pos2(proj.origin_x, root_y),
+                            &mut path,
+                            true,
+                            container_mode,
+                        ) {
+                            hit_result = Some(hit);
+                            break;
+                        }
+                    }
+                }
+                preview_state.editor.hovered_path = hit_result;
+
+                if primary_pressed && viewport_res.hovered() {
+                    if let Some(path) = preview_state.editor.hovered_path.clone() {
+                        preview_state.editor.grabbed_path = Some(path.clone());
+                        if ui.input(|i| i.modifiers.shift) {
+                            actions.push(LayerAction::ToggleSelection(vec![path]));
+                        } else {
+                            actions.push(LayerAction::Select(vec![path]));
+                        }
+                    }
+                }
+            } else {
+                preview_state.editor.hovered_path = None;
+            }
+
+            let time = ui.input(|i| i.time);
+            let fps = preview_state.editor.display_fps;
+            let root_y = if bar.fullscreen_render {
+                0.0
+            } else {
+                200.0 - bar.height as f32
             };
 
-            if viewport_res.hovered() {
-                for (idx, child) in bar.children.iter().enumerate().rev() {
+            let draw_hud_elements = |painter: &egui::Painter, pass: RenderPass| {
+                let render_ctx = render::RenderContext {
+                    painter,
+                    assets,
+                    file: sbar,
+                    state: preview_state,
+                    time,
+                    fps,
+                    mouse_pos: preview_state.editor.virtual_mouse_pos,
+                    selection,
+                    pass,
+                    proj: &proj,
+                    is_dragging: controller.is_dragging,
+                    is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
+                    is_native: false,
+                };
+
+                for (idx, child) in bar.children.iter().enumerate() {
                     let mut path = vec![bar_idx, idx];
-                    if let Some(hit) = render::hit_test(
-                        &hit_ctx,
+                    render::draw_element_wrapper(
+                        &render_ctx,
                         child,
                         egui::pos2(proj.origin_x, root_y),
                         &mut path,
                         true,
-                        container_mode,
-                    ) {
-                        hit_result = Some(hit);
-                        break;
-                    }
+                    );
                 }
+            };
+
+            draw_hud_elements(viewport_ui.painter(), RenderPass::Background);
+
+            if !selection.is_empty() && preview_state.editor.strobe_timer > 0.0 {
+                draw_hud_elements(viewport_ui.painter(), RenderPass::Foreground);
             }
         }
-
-        if preview_state.editor.hovered_path != hit_result {
-            preview_state.editor.hovered_path = hit_result;
+        Some(ProjectData::Interlevel(int)) => {
+            render_id24_background(&mut viewport_ui, &int.data.backgroundimage, assets, &proj);
+            preview_state.editor.hovered_path = None;
         }
-
-        if primary_pressed && viewport_res.hovered() {
-            if let Some(path) = preview_state.editor.hovered_path.clone() {
-                preview_state.editor.grabbed_path = Some(path.clone());
-                if ui.input(|i| i.modifiers.shift) {
-                    actions.push(LayerAction::ToggleSelection(vec![path]));
-                } else {
-                    actions.push(LayerAction::Select(vec![path]));
-                }
-            }
+        Some(ProjectData::Finale(fin)) => {
+            render_id24_background(&mut viewport_ui, &fin.data.background, assets, &proj);
+            preview_state.editor.hovered_path = None;
         }
-    } else {
-        preview_state.editor.hovered_path = None;
+        _ => {
+            viewport_ui
+                .painter()
+                .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
+        }
     }
 
     if !primary_down {
@@ -242,18 +389,98 @@ pub fn draw_viewport(
         is_panning,
     ));
 
-    let final_clip_rect = proj.screen_rect.intersect(background_rect);
-    let mut screen_ui = ui.new_child(egui::UiBuilder::new().max_rect(background_rect));
-    screen_ui.set_clip_rect(final_clip_rect);
+    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
+        if viewport_res.contains_pointer() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+            if let Some(ProjectData::StatusBar(sbar)) = project {
+                if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
+                    let bar_idx =
+                        current_bar_idx.min(sbar.data.status_bars.len().saturating_sub(1));
+                    let bar = &sbar.data.status_bars[bar_idx];
+                    let root_y = if bar.fullscreen_render {
+                        0.0
+                    } else {
+                        200.0 - bar.height as f32
+                    };
+                    let virtual_pos = proj.to_virtual(pos);
+                    let final_x = (virtual_pos.x - proj.origin_x).round() as i32;
+                    let final_y = (virtual_pos.y - root_y).round() as i32;
 
-    screen_ui
-        .painter()
-        .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
+                    let render_ctx = render::RenderContext {
+                        painter: viewport_ui.painter(),
+                        assets,
+                        file: sbar,
+                        state: preview_state,
+                        time: ui.input(|i| i.time),
+                        fps: preview_state.editor.display_fps,
+                        mouse_pos: preview_state.editor.virtual_mouse_pos,
+                        selection,
+                        pass: RenderPass::Background,
+                        proj: &proj,
+                        is_dragging: controller.is_dragging,
+                        is_viewport_clicked: true,
+                        is_native: false,
+                    };
 
+                    for (i, key) in asset_keys.iter().enumerate() {
+                        let preview_el =
+                            wrap_graphic(key, final_x + (i as i32 * 4), final_y + (i as i32 * 4));
+                        render::draw_element_wrapper(
+                            &render_ctx,
+                            &preview_el,
+                            egui::pos2(proj.origin_x, root_y),
+                            &mut vec![],
+                            true,
+                        );
+                    }
+
+                    if ui.input(|i| i.pointer.any_released()) {
+                        let (parent_path, mut insert_idx) =
+                            determine_insertion_point(sbar, selection, bar_idx);
+                        for key in asset_keys.iter() {
+                            actions.push(LayerAction::Add {
+                                parent_path: parent_path.clone(),
+                                insert_idx,
+                                element: wrap_graphic(key, final_x, final_y),
+                            });
+                            insert_idx += 1;
+                        }
+                        egui::DragAndDrop::clear_payload(ui.ctx());
+                    }
+                }
+            }
+        }
+    }
+
+    actions
+}
+
+/// Renders a generic ID24 background centered in the virtual 320x200 space.
+fn render_id24_background(
+    ui: &mut egui::Ui,
+    lump: &str,
+    assets: &AssetStore,
+    proj: &ViewportProjection,
+) {
+    let id = AssetId::new(lump);
+    if let Some(tex) = assets.textures.get(&id) {
+        let uv_rect = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+
+        ui.painter()
+            .image(tex.id(), proj.screen_rect, uv_rect, egui::Color32::WHITE);
+    }
+}
+
+/// Renders the complex workspace for SBARDEF, including world view and status bar flats.
+fn render_statusbar_workspace(
+    ui: &mut egui::Ui,
+    bar: &StatusBarLayout,
+    assets: &AssetStore,
+    state: &PreviewState,
+    proj: &ViewportProjection,
+) {
     let bar_height = bar.height as f32;
-    let is_fullscreen = bar.fullscreen_render;
-
-    let h_view = if is_fullscreen {
+    let h_view = if bar.fullscreen_render {
         200.0
     } else {
         200.0 - bar_height
@@ -261,11 +488,8 @@ pub fn draw_viewport(
     let y_center = h_view / 2.0;
     let y_offset_from_top = y_center - 100.0;
 
-    if let Some(tex) = assets
-        .textures
-        .get(&crate::assets::AssetId::new("_BG_MASTER"))
-    {
-        let mut uv_rect = if preview_state.engine.widescreen_mode {
+    if let Some(tex) = assets.textures.get(&AssetId::new("_BG_MASTER")) {
+        let mut uv_rect = if state.engine.widescreen_mode {
             egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0))
         } else {
             let margin = (1.0 - 0.75) / 2.0;
@@ -278,19 +502,16 @@ pub fn draw_viewport(
         let mut draw_rect = proj.screen_rect;
         draw_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
 
-        screen_ui
-            .painter()
+        ui.painter()
             .image(tex.id(), draw_rect, uv_rect, egui::Color32::WHITE);
     }
 
-    if !is_fullscreen && bar_height > 0.0 {
+    if !bar.fullscreen_render && bar_height > 0.0 {
         let flat_key = bar
             .fill_flat
             .clone()
             .unwrap_or_else(|| "GRNROCK".to_string());
-        let id = crate::assets::AssetId::new(&flat_key);
-
-        if let Some(tex) = assets.textures.get(&id) {
+        if let Some(tex) = assets.textures.get(&AssetId::new(&flat_key)) {
             let tile_size_px = 64.0 * proj.final_scale_x;
             let bar_area_rect = egui::Rect::from_min_max(
                 egui::pos2(
@@ -308,7 +529,8 @@ pub fn draw_viewport(
                         egui::vec2(tile_size_px, tile_size_px),
                     )
                     .intersect(bar_area_rect);
-                    screen_ui.painter().image(
+
+                    ui.painter().image(
                         tex.id(),
                         r,
                         egui::Rect::from_min_max(
@@ -322,117 +544,12 @@ pub fn draw_viewport(
         }
     }
 
-    {
-        let mut world_clip_rect = proj.screen_rect;
-        world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
+    let mut world_clip_rect = proj.screen_rect;
+    world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
 
-        let mut weapon_ui = screen_ui.new_child(egui::UiBuilder::new());
-        weapon_ui.set_clip_rect(world_clip_rect.intersect(final_clip_rect));
-        render_player_weapon(&weapon_ui, preview_state, assets, &proj, y_offset_from_top);
-    }
-
-    let time = ui.input(|i| i.time);
-    let fps = preview_state.editor.display_fps;
-
-    let draw_all = |painter: &egui::Painter, pass: RenderPass| {
-        let render_ctx = render::RenderContext {
-            painter,
-            assets,
-            file: file_ref,
-            state: preview_state,
-            time,
-            fps,
-            mouse_pos: preview_state.editor.virtual_mouse_pos,
-            selection,
-            pass,
-            proj: &proj,
-            is_dragging: controller.is_dragging,
-            is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
-            is_native: false,
-        };
-
-        for (idx, child) in bar.children.iter().enumerate() {
-            let mut path = vec![bar_idx, idx];
-            render::draw_element_wrapper(
-                &render_ctx,
-                child,
-                egui::pos2(proj.origin_x, root_y),
-                &mut path,
-                true,
-            );
-        }
-    };
-
-    draw_all(screen_ui.painter(), RenderPass::Background);
-
-    if !selection.is_empty() && preview_state.editor.strobe_timer > 0.0 {
-        draw_all(screen_ui.painter(), RenderPass::Foreground);
-    }
-
-    if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
-        if viewport_res.contains_pointer() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-            if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
-                let virtual_pos = proj.to_virtual(pos);
-                let final_x = (virtual_pos.x - proj.origin_x).round() as i32;
-                let final_y = (virtual_pos.y - root_y).round() as i32;
-
-                let render_ctx = render::RenderContext {
-                    painter: screen_ui.painter(),
-                    assets,
-                    file: file_ref,
-                    state: preview_state,
-                    time,
-                    fps,
-                    mouse_pos: preview_state.editor.virtual_mouse_pos,
-                    selection,
-                    pass: RenderPass::Background,
-                    proj: &proj,
-                    is_dragging: controller.is_dragging,
-                    is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
-                    is_native: false,
-                };
-
-                for (i, key) in asset_keys.iter().enumerate() {
-                    let preview_el = ElementWrapper {
-                        data: Element::Graphic(GraphicDef {
-                            common: CommonAttrs {
-                                x: final_x + (i as i32 * 4),
-                                y: final_y + (i as i32 * 4),
-                                ..Default::default()
-                            },
-                            patch: AssetStore::stem(key),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    };
-                    render::draw_element_wrapper(
-                        &render_ctx,
-                        &preview_el,
-                        egui::pos2(proj.origin_x, root_y),
-                        &mut vec![],
-                        true,
-                    );
-                }
-
-                if ui.input(|i| i.pointer.any_released()) {
-                    let (parent_path, mut insert_idx) =
-                        determine_insertion_point(file_ref, selection, bar_idx);
-                    for key in asset_keys.iter() {
-                        actions.push(LayerAction::Add {
-                            parent_path: parent_path.clone(),
-                            insert_idx,
-                            element: wrap_graphic(key, final_x, final_y),
-                        });
-                        insert_idx += 1;
-                    }
-                    egui::DragAndDrop::clear_payload(ui.ctx());
-                }
-            }
-        }
-    }
-
-    actions
+    ui.scope_builder(egui::UiBuilder::new().max_rect(world_clip_rect), |ui| {
+        render_player_weapon(ui, state, assets, proj, y_offset_from_top);
+    });
 }
 
 fn render_player_weapon(
@@ -478,7 +595,7 @@ fn render_player_weapon(
     };
 
     if let Some(lump) = weapon_lump_name {
-        let id = crate::assets::AssetId::new(lump);
+        let id = AssetId::new(lump);
         if let Some(tex) = assets.textures.get(&id) {
             let tex_size = tex.size_vec2();
             let scaled_size = egui::vec2(

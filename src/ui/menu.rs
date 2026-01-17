@@ -1,9 +1,7 @@
-use crate::app::PendingAction;
+use crate::app::{CreationModal, PendingAction, ProjectMode};
 use crate::assets::AssetStore;
 use crate::config::{AppConfig, SourcePortConfig};
-use crate::document::SBarDocument;
 use crate::io::{self, LoadedProject};
-use crate::library;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
 use eframe::egui;
@@ -12,28 +10,31 @@ use eframe::egui;
 pub enum MenuAction {
     None,
     LoadProject(LoadedProject, String),
-    LoadTemplate(&'static library::Template),
-    NewEmpty,
     Open,
     RequestDiscard(PendingAction),
     SaveDone(String),
     ExportDone(String),
-    SetTarget(crate::model::ExportTarget),
+    SetTarget(crate::models::sbardef::ExportTarget),
 }
 
 /// Draws the primary application menu bar (File, Run, Target).
+///
+/// This function manages the top-level navigation and dispatches actions
+/// for project management, engine launching, and target switching.
 pub fn draw_menu_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
-    doc: &mut Option<SBarDocument>,
+    doc: &mut Option<crate::document::ProjectDocument>,
     config: &mut AppConfig,
     assets: &mut AssetStore,
     settings_open: &mut bool,
 ) -> MenuAction {
     let mut action = MenuAction::None;
 
-    let template_modal_id = ui.make_persistent_id("template_selector_open");
-    let mut template_open = ui.data(|d| d.get_temp::<bool>(template_modal_id).unwrap_or(false));
+    let active_mode = ui.ctx().data(|d| {
+        d.get_temp::<ProjectMode>(egui::Id::new("active_mode"))
+            .unwrap_or_default()
+    });
 
     let file_id = ui.make_persistent_id("file_menu_area");
     let run_id = ui.make_persistent_id("run_menu_area");
@@ -45,9 +46,15 @@ pub fn draw_menu_bar(
 
     let dirty = doc.as_ref().map_or(false, |d| d.dirty);
 
-    let current_target = doc
-        .as_ref()
-        .map_or(crate::model::ExportTarget::Extended, |d| d.file.target);
+    let current_target = if let Some(d) = doc {
+        d.lumps
+            .first()
+            .map_or(crate::models::sbardef::ExportTarget::Extended, |l| {
+                l.target()
+            })
+    } else {
+        crate::models::sbardef::ExportTarget::Extended
+    };
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
@@ -70,8 +77,8 @@ pub fn draw_menu_bar(
         }
 
         let target_label = match current_target {
-            crate::model::ExportTarget::Basic => "Basic",
-            crate::model::ExportTarget::Extended => "Extended",
+            crate::models::sbardef::ExportTarget::Basic => "Basic",
+            crate::models::sbardef::ExportTarget::Extended => "Extended",
         };
         let target_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
             shared::section_header_button(
@@ -93,7 +100,12 @@ pub fn draw_menu_bar(
                 if dirty {
                     action = MenuAction::RequestDiscard(PendingAction::New);
                 } else {
-                    template_open = true;
+                    ui.data_mut(|d| {
+                        d.insert_temp(
+                            egui::Id::new("creation_modal_type"),
+                            CreationModal::LumpSelector,
+                        )
+                    });
                 }
                 ContextMenu::close(ui);
             }
@@ -132,26 +144,35 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(path) = io::save_pk3_dialog(&d.file, assets, d.path.clone()) {
-                        action = MenuAction::SaveDone(path);
+                    if let Some(lump) = d.lumps.first() {
+                        if let Some(sbar) = lump.as_sbar() {
+                            if let Some(path) = io::save_pk3_dialog(sbar, assets, d.path.clone()) {
+                                action = MenuAction::SaveDone(path);
+                            }
+                        }
                     }
                 }
                 ContextMenu::close(ui);
             }
             if ContextMenu::button(ui, "Export JSON...", doc.is_some()) {
                 if let Some(d) = doc {
-                    let sanitized = d.file.to_sanitized_json(assets);
-                    if let Some(path) = io::save_json_dialog(&sanitized, d.path.clone()) {
-                        action = MenuAction::ExportDone(path);
+                    if let Some(lump) = d.get_lump(active_mode) {
+                        let sanitized = lump.to_sanitized_json(assets);
+                        if let Some(path) = io::save_json_dialog(&sanitized, d.path.clone()) {
+                            action = MenuAction::ExportDone(path);
+                        }
                     }
                 }
                 ContextMenu::close(ui);
             }
             if ContextMenu::button(ui, "Export WAD...", doc.is_some()) {
                 if let Some(d) = doc {
-                    let sanitized = d.file.to_sanitized_json(assets);
-                    if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone()) {
-                        action = MenuAction::ExportDone(path);
+                    if let Some(lump) = d.get_lump(active_mode) {
+                        let sanitized = lump.to_sanitized_json(assets);
+                        if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone())
+                        {
+                            action = MenuAction::ExportDone(path);
+                        }
                     }
                 }
                 ContextMenu::close(ui);
@@ -187,8 +208,16 @@ pub fn draw_menu_bar(
                     if ContextMenu::button(ui, &format!("Launch in {}", port.name), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
-                            let sanitized = d.file.to_sanitized_json(assets);
-                            io::launch_game(&sanitized, assets, &port.command, iwad, d.file.target);
+                            if let Some(lump) = d.get_lump(active_mode) {
+                                let sanitized = lump.to_sanitized_json(assets);
+                                io::launch_game(
+                                    &sanitized,
+                                    assets,
+                                    &port.command,
+                                    iwad,
+                                    lump.target(),
+                                );
+                            }
                         }
                         ContextMenu::close(ui);
                     }
@@ -207,17 +236,17 @@ pub fn draw_menu_bar(
             if ContextMenu::button(
                 ui,
                 "Basic (KEX / 1.0.0)",
-                current_target != crate::model::ExportTarget::Basic,
+                current_target != crate::models::sbardef::ExportTarget::Basic,
             ) {
-                action = MenuAction::SetTarget(crate::model::ExportTarget::Basic);
+                action = MenuAction::SetTarget(crate::models::sbardef::ExportTarget::Basic);
                 ContextMenu::close(ui);
             }
             if ContextMenu::button(
                 ui,
                 "Extended (1.2.0+)",
-                current_target != crate::model::ExportTarget::Extended,
+                current_target != crate::models::sbardef::ExportTarget::Extended,
             ) {
-                action = MenuAction::SetTarget(crate::model::ExportTarget::Extended);
+                action = MenuAction::SetTarget(crate::models::sbardef::ExportTarget::Extended);
                 ContextMenu::close(ui);
             }
             ui.separator();
@@ -229,70 +258,10 @@ pub fn draw_menu_bar(
         });
     }
 
-    if template_open {
-        let mut close_window = false;
-        egui::Window::new("Create New Project")
-            .open(&mut template_open)
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .show(ctx, |ui| {
-                ui.set_width(480.0);
-                ui.add_space(4.0);
-
-                egui::ScrollArea::vertical()
-                    .max_height(400.0)
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        ui.spacing_mut().item_spacing.y = 8.0;
-
-                        if draw_menu_card(ui, "Empty", "Start from scratch.") {
-                            if dirty {
-                                action = MenuAction::RequestDiscard(PendingAction::New);
-                            } else {
-                                action = MenuAction::NewEmpty;
-                            }
-                            close_window = true;
-                        }
-
-                        ui.add_space(4.0);
-                        ui.label(egui::RichText::new("Templates").weak().italics().size(11.0));
-
-                        for template in library::TEMPLATES {
-                            if draw_menu_card(ui, template.name, template.description) {
-                                if dirty {
-                                    action = MenuAction::RequestDiscard(PendingAction::Template(
-                                        template,
-                                    ));
-                                } else {
-                                    action = MenuAction::LoadTemplate(template);
-                                }
-                                close_window = true;
-                            }
-                        }
-                    });
-
-                ui.add_space(12.0);
-                ui.separator();
-
-                ui.vertical_centered(|ui| {
-                    ui.add_space(8.0);
-                    if ui.button("  Cancel  ").clicked() {
-                        close_window = true;
-                    }
-                    ui.add_space(8.0);
-                });
-            });
-
-        if close_window {
-            template_open = false;
-        }
-    }
-
-    ui.data_mut(|d| d.insert_temp(template_modal_id, template_open));
     action
 }
 
+/// Renders the specialized Settings window for application-wide configuration.
 pub fn draw_settings_window(
     ctx: &egui::Context,
     settings_open: &mut bool,
@@ -359,34 +328,40 @@ pub fn draw_settings_window(
                                 frame.show(ui, |ui| {
                                     ui.vertical(|ui| {
                                         let mut label_width: f32 = 0.0;
-                                        let row_width =
-                                        ui.horizontal(|ui| {
-                                            label_width = ui.label("Name:").rect.width();
-                                            ui.add(
-                                                egui::TextEdit::singleline(&mut port.name)
-                                                    .hint_text("Port name")
-                                                    .desired_width(f32::INFINITY)
-                                                    .font(egui::FontId::proportional(14.0))
-                                                    .text_color(ui.visuals().strong_text_color()),
-                                            );
-                                        }).response.rect.width();
+                                        let row_width = ui
+                                            .horizontal(|ui| {
+                                                label_width = ui.label("Name:").rect.width();
+                                                ui.add(
+                                                    egui::TextEdit::singleline(&mut port.name)
+                                                        .hint_text("Port name")
+                                                        .desired_width(f32::INFINITY)
+                                                        .font(egui::FontId::proportional(14.0))
+                                                        .text_color(
+                                                            ui.visuals().strong_text_color(),
+                                                        ),
+                                                );
+                                            })
+                                            .response
+                                            .rect
+                                            .width();
                                         ui.add_space(4.0);
                                         ui.horizontal(|ui| {
                                             ui.horizontal(|ui| {
                                                 ui.set_min_width(label_width);
                                                 ui.label("Cmd:")
                                             });
-                                            let browse_button_width = ui
-                                                .ctx().fonts_mut(|f| {
+                                            let browse_button_width =
+                                                ui.ctx().fonts_mut(|f| {
                                                     f.layout_no_wrap(
                                                         "Browse...".to_owned(),
-                                                        ui.style().text_styles[&egui::TextStyle::Button].clone(),
+                                                        ui.style().text_styles
+                                                            [&egui::TextStyle::Button]
+                                                            .clone(),
                                                         ui.visuals().text_color(),
                                                     )
                                                     .size()
                                                     .x
-                                                })
-                                                + ui.spacing().button_padding.x * 2.0;
+                                                }) + ui.spacing().button_padding.x * 2.0;
                                             let cmd_input_w = row_width
                                                 - label_width
                                                 - browse_button_width
@@ -399,16 +374,19 @@ pub fn draw_settings_window(
                                                     .font(egui::FontId::monospace(11.0)),
                                             );
                                             if ui.button("Browse...").clicked() {
-                                                let mut dialog = rfd::FileDialog::new().set_title("Select Port Executable");
+                                                let mut dialog = rfd::FileDialog::new()
+                                                    .set_title("Select Port Executable");
                                                 if cfg!(windows) {
-                                                    dialog = dialog.add_filter("Executable", &["exe"]);
+                                                    dialog =
+                                                        dialog.add_filter("Executable", &["exe"]);
                                                 }
 
                                                 if let Some(path) = dialog.pick_file() {
-                                                    let path_str = path.to_string_lossy().into_owned();
-                                                    if port.name.is_empty()
-                                                    {
-                                                        port.name = SourcePortConfig::infer_name(&path_str);
+                                                    let path_str =
+                                                        path.to_string_lossy().into_owned();
+                                                    if port.name.is_empty() {
+                                                        port.name =
+                                                            SourcePortConfig::infer_name(&path_str);
                                                     }
                                                     port.command = path_str;
                                                 }
@@ -477,6 +455,7 @@ pub fn draw_settings_window(
     }
 }
 
+/// Renders a card-style button used in settings and project selection.
 pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     let width = ui.available_width();
     let height = 54.0;
@@ -518,6 +497,7 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
     response.clicked()
 }
 
+/// Renders a specialized delete button for use in list views.
 pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     let height = 70.0;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
@@ -555,6 +535,138 @@ pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
     );
 
     response.clicked()
+}
+
+/// Renders the multistep wizard for creating new project lumps.
+pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp) {
+    let mut is_open = app.creation_modal != CreationModal::None;
+
+    let title = match app.creation_modal {
+        CreationModal::LumpSelector => "New ID24 Project",
+        CreationModal::SBarDef => "Create SBARDEF Lump",
+        CreationModal::SkyDefs => "Create SKYDEFS Lump",
+        CreationModal::Interlevel => "Create INTERLEVEL Lump",
+        CreationModal::Finale => "Create FINALE Lump",
+        _ => "Create New Project",
+    };
+
+    egui::Window::new(title)
+        .open(&mut is_open)
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .show(ctx, |ui| {
+            ui.set_width(480.0);
+            ui.add_space(4.0);
+
+            egui::ScrollArea::vertical()
+                .max_height(400.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 8.0;
+
+                    match app.creation_modal {
+                        CreationModal::LumpSelector => {
+                            ui.label(
+                                egui::RichText::new("Choose the ID24 lump type to create:").weak(),
+                            );
+                            ui.add_space(4.0);
+
+                            if draw_menu_card(
+                                ui,
+                                "Status Bar (SBARDEF)",
+                                "Recursive HUD and UI layouts.",
+                            ) {
+                                app.creation_modal = CreationModal::SBarDef;
+                            }
+                            if draw_menu_card(
+                                ui,
+                                "Sky Definitions (SKYDEFS)",
+                                "Custom panoramas, Hexen skies, and Fire effects.",
+                            ) {
+                                app.creation_modal = CreationModal::SkyDefs;
+                            }
+                            if draw_menu_card(
+                                ui,
+                                "Interlevel Animations",
+                                "Victory screens, score tallies, and map transitions.",
+                            ) {
+                                app.creation_modal = CreationModal::Interlevel;
+                            }
+                            if draw_menu_card(
+                                ui,
+                                "Finale Definitions",
+                                "Art screens, bunny scrollers, and cast calls.",
+                            ) {
+                                app.creation_modal = CreationModal::Finale;
+                            }
+                        }
+                        _ => {
+                            if draw_menu_card(ui, "Empty Project", "Start from a clean slate.") {
+                                use crate::models::*;
+                                let new_data = match app.creation_modal {
+                                    CreationModal::SBarDef => {
+                                        ProjectData::StatusBar(sbardef::SBarDefFile::new_empty())
+                                    }
+                                    CreationModal::SkyDefs => {
+                                        ProjectData::Sky(skydefs::SkyDefsFile::new_empty())
+                                    }
+                                    CreationModal::Interlevel => ProjectData::Interlevel(
+                                        interlevel::InterlevelDefFile::new_empty(),
+                                    ),
+                                    CreationModal::Finale => {
+                                        ProjectData::Finale(finale::FinaleDefFile::new_empty())
+                                    }
+                                    _ => ProjectData::StatusBar(sbardef::SBarDefFile::new_empty()),
+                                };
+
+                                if app.doc.is_some() {
+                                    app.add_lump_to_project(new_data);
+                                } else {
+                                    app.new_project(ctx, new_data);
+                                }
+                                app.creation_modal = CreationModal::None;
+                            }
+
+                            if app.creation_modal == CreationModal::SBarDef {
+                                ui.add_space(4.0);
+                                ui.label(
+                                    egui::RichText::new("Templates").weak().italics().size(11.0),
+                                );
+
+                                for template in crate::library::TEMPLATES {
+                                    if draw_menu_card(ui, template.name, template.description) {
+                                        app.apply_template(ctx, template);
+                                        app.creation_modal = CreationModal::None;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+            ui.add_space(12.0);
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                if app.creation_modal != CreationModal::LumpSelector {
+                    if ui.button("  Back  ").clicked() {
+                        app.creation_modal = CreationModal::LumpSelector;
+                    }
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("  Cancel  ").clicked() {
+                        app.creation_modal = CreationModal::None;
+                    }
+                });
+            });
+            ui.add_space(4.0);
+        });
+
+    if !is_open {
+        app.creation_modal = CreationModal::None;
+    }
 }
 
 fn trigger_menu(ui: &mut egui::Ui, id: egui::Id, pos: egui::Pos2) {

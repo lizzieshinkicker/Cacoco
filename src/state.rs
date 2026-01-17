@@ -1,5 +1,5 @@
 use crate::constants::DOOM_TICS_PER_SEC;
-use crate::model::FeatureLevel;
+use crate::models::sbardef::FeatureLevel;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

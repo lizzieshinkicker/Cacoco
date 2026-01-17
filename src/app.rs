@@ -1,10 +1,8 @@
 use crate::assets::AssetStore;
 use crate::cheats::CheatEngine;
 use crate::config::AppConfig;
-use crate::document::{LayerAction, SBarDocument};
+use crate::document::{LayerAction, ProjectDocument};
 use crate::io;
-use crate::library::Template;
-use crate::model::SBarDefFile;
 use crate::state::PreviewState;
 use crate::ui;
 use crate::ui::font_wizard::FontWizardState;
@@ -15,29 +13,62 @@ use std::collections::HashSet;
 
 const MAX_RECENT_FILES: usize = 5;
 
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
+pub enum ProjectMode {
+    #[default]
+    SBarDef,
+    SkyDefs,
+    Interlevel,
+    Finale,
+}
+
+impl ProjectMode {
+    pub fn from_data(data: &crate::models::ProjectData) -> Self {
+        match data {
+            crate::models::ProjectData::StatusBar(_) => ProjectMode::SBarDef,
+            crate::models::ProjectData::Finale(_) => ProjectMode::Finale,
+            crate::models::ProjectData::Sky(_) => ProjectMode::SkyDefs,
+            crate::models::ProjectData::Interlevel(_) => ProjectMode::Interlevel,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CreationModal {
+    #[default]
+    None,
+    LumpSelector,
+    SBarDef,
+    SkyDefs,
+    Interlevel,
+    Finale,
+}
+
 /// Actions that require user confirmation (usually due to unsaved changes).
 #[derive(Clone)]
 pub enum PendingAction {
     New,
     Load(String),
-    Template(&'static Template),
     Quit,
 }
 
 /// Requests for user confirmation before performing destructive operations.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
     DeleteLayers(Vec<Vec<usize>>),
     DeleteAssets(Vec<String>),
     DiscardChanges(PendingAction),
-    DowngradeTarget(crate::model::ExportTarget),
+    DowngradeTarget(crate::models::sbardef::ExportTarget),
 }
 
 /// The main application container for the Cacoco SBARDEF editor.
 pub struct CacocoApp {
     /// The active project document, if any.
-    pub doc: Option<SBarDocument>,
+    pub doc: Option<ProjectDocument>,
     /// Registry of all loaded textures and raw asset data.
     pub assets: AssetStore,
     /// Persistent application configuration (IWAD paths, recent files).
@@ -62,6 +93,10 @@ pub struct CacocoApp {
     pub hotkeys: crate::hotkeys::HotkeyRegistry,
     /// True if a valid Doom II IWAD has been verified.
     pub iwad_verified: bool,
+    /// Lump that is currently being edited.
+    pub active_mode: ProjectMode,
+    /// Modal to select which Lump to create.
+    pub creation_modal: CreationModal,
 }
 
 impl Default for CacocoApp {
@@ -80,6 +115,8 @@ impl Default for CacocoApp {
             confirmation_modal: None,
             hotkeys: crate::hotkeys::HotkeyRegistry::default(),
             iwad_verified: false,
+            active_mode: ProjectMode::SBarDef,
+            creation_modal: CreationModal::default(),
         }
     }
 }
@@ -135,7 +172,11 @@ impl CacocoApp {
 
     /// Loads a project from a file and resets the application state.
     pub fn load_project(&mut self, ctx: &egui::Context, loaded: io::LoadedProject, path_str: &str) {
-        self.doc = Some(SBarDocument::new(loaded.file, Some(path_str.to_string())));
+        self.active_mode = ProjectMode::from_data(&loaded.file);
+        self.doc = Some(ProjectDocument::new(
+            loaded.file,
+            Some(path_str.to_string()),
+        ));
         self.assets = loaded.assets;
         self.preview_state = PreviewState::default();
 
@@ -154,11 +195,10 @@ impl CacocoApp {
         );
     }
 
-    /// Initializes a new empty SBARDEF project.
-    pub fn new_project(&mut self, ctx: &egui::Context) {
-        let file = SBarDefFile::new_empty();
-
-        self.doc = Some(SBarDocument::new(file, None));
+    /// Initializes a new empty project.
+    pub fn new_project(&mut self, ctx: &egui::Context, data: crate::models::ProjectData) {
+        self.active_mode = ProjectMode::from_data(&data);
+        self.doc = Some(ProjectDocument::new(data, None));
         self.assets = AssetStore::default();
         self.preview_state = PreviewState::default();
 
@@ -169,19 +209,35 @@ impl CacocoApp {
 
         self.last_selection.clear();
         self.current_statusbar_idx = 0;
+
         messages::log_event(&mut self.preview_state, EditorEvent::ProjectNew);
     }
 
+    /// Appends a new lump to the current project or switches to it if it exists.
+    pub fn add_lump_to_project(&mut self, data: crate::models::ProjectData) {
+        if let Some(doc) = &mut self.doc {
+            let mode = ProjectMode::from_data(&data);
+            if doc.get_lump(mode).is_none() {
+                doc.lumps.push(data);
+                doc.dirty = true;
+            }
+            self.active_mode = mode;
+            self.last_selection.clear();
+        }
+    }
+
     /// Applies a library template as the current project.
-    pub fn apply_template(&mut self, ctx: &egui::Context, template: &Template) {
-        match serde_json::from_str::<SBarDefFile>(template.json_content) {
+    pub fn apply_template(&mut self, ctx: &egui::Context, template: &crate::library::Template) {
+        match serde_json::from_str::<crate::models::sbardef::SBarDefFile>(template.json_content) {
             Ok(mut parsed_file) => {
                 parsed_file.normalize_paths();
-
                 parsed_file.target = parsed_file.determine_target();
                 parsed_file.normalize_for_target();
 
-                self.doc = Some(SBarDocument::new(parsed_file, None));
+                let data = crate::models::ProjectData::StatusBar(parsed_file);
+                self.active_mode = ProjectMode::from_data(&data);
+                self.doc = Some(ProjectDocument::new(data, None));
+
                 self.assets = AssetStore::default();
                 self.preview_state = PreviewState::default();
 
@@ -215,7 +271,7 @@ impl CacocoApp {
     pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
         if let Some(doc) = &mut self.doc {
             let old_selection = doc.selection.clone();
-            doc.execute_actions(actions);
+            doc.execute_actions(actions, self.active_mode);
 
             if doc.selection != old_selection {
                 self.preview_state.editor.strobe_timer = 0.5;
@@ -223,15 +279,9 @@ impl CacocoApp {
 
             if doc.selection.len() == 1 {
                 let path = doc.selection.iter().next().unwrap();
-                if path.len() == 1 {
+                if path.len() == 1 && self.active_mode == ProjectMode::SBarDef {
                     self.current_statusbar_idx = path[0];
                 }
-            }
-        }
-
-        if let Some(doc) = &self.doc {
-            if self.current_statusbar_idx >= doc.file.data.status_bars.len() {
-                self.current_statusbar_idx = doc.file.data.status_bars.len().saturating_sub(1);
             }
         }
     }

@@ -530,7 +530,7 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         .selected_text(format!("{:?}", state.world.game_version))
                         .width(110.0)
                         .show_ui(ui, |ui| {
-                            use crate::model::FeatureLevel::*;
+                            use crate::models::sbardef::FeatureLevel::*;
                             ui.selectable_value(&mut state.world.game_version, Doom19, "Doom 1.9");
                             ui.selectable_value(
                                 &mut state.world.game_version,

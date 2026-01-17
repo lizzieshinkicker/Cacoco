@@ -1,5 +1,5 @@
 use crate::document::LayerAction;
-use crate::model::{SBarDefFile, StatusBarLayout};
+use crate::models::sbardef::{SBarDefFile, StatusBarLayout};
 use std::collections::HashSet;
 
 /// Processes actions that target the top-level Status Bar layout list.

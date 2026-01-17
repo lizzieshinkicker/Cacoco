@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::model::{HudFontDef, NumberFontDef, SBarDefFile};
+use crate::models::sbardef::{HudFontDef, NumberFontDef, SBarDefFile};
 use eframe::egui;
 
 /// Internal state for the font registration wizard.

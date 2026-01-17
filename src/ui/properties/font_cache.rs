@@ -1,9 +1,10 @@
-use crate::model::SBarDefFile;
+use crate::models::ProjectData;
+use crate::models::sbardef::SBarDefFile;
 use std::collections::HashMap;
 
 pub struct FontCache {
-    number_fonts: HashMap<String, String>,
-    hud_fonts: HashMap<String, String>,
+    pub number_fonts: HashMap<String, String>,
+    pub hud_fonts: HashMap<String, String>,
     pub number_font_names: Vec<String>,
     pub hud_font_names: Vec<String>,
 }
@@ -29,6 +30,19 @@ impl FontCache {
             hud_fonts,
             number_font_names,
             hud_font_names,
+        }
+    }
+
+    pub fn new_from_proj(project: &ProjectData) -> Self {
+        if let Some(sbar) = project.as_sbar() {
+            Self::new(sbar)
+        } else {
+            Self {
+                number_fonts: HashMap::new(),
+                hud_fonts: HashMap::new(),
+                number_font_names: Vec::new(),
+                hud_font_names: Vec::new(),
+            }
         }
     }
 

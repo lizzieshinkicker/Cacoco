@@ -1,8 +1,10 @@
 mod layout;
 mod tree;
 
+use crate::app::ProjectMode;
 use crate::history::HistoryManager;
-use crate::model::{ElementWrapper, SBarDefFile, StatusBarLayout};
+use crate::models::ProjectData;
+use crate::models::sbardef::{ElementWrapper, StatusBarLayout};
 use std::collections::HashSet;
 
 /// Actions that can be performed on the document's layer hierarchy or layouts.
@@ -60,10 +62,10 @@ pub enum LayerAction {
     ToggleSelection(Vec<Vec<usize>>),
 }
 
-/// Manages a single SBARDEF project, its selection, and its modification history.
-pub struct SBarDocument {
-    /// The actual SBARDEF project data.
-    pub file: SBarDefFile,
+/// Manages a collection of ID24 lumps, their selection, and its modification history.
+pub struct ProjectDocument {
+    /// All lumps contained in this project (SBARDEF, SKYDEFS, etc.)
+    pub lumps: Vec<ProjectData>,
     /// The filesystem path where this document is saved.
     pub path: Option<String>,
     /// The set of tree-paths currently selected by the user.
@@ -76,11 +78,11 @@ pub struct SBarDocument {
     pub dirty: bool,
 }
 
-impl SBarDocument {
-    /// Creates a new document from a file and optional path.
-    pub fn new(file: SBarDefFile, path: Option<String>) -> Self {
+impl ProjectDocument {
+    /// Creates a new document from an initial lump and optional path.
+    pub fn new(initial_lump: ProjectData, path: Option<String>) -> Self {
         Self {
-            file,
+            lumps: vec![initial_lump],
             path,
             selection: HashSet::new(),
             selection_pivot: None,
@@ -89,41 +91,67 @@ impl SBarDocument {
         }
     }
 
-    /// The central hub for executing modifications.
-    /// Ensures that mutations, selection updates, and history are kept in sync.
-    pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
+    /// Returns a mutable reference to the lump matching the given mode.
+    pub fn get_lump_mut(&mut self, mode: ProjectMode) -> Option<&mut ProjectData> {
+        self.lumps
+            .iter_mut()
+            .find(|l| ProjectMode::from_data(l) == mode)
+    }
+
+    /// Returns an immutable reference to the lump matching the given mode.
+    pub fn get_lump(&self, mode: ProjectMode) -> Option<&ProjectData> {
+        self.lumps
+            .iter()
+            .find(|l| ProjectMode::from_data(l) == mode)
+    }
+
+    /// Primary entry point for mutating project data via user actions.
+    pub fn execute_actions(&mut self, actions: Vec<LayerAction>, active_mode: ProjectMode) {
         for action in actions {
             match action {
                 LayerAction::UndoSnapshot => {
-                    self.history.take_snapshot(&self.file, &self.selection);
-                }
-                LayerAction::AddStatusBar
-                | LayerAction::DuplicateStatusBar(_)
-                | LayerAction::MoveStatusBar { .. }
-                | LayerAction::DeleteStatusBar(_)
-                | LayerAction::PasteStatusBars(_) => {
-                    self.dirty = true;
-                    layout::execute_layout_action(&mut self.file, action, &mut self.selection);
+                    self.history.take_snapshot(&self.lumps, &self.selection);
                 }
                 _ => {
                     self.dirty = true;
-                    tree::execute_tree_action(&mut self.file, action, &mut self.selection);
+                    let selection_ref = &mut self.selection;
+                    let active_lump = self
+                        .lumps
+                        .iter_mut()
+                        .find(|l| ProjectMode::from_data(l) == active_mode);
+
+                    if let Some(ProjectData::StatusBar(sbar)) = active_lump {
+                        match action {
+                            LayerAction::AddStatusBar
+                            | LayerAction::DuplicateStatusBar(_)
+                            | LayerAction::MoveStatusBar { .. }
+                            | LayerAction::DeleteStatusBar(_)
+                            | LayerAction::PasteStatusBars(_) => {
+                                layout::execute_layout_action(sbar, action, selection_ref);
+                            }
+                            _ => {
+                                tree::execute_tree_action(sbar, action, selection_ref);
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        self.file.normalize_for_target();
+        if let Some(ProjectData::StatusBar(sbar)) = self.get_lump_mut(active_mode) {
+            sbar.normalize_for_target();
+        }
     }
 
-    /// Performs an undo operation on the document state.
+    /// Reverts the document to the previous state in history.
     pub fn undo(&mut self) {
-        self.history.undo(&mut self.file, &mut self.selection);
+        self.history.undo(&mut self.lumps, &mut self.selection);
         self.dirty = true;
     }
 
-    /// Performs a redo operation on the document state.
+    /// Re-applies a state that was recently undone.
     pub fn redo(&mut self) {
-        self.history.redo(&mut self.file, &mut self.selection);
+        self.history.redo(&mut self.lumps, &mut self.selection);
         self.dirty = true;
     }
 }

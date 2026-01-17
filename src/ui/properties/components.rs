@@ -3,7 +3,7 @@ use super::common;
 use super::editor::PropertiesUI;
 use super::preview::PreviewContent;
 use crate::assets::AssetStore;
-use crate::model::{ComponentDef, ComponentType};
+use crate::models::sbardef::{ComponentDef, ComponentType};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
@@ -43,7 +43,7 @@ impl PropertiesUI for ComponentDef {
                 }
             });
 
-            use crate::model::ComponentType::*;
+            use crate::models::sbardef::ComponentType::*;
             if matches!(self.type_, StatTotals | Coordinates) {
                 ui.add_space(4.0);
                 changed |= ui.checkbox(&mut self.vertical, "Vertical Layout").changed();
@@ -104,7 +104,7 @@ impl PropertiesUI for ComponentDef {
 
 /// Helper to render the subtype selection list for engine components.
 pub(super) fn draw_component_options(ui: &mut egui::Ui, type_: &mut ComponentType) -> bool {
-    use crate::model::ComponentType::*;
+    use crate::models::sbardef::ComponentType::*;
     let mut changed = false;
     let items = [
         ("Time", Time),

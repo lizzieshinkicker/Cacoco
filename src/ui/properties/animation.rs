@@ -1,6 +1,6 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::constants::DOOM_TICS_PER_SEC;
-use crate::model::{AnimationDef, FrameDef};
+use crate::models::sbardef::{AnimationDef, FrameDef};
 use crate::state::PreviewState;
 use crate::ui::layers::thumbnails;
 use crate::ui::shared;

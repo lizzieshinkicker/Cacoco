@@ -2,7 +2,7 @@ use super::thumbnails::{self, ListRow};
 use crate::app::ConfirmationRequest;
 use crate::assets::{AssetId, AssetStore};
 use crate::library::{self, FontDefinition, FontSource};
-use crate::model::{HudFontDef, NumberFontDef, SBarDefFile};
+use crate::models::sbardef::{HudFontDef, NumberFontDef, SBarDefFile};
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::font_wizard::FontWizardState;
 use crate::ui::shared;

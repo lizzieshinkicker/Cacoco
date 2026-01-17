@@ -1,4 +1,4 @@
-use crate::model::{Element, ElementWrapper, ExportTarget};
+use crate::models::sbardef::{Element, ElementWrapper, ExportTarget};
 
 /// Evaluates if a given HUD element is compatible with the specified export target.
 pub fn is_compatible(element: &ElementWrapper, target: ExportTarget) -> bool {

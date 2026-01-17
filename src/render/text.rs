@@ -1,6 +1,6 @@
 use super::{RenderContext, get_alignment_anchor_offset};
 use crate::constants::{DEFAULT_GLYPH_H, DEFAULT_GLYPH_W};
-use crate::model::*;
+use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Renders a numeric player statistic.
@@ -55,7 +55,8 @@ pub(super) fn draw_number(
             .powerup_durations
             .get(&def.param)
             .cloned()
-            .unwrap_or(0.0) as i32,
+            .unwrap_or(0.0)
+            .ceil() as i32,
     };
 
     if def.maxlength > 0 {
@@ -251,12 +252,10 @@ fn layout_text_line<'a>(
             let sz = tex.size_vec2();
             let mut y_offset = 0.0;
 
-            let advance = if font_type == 2 { sz.x } else { mono_width };
+            let mut advance = if font_type == 2 { sz.x } else { mono_width };
 
-            if stem_upper == "STT" && c == '1' {
-                if font_type == 2 {
-                    total_w += 2.0;
-                }
+            if stem_upper == "STT" && c == '1' && font_type == 2 {
+                advance += 2.0;
             }
 
             if stem_upper == "STCFN" {

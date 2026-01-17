@@ -4,7 +4,9 @@ use super::editor::PropertiesUI;
 use super::lookups;
 use super::preview::PreviewContent;
 use crate::assets::AssetStore;
-use crate::model::{Element, ElementWrapper, ExportTarget, NumberDef, NumberType, StringDef};
+use crate::models::sbardef::{
+    Element, ElementWrapper, ExportTarget, NumberDef, NumberType, StringDef,
+};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;

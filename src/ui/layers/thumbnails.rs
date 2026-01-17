@@ -1,5 +1,5 @@
 use crate::assets::{AssetId, AssetStore};
-use crate::model::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
+use crate::models::sbardef::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::shared;
 use eframe::egui;
@@ -133,7 +133,7 @@ fn draw_static_texture_content(
 fn draw_live_number_thumbnail(
     ui: &mut egui::Ui,
     rect: egui::Rect,
-    number_def: &crate::model::NumberDef,
+    number_def: &crate::models::sbardef::NumberDef,
     is_percent: bool,
     state: &PreviewState,
     file: &SBarDefFile,
@@ -177,7 +177,7 @@ fn draw_live_time_thumbnail(
     ui: &mut egui::Ui,
     rect: egui::Rect,
     time: f64,
-    component: &crate::model::ComponentDef,
+    component: &crate::models::sbardef::ComponentDef,
     file: &SBarDefFile,
     assets: &AssetStore,
     is_dimmed: bool,
@@ -201,7 +201,7 @@ fn draw_live_time_thumbnail(
 fn draw_live_component_thumbnail(
     ui: &mut egui::Ui,
     rect: egui::Rect,
-    component: &crate::model::ComponentDef,
+    component: &crate::models::sbardef::ComponentDef,
     file: &SBarDefFile,
     assets: &AssetStore,
     is_dimmed: bool,

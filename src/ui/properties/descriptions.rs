@@ -1,4 +1,4 @@
-use crate::model::{ComponentType, Element, ElementWrapper, NumberType};
+use crate::models::sbardef::{ComponentType, Element, ElementWrapper, NumberType};
 
 pub fn get_helper_text(element: &ElementWrapper) -> &'static str {
     if element._cacoco_text.is_some() {
