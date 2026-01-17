@@ -17,5 +17,6 @@ pub fn get_layer_color(element: &ElementWrapper) -> Option<Color32> {
         Element::Number(_) | Element::Percent(_) => Some(Color32::from_rgb(154, 205, 50)),
         Element::String(_) => Some(Color32::from_rgb(255, 215, 0)),
         Element::Component(_) => Some(Color32::from_rgb(0, 200, 200)),
+        Element::Minimap(_) => Some(Color32::from_rgb(255, 0, 0)),
     }
 }

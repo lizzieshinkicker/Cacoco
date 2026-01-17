@@ -187,6 +187,19 @@ pub fn draw_element_wrapper(
             Element::String(s) => text::draw_string(&local_ctx, s, pos, alpha),
             Element::Component(c) => components::draw_component(&local_ctx, c, pos, alpha),
             Element::Carousel(_) => {}
+            Element::Minimap(m) => {
+                let rect = egui::Rect::from_min_size(pos, egui::vec2(m.width as f32, m.height as f32));
+                let screen_rect = ctx.to_screen_rect(rect);
+
+                match ctx.pass {
+                    RenderPass::Background => {
+                        ctx.painter.rect_filled(screen_rect, 0.0, egui::Color32::WHITE);
+                    }
+                    RenderPass::Foreground => {
+                        ctx.painter.rect_stroke(screen_rect, 0.0, egui::Stroke::new(1.0, egui::Color32::YELLOW), egui::StrokeKind::Middle);
+                    }
+                }
+            }
         }
     } else if let Element::List(l) = &element.data {
         list::draw_list(&local_ctx, l, pos, alpha, current_path, visible_in_game);
@@ -299,6 +312,7 @@ fn get_element_footprint(ctx: &RenderContext, element: &ElementWrapper) -> egui:
             })
             .unwrap_or(egui::vec2(16.0, 16.0))
         }
+        Element::Minimap(m) => egui::vec2(m.width as f32, m.height as f32),
         _ => egui::Vec2::ZERO,
     };
 

@@ -340,6 +340,7 @@ pub enum Element {
     Carousel(CarouselDef),
     List(ListDef),
     String(StringDef),
+    Minimap(MinimapDef),
 }
 
 /// A polymorphic wrapper that holds an Element along with editor-specific metadata.
@@ -442,6 +443,15 @@ pub struct CropDef {
 pub struct CanvasDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
+}
+
+/// Renders a minimap.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct MinimapDef {
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    pub width: i32,
+    pub height: i32,
 }
 
 /// A container that automatically stacks its children horizontally or vertically.
@@ -611,7 +621,7 @@ impl ElementWrapper {
     pub fn is_spec_container(&self) -> bool {
         matches!(
             self.data,
-            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_)
+            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_) | Element::Minimap(_)
         )
     }
 
@@ -652,6 +662,7 @@ impl ElementWrapper {
             }
             Element::Component(c) => format!("Component: {:?}", c.type_),
             Element::Carousel(_) => "Carousel".to_string(),
+            Element::Minimap(_) => "Minimap".to_string(),
         }
     }
 
@@ -670,6 +681,7 @@ impl ElementWrapper {
             Element::String(e) => &e.common.children,
             Element::Component(e) => &e.common.children,
             Element::Carousel(e) => &e.common.children,
+            Element::Minimap(e) => &e.common.children,
         }
     }
 
@@ -688,6 +700,7 @@ impl ElementWrapper {
             Element::Component(e) => &mut e.common,
             Element::Carousel(e) => &mut e.common,
             Element::Native(e) => &mut e.common,
+            Element::Minimap(e) => &mut e.common,
         }
     }
 
@@ -706,6 +719,7 @@ impl ElementWrapper {
             Element::Component(e) => &e.common,
             Element::Carousel(e) => &e.common,
             Element::Native(e) => &e.common,
+            Element::Minimap(e) => &e.common,
         }
     }
 
@@ -774,6 +788,7 @@ impl SBarDefFile {
                     | Element::String(_)
                     | Element::Component(_)
                     | Element::Carousel(_)
+                    | Element::Minimap(_)
             ) {
                 return true;
             }
@@ -982,6 +997,7 @@ impl SBarDefFile {
                         | Element::String(_)
                         | Element::Component(_)
                         | Element::Carousel(_)
+                        | Element::Minimap(_)
                 )
             });
         }

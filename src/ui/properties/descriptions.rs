@@ -72,5 +72,6 @@ pub fn get_helper_text(element: &ElementWrapper) -> &'static str {
                 "A special component that displays game information. Renders in fullscreen coordinates."
             }
         },
+        Element::Minimap(_) => "Renders a minimap.",
     }
 }

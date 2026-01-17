@@ -301,6 +301,7 @@ pub fn draw_interactive_header(
                         Element::List(_) => "List Container".to_string(),
                         Element::Native(_) => "Native Container".to_string(),
                         Element::Carousel(_) => "Carousel".to_string(),
+                        Element::Minimap(_) => "Minimap".to_string(),
                     }
                 };
 

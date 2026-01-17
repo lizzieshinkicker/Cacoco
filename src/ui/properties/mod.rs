@@ -19,6 +19,7 @@ pub(crate) mod font_cache;
 mod graphics;
 mod list;
 mod lookups;
+mod minimap;
 pub(crate) mod preview;
 mod text;
 pub mod text_helper;
@@ -56,6 +57,7 @@ impl PropertiesUI for ElementWrapper {
             Element::Component(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Carousel(e) => e.draw_specific_fields(ui, fonts, assets, state),
             Element::Native(e) => e.draw_specific_fields(ui, fonts, assets, state),
+            Element::Minimap(e) => e.draw_specific_fields(ui, fonts, assets, state),
         }
     }
 
@@ -84,6 +86,7 @@ impl PropertiesUI for ElementWrapper {
             Element::Component(e) => e.get_preview_content(ui, fonts, state),
             Element::Carousel(e) => e.get_preview_content(ui, fonts, state),
             Element::Native(e) => e.get_preview_content(ui, fonts, state),
+            Element::Minimap(_) => None,
         }
     }
 
@@ -101,6 +104,7 @@ impl PropertiesUI for ElementWrapper {
             Element::Component(e) => e.has_specific_fields(),
             Element::Carousel(e) => e.has_specific_fields(),
             Element::Native(e) => e.has_specific_fields(),
+            Element::Minimap(_) => true,
         }
     }
 }
@@ -149,6 +153,7 @@ pub fn draw_properties_panel(
                                 Element::Component(c) => format!("{:?}", c.type_),
                                 Element::List(_) => "List Container".to_string(),
                                 Element::String(_) => "Dynamic String".to_string(),
+                                Element::Minimap(_) => "Minimap".to_string(),
                                 _ => el.display_name(),
                             }
                         };
