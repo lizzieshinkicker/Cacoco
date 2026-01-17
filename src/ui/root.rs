@@ -551,6 +551,10 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
 /// Dispatches menu actions to application logic.
 fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::Context) {
     match action {
+        ui::MenuAction::NewProject => {
+            app.doc = None;
+            app.creation_modal = crate::app::CreationModal::LumpSelector;
+        }
         ui::MenuAction::LoadProject(loaded, path) => app.load_project(ctx, loaded, &path),
         ui::MenuAction::Open => app.open_project_ui(ctx),
         ui::MenuAction::RequestDiscard(pending) => {

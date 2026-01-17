@@ -165,12 +165,8 @@ pub fn draw_confirmation_modal(
                 }
                 match pending {
                     PendingAction::New => {
-                        ctx.data_mut(|d: &mut egui::util::IdTypeMap| {
-                            d.insert_temp(
-                                egui::Id::new("creation_modal_type"),
-                                crate::app::CreationModal::LumpSelector,
-                            )
-                        });
+                        app.doc = None;
+                        app.creation_modal = crate::app::CreationModal::LumpSelector;
                     }
                     PendingAction::Load(path) => {
                         if path.is_empty() {
