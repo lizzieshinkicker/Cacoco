@@ -10,10 +10,6 @@ fn default_version() -> String {
     "1.2.0".to_string()
 }
 
-fn is_zero(num: &i32) -> bool {
-    *num == 0
-}
-
 /// A helper for serde to handle null values by falling back to the Default implementation.
 fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
@@ -473,16 +469,6 @@ pub struct GraphicDef {
     pub common: CommonAttrs,
     /// The lump name of the patch to draw.
     pub patch: String,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub width: i32,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub height: i32,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub topoffset: i32,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub leftoffset: i32,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub midoffset: i32,
     /// Optional cropping parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crop: Option<CropDef>,
@@ -520,16 +506,6 @@ pub struct FrameDef {
 pub struct FaceDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
-    #[serde(default)]
-    pub width: i32,
-    #[serde(default)]
-    pub height: i32,
-    #[serde(default)]
-    pub topoffset: i32,
-    #[serde(default)]
-    pub leftoffset: i32,
-    #[serde(default)]
-    pub midoffset: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crop: Option<CropDef>,
 }

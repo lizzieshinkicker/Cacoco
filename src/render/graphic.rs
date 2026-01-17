@@ -4,11 +4,7 @@ use crate::models::sbardef::*;
 use eframe::egui;
 
 /// Renders a single static Graphic element into the viewport.
-pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, mut pos: egui::Pos2, alpha: f32) {
-    if def.midoffset != 0 {
-        pos.x += def.midoffset as f32;
-    }
-
+pub(super) fn draw_graphic(ctx: &RenderContext, def: &GraphicDef, pos: egui::Pos2, alpha: f32) {
     let patch_id = AssetId::new(&def.patch);
     draw_simple_graphic_patch(ctx, patch_id, pos, def.common.alignment, alpha, &def.crop);
 }
