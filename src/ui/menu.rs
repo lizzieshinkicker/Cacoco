@@ -15,6 +15,7 @@ pub enum MenuAction {
     SaveDone(String),
     ExportDone(String),
     SetTarget(crate::models::sbardef::ExportTarget),
+    NewProject,
 }
 
 /// Draws the primary application menu bar (File, Run, Target).
@@ -100,12 +101,7 @@ pub fn draw_menu_bar(
                 if dirty {
                     action = MenuAction::RequestDiscard(PendingAction::New);
                 } else {
-                    ui.data_mut(|d| {
-                        d.insert_temp(
-                            egui::Id::new("creation_modal_type"),
-                            CreationModal::LumpSelector,
-                        )
-                    });
+                    action = MenuAction::NewProject;
                 }
                 ContextMenu::close(ui);
             }

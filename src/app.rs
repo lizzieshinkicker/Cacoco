@@ -236,14 +236,20 @@ impl CacocoApp {
 
                 let data = crate::models::ProjectData::StatusBar(parsed_file);
                 self.active_mode = ProjectMode::from_data(&data);
-                self.doc = Some(ProjectDocument::new(data, None));
+                if let Some(doc) = &mut self.doc {
+                    doc.lumps
+                        .retain(|l| !matches!(l, crate::models::ProjectData::StatusBar(_)));
+                    doc.lumps.push(data);
+                    doc.dirty = true;
+                } else {
+                    self.doc = Some(ProjectDocument::new(data, None));
+                    self.assets = AssetStore::default();
+                    self.preview_state = PreviewState::default();
 
-                self.assets = AssetStore::default();
-                self.preview_state = PreviewState::default();
-
-                self.load_system_assets(ctx);
-                if let Some(path) = &self.config.base_wad_path {
-                    io::load_wad_from_path(ctx, path, &mut self.assets);
+                    self.load_system_assets(ctx);
+                    if let Some(path) = &self.config.base_wad_path {
+                        io::load_wad_from_path(ctx, path, &mut self.assets);
+                    }
                 }
 
                 self.last_selection.clear();
