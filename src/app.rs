@@ -59,6 +59,7 @@ pub enum PendingAction {
 #[allow(dead_code)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
+    DeleteSky(usize),
     DeleteLayers(Vec<Vec<usize>>),
     DeleteAssets(Vec<String>),
     DiscardChanges(PendingAction),
@@ -285,7 +286,7 @@ impl CacocoApp {
 
             if doc.selection.len() == 1 {
                 let path = doc.selection.iter().next().unwrap();
-                if path.len() == 1 && self.active_mode == ProjectMode::SBarDef {
+                if path.len() == 1 {
                     self.current_statusbar_idx = path[0];
                 }
             }

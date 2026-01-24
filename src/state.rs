@@ -240,6 +240,7 @@ pub struct EditorContext {
     pub display_weapon_slot: u8,
     pub display_super_shotgun: bool,
     pub weapon_offset_y: f32,
+    pub sky_yaw: i32,
 }
 
 /// The top-level state object representing everything the editor knows about the "Game".

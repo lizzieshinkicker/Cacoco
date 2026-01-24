@@ -1,4 +1,5 @@
 mod layout;
+mod sky;
 mod tree;
 
 use crate::app::ProjectMode;
@@ -60,6 +61,10 @@ pub enum LayerAction {
     Select(Vec<Vec<usize>>),
     /// Toggles the selection state of specific paths (Multi-select support).
     ToggleSelection(Vec<Vec<usize>>),
+    /// Adds a new sky definition.
+    AddSky,
+    /// Deletes a sky definition by index.
+    DeleteSky(usize),
 }
 
 /// Manages a collection of ID24 lumps, their selection, and its modification history.
@@ -120,8 +125,8 @@ impl ProjectDocument {
                         .iter_mut()
                         .find(|l| ProjectMode::from_data(l) == active_mode);
 
-                    if let Some(ProjectData::StatusBar(sbar)) = active_lump {
-                        match action {
+                    match active_lump {
+                        Some(ProjectData::StatusBar(sbar)) => match action {
                             LayerAction::AddStatusBar
                             | LayerAction::DuplicateStatusBar(_)
                             | LayerAction::MoveStatusBar { .. }
@@ -132,7 +137,11 @@ impl ProjectDocument {
                             _ => {
                                 tree::execute_tree_action(sbar, action, selection_ref);
                             }
+                        },
+                        Some(ProjectData::Sky(sky_file)) => {
+                            sky::execute_sky_action(sky_file, action, selection_ref);
                         }
+                        _ => {}
                     }
                 }
             }

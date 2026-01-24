@@ -140,11 +140,9 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(lump) = d.lumps.first() {
-                        if let Some(sbar) = lump.as_sbar() {
-                            if let Some(path) = io::save_pk3_dialog(sbar, assets, d.path.clone()) {
-                                action = MenuAction::SaveDone(path);
-                            }
+                    if let Some(lump) = d.get_lump(active_mode) {
+                        if let Some(path) = io::save_pk3_dialog(lump, assets, d.path.clone()) {
+                            action = MenuAction::SaveDone(path);
                         }
                     }
                 }
@@ -165,7 +163,9 @@ pub fn draw_menu_bar(
                 if let Some(d) = doc {
                     if let Some(lump) = d.get_lump(active_mode) {
                         let sanitized = lump.to_sanitized_json(assets);
-                        if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone())
+                        let name = lump.standard_lump_name();
+                        if let Some(path) =
+                            io::save_wad_dialog(name, &sanitized, assets, d.path.clone())
                         {
                             action = MenuAction::ExportDone(path);
                         }
@@ -206,12 +206,15 @@ pub fn draw_menu_bar(
                         {
                             if let Some(lump) = d.get_lump(active_mode) {
                                 let sanitized = lump.to_sanitized_json(assets);
+                                let name = lump.standard_lump_name();
                                 io::launch_game(
+                                    name,
                                     &sanitized,
                                     assets,
                                     &port.command,
                                     iwad,
                                     lump.target(),
+                                    lump,
                                 );
                             }
                         }

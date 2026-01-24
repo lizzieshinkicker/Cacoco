@@ -244,6 +244,40 @@ pub fn combobox_button(ui: &mut egui::Ui, text: &str, width: f32) -> egui::Respo
     response
 }
 
+/// A version of draw_scaled_image that works with raw IDs and sizes to satisfy the borrow checker.
+pub fn draw_scaled_texture_id(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    tex_id: egui::TextureId,
+    tex_size: egui::Vec2,
+    tint: egui::Color32,
+    max_scale: f32,
+) {
+    if tex_size.x > 0.0 && tex_size.y > 0.0 {
+        let raw_scale = (rect.width() / tex_size.x)
+            .min(rect.height() / tex_size.y)
+            .min(max_scale);
+
+        let scale = if raw_scale >= 1.0 {
+            raw_scale.floor()
+        } else {
+            raw_scale
+        };
+        let final_size = tex_size * scale;
+
+        let left = (rect.left() + (rect.width() - final_size.x) / 2.0).floor();
+        let top = (rect.top() + (rect.height() - final_size.y) / 2.0).floor();
+        let draw_rect = egui::Rect::from_min_size(egui::pos2(left, top), final_size);
+
+        ui.painter().image(
+            tex_id,
+            draw_rect,
+            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            tint,
+        );
+    }
+}
+
 pub fn truncate_path(path: &str, max_chars: usize) -> String {
     if path.len() <= max_chars {
         return path.to_string();

@@ -16,6 +16,7 @@ use std::collections::HashSet;
 mod browser;
 pub(crate) mod colors;
 mod layouts;
+mod sky;
 pub mod thumbnails;
 pub(crate) mod tree;
 
@@ -165,6 +166,7 @@ pub fn draw_layers_panel(
                         changed |= browser::draw_filtered_browser(
                             ui,
                             assets,
+                            state,
                             &mut sbar_opt,
                             zoom,
                             true,
@@ -181,6 +183,7 @@ pub fn draw_layers_panel(
                         changed |= browser::draw_filtered_browser(
                             ui,
                             assets,
+                            state,
                             &mut sbar_opt,
                             zoom,
                             false,
@@ -521,22 +524,32 @@ pub fn draw_layers_panel(
                     }
                 }
             }
-            ProjectData::Sky(sky) => {
-                shared::heading_action_button(&mut bottom_ui, "Skies", Some("Add Sky"), false);
+            ProjectData::Sky(sky_file) => {
+                if shared::heading_action_button(&mut bottom_ui, "Skies", Some("Add Sky"), false)
+                    .clicked()
+                {
+                    actions.push(LayerAction::UndoSnapshot);
+                    actions.push(LayerAction::AddSky);
+                }
+
                 egui::ScrollArea::vertical()
                     .id_salt("sky_scroll")
+                    .auto_shrink([false, false])
                     .show(&mut bottom_ui, |ui| {
-                        for (i, def) in sky.data.skies.iter().enumerate() {
-                            let is_selected = selection.contains(&vec![i]);
-                            let res = thumbnails::ListRow::new(&def.name)
-                                .subtitle(format!("Type: {:?}", def.sky_type))
-                                .selected(is_selected)
-                                .show(ui);
-                            if res.clicked() {
-                                selection.clear();
-                                selection.insert(vec![i]);
-                            }
-                        }
+                        egui::Frame::NONE
+                            .inner_margin(egui::Margin::symmetric(2, 0))
+                            .show(ui, |ui| {
+                                sky::draw_sky_layers_list(
+                                    ui,
+                                    sky_file,
+                                    selection,
+                                    current_bar_idx,
+                                    assets,
+                                    &mut actions,
+                                    confirmation_modal,
+                                );
+                            });
+                        ui.add_space(2.0);
                     });
             }
             _ => {

@@ -57,6 +57,7 @@ pub enum EditorEvent {
     ImportImages(usize),
     ImportFolder(usize),
     AssetsDeleted,
+    AssetsFlipped(usize),
     Pickup(MessageItem),
     Cheat(String),
 }
@@ -78,6 +79,7 @@ pub fn log_event(state: &mut PreviewState, event: EditorEvent) {
         EditorEvent::ImportImages(count) => format!("Imported {} images.", count),
         EditorEvent::ImportFolder(count) => format!("Imported {} images from folder.", count),
         EditorEvent::AssetsDeleted => "Deleted assets from project.".to_string(),
+        EditorEvent::AssetsFlipped(count) => format!("Flipped {} assets horizontally.", count),
         EditorEvent::Cheat(m) => m,
         EditorEvent::Pickup(item) => match item {
             MessageItem::BlueCard => "Picked up a blue keycard.",

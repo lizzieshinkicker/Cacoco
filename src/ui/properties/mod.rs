@@ -20,6 +20,7 @@ mod graphics;
 mod list;
 mod lookups;
 pub(crate) mod preview;
+mod skydefs;
 mod text;
 pub mod text_helper;
 
@@ -384,35 +385,14 @@ pub fn draw_properties_panel(
                         }
                     } else {
                         match f {
-                            ProjectData::Sky(sky) => {
-                                if let Some(s) = sky.data.skies.get_mut(path[0]) {
-                                    ui.vertical_centered(|ui| {
-                                        ui.horizontal(|ui| {
-                                            ui.label("Sky Name:");
-                                            let mut buf = s.name.clone();
-                                            if ui.text_edit_singleline(&mut buf).changed() {
-                                                s.name = buf;
-                                                changed = true;
-                                            }
-                                        });
-                                        ui.horizontal(|ui| {
-                                            ui.label("Mid Texel:");
-                                            changed |= ui.add(egui::DragValue::new(&mut s.mid)).changed();
-                                        });
-                                        ui.horizontal(|ui| {
-                                            ui.label("Scroll X:");
-                                            changed |= ui.add(egui::DragValue::new(&mut s.scrollx)).changed();
-                                            ui.label("Scroll Y:");
-                                            changed |= ui.add(egui::DragValue::new(&mut s.scrolly)).changed();
-                                        });
-                                        ui.horizontal(|ui| {
-                                            ui.label("Scale X:");
-                                            changed |= ui.add(egui::DragValue::new(&mut s.scalex)).changed();
-                                            ui.label("Scale Y:");
-                                            changed |= ui.add(egui::DragValue::new(&mut s.scaley)).changed();
-                                        });
-                                    });
-                                }
+                            ProjectData::Sky(sky_file) => {
+                                changed |= skydefs::draw_skydefs_editor(
+                                    ui,
+                                    sky_file,
+                                    path,
+                                    assets,
+                                    state
+                                );
                             }
                             _ => {
                                 ui.vertical_centered(|ui| {

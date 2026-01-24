@@ -364,6 +364,28 @@ pub fn draw_viewport(
             render_id24_background(&mut viewport_ui, &fin.data.background, assets, &proj);
             preview_state.editor.hovered_path = None;
         }
+        Some(ProjectData::Sky(sky_file)) => {
+            let sky_idx = current_bar_idx.min(sky_file.data.skies.len().saturating_sub(1));
+            if let Some(sky) = sky_file.data.skies.get(sky_idx) {
+                let time = ui.input(|i| i.time);
+                render::sky::draw_sky_view(
+                    viewport_ui.painter(),
+                    sky,
+                    assets,
+                    preview_state,
+                    &proj,
+                    time,
+                );
+            } else {
+                viewport_ui
+                    .painter()
+                    .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
+                viewport_ui.centered_and_justified(|ui| {
+                    ui.label("No Sky selected.");
+                });
+            }
+            preview_state.editor.hovered_path = None;
+        }
         _ => {
             viewport_ui
                 .painter()
@@ -387,6 +409,8 @@ pub fn draw_viewport(
         &effective_selection,
         &viewport_res,
         is_panning,
+        Default::default(),
+        &mut Default::default(),
     ));
 
     if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {

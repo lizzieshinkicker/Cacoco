@@ -56,6 +56,14 @@ impl Default for AssetStore {
 }
 
 impl AssetStore {
+    /// Sampler settings that allow Doom textures to repeat infinitely.
+    const REPEAT_OPTIONS: egui::TextureOptions = egui::TextureOptions {
+        magnification: egui::TextureFilter::Nearest,
+        minification: egui::TextureFilter::Nearest,
+        wrap_mode: egui::TextureWrapMode::Repeat,
+        mipmap_mode: None,
+    };
+
     /// Standardized method to convert any path or filename into a clean Doom key.
     ///
     /// Converts to uppercase and removes file extensions.
@@ -71,10 +79,7 @@ impl AssetStore {
     pub fn load_image(&mut self, ctx: &egui::Context, name: &str, bytes: &[u8]) {
         let id = AssetId::new(name);
         self.raw_files.insert(id, bytes.to_vec());
-
-        // Preserve the full name (e.g. "graphics/my_patch.png") for PK3 export.
         self.names.insert(id, name.to_string());
-
         self.load_texture_only(ctx, name, bytes);
     }
 
@@ -121,7 +126,7 @@ impl AssetStore {
     }
 
     fn load_texture_only(&mut self, ctx: &egui::Context, name: &str, bytes: &[u8]) {
-        self.load_image_from_bytes(ctx, name, bytes, egui::TextureOptions::NEAREST);
+        self.load_image_from_bytes(ctx, name, bytes, Self::REPEAT_OPTIONS);
     }
 
     /// Loads an image with linear filtering.
@@ -144,7 +149,7 @@ impl AssetStore {
 
         let color_image =
             egui::ColorImage::from_rgba_unmultiplied([width as _, height as _], pixels);
-        self.create_and_store_texture(ctx, name, color_image, egui::TextureOptions::NEAREST);
+        self.create_and_store_texture(ctx, name, color_image, Self::REPEAT_OPTIONS);
     }
 
     /// Loads raw RGBA pixels and registers a Doom patch offset.
@@ -231,6 +236,48 @@ impl AssetStore {
             }
         } else {
             AssetId::new(&format!("{}{:03}", stem, c_upper as u32))
+        }
+    }
+
+    /// Specialized resolver for Sky textures that handles the SKY/RSKY naming fallback.
+    pub fn resolve_sky_id(&self, name: &str) -> AssetId {
+        let mut id = AssetId::new(name);
+
+        if !self.textures.contains_key(&id) {
+            if name.starts_with("SKY") {
+                let fallback = format!("R{}", name);
+                id = AssetId::new(&fallback);
+            } else if name.starts_with("RSKY") {
+                if let Some(fallback) = name.strip_prefix('R') {
+                    id = AssetId::new(fallback);
+                }
+            }
+        }
+
+        id
+    }
+
+    /// Decodes an asset, flips it horizontally, and re-saves the result.
+    pub fn flip_asset_horizontal(&mut self, ctx: &egui::Context, id: AssetId) {
+        if let Some(bytes) = self.raw_files.get(&id) {
+            if let Ok(img) = image::load_from_memory(bytes) {
+                let flipped = img.fliph();
+                let mut buffer = std::io::Cursor::new(Vec::new());
+
+                if flipped
+                    .write_to(&mut buffer, image::ImageFormat::Png)
+                    .is_ok()
+                {
+                    let new_bytes = buffer.into_inner();
+                    let name = self
+                        .names
+                        .get(&id)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
+
+                    self.load_image(ctx, &name, &new_bytes);
+                }
+            }
         }
     }
 }

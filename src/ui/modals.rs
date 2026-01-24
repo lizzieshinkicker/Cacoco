@@ -83,6 +83,9 @@ pub fn draw_confirmation_modal(
                 ConfirmationRequest::DeleteStatusBar(_) => {
                     ui.label("Delete this status bar layout?");
                 }
+                ConfirmationRequest::DeleteSky(_) => {
+                    ui.label("Delete this sky definition?");
+                }
                 ConfirmationRequest::DeleteLayers(paths) => {
                     ui.label(format!("Delete {} selected layers?", paths.len()));
                 }
@@ -136,6 +139,13 @@ pub fn draw_confirmation_modal(
                 app.execute_actions(vec![
                     document::LayerAction::UndoSnapshot,
                     document::LayerAction::DeleteStatusBar(*idx),
+                ]);
+                messages::log_event(&mut app.preview_state, EditorEvent::Delete);
+            }
+            ConfirmationRequest::DeleteSky(idx) => {
+                app.execute_actions(vec![
+                    document::LayerAction::UndoSnapshot,
+                    document::LayerAction::DeleteSky(*idx),
                 ]);
                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }

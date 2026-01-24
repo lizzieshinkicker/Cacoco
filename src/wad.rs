@@ -13,7 +13,7 @@ static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
         "ST", "WI", "M_", "BRDR", "DGT", "NUM", "PRCN", "MINUS", "PUNG", "SAWG", "PISG", "SHTG",
         "SHT2", "CHGG", "MISG", "PLSG", "BFGG", "BKEY", "YKEY", "RKEY", "BSKU", "YSKU", "RSKU",
         "PINV", "PSTR", "PINS", "SUIT", "PMAP", "PVIS", "ARM", "MEDI", "BPAK", "AMMO", "SHEL",
-        "CELL", "ROCK", "INTER", "FINALE", "TITLE", "PAT", "GRN",
+        "CELL", "ROCK", "INTER", "FINALE", "TITLE", "PAT", "GRN", "SKY", "RSKY", "F_SKY",
     ];
     prefixes.into_iter().collect()
 });
@@ -101,7 +101,8 @@ fn is_graphic_lump(name: &str) -> bool {
 
 pub fn write_wad_to_file<W: Write + Seek>(
     writer: &mut W,
-    sbardef_json: &[u8],
+    lump_name: &str,
+    json_bytes: &[u8],
     assets: &AssetStore,
 ) -> anyhow::Result<()> {
     writer.write_all(b"PWAD")?;
@@ -120,11 +121,17 @@ pub fn write_wad_to_file<W: Write + Seek>(
     let mut records = Vec::new();
 
     let pos = writer.stream_position()? as u32;
-    writer.write_all(sbardef_json)?;
+    writer.write_all(json_bytes)?;
     records.push(LumpRecord {
         pos,
-        size: sbardef_json.len() as u32,
-        name: "SBARDEF".to_string(),
+        size: json_bytes.len() as u32,
+        name: lump_name.to_string(),
+    });
+
+    records.push(LumpRecord {
+        pos: writer.stream_position()? as u32,
+        size: 0,
+        name: "TX_START".to_string(),
     });
 
     for (id, bytes) in &assets.raw_files {
@@ -144,6 +151,12 @@ pub fn write_wad_to_file<W: Write + Seek>(
             name: stem,
         });
     }
+
+    records.push(LumpRecord {
+        pos: writer.stream_position()? as u32,
+        size: 0,
+        name: "TX_END".to_string(),
+    });
 
     let directory_pos = writer.stream_position()? as u32;
     for rec in records {

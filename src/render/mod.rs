@@ -14,6 +14,7 @@ pub mod list;
 pub mod palette;
 pub mod patch;
 pub mod projection;
+pub(crate) mod sky;
 pub mod text;
 
 /// Defines whether an element is being drawn in the standard background pass
