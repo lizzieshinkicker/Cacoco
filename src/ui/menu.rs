@@ -140,10 +140,8 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(lump) = d.get_lump(active_mode) {
-                        if let Some(path) = io::save_pk3_dialog(lump, assets, d.path.clone()) {
-                            action = MenuAction::SaveDone(path);
-                        }
+                    if let Some(path) = io::save_pk3_dialog(&d.lumps, assets, d.path.clone()) {
+                        action = MenuAction::SaveDone(path);
                     }
                 }
                 ContextMenu::close(ui);
@@ -161,14 +159,8 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Export WAD...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(lump) = d.get_lump(active_mode) {
-                        let sanitized = lump.to_sanitized_json(assets);
-                        let name = lump.standard_lump_name();
-                        if let Some(path) =
-                            io::save_wad_dialog(name, &sanitized, assets, d.path.clone())
-                        {
-                            action = MenuAction::ExportDone(path);
-                        }
+                    if let Some(path) = io::save_wad_dialog(&d.lumps, assets, d.path.clone()) {
+                        action = MenuAction::ExportDone(path);
                     }
                 }
                 ContextMenu::close(ui);
@@ -204,19 +196,13 @@ pub fn draw_menu_bar(
                     if ContextMenu::button(ui, &format!("Launch in {}", port.name), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
-                            if let Some(lump) = d.get_lump(active_mode) {
-                                let sanitized = lump.to_sanitized_json(assets);
-                                let name = lump.standard_lump_name();
-                                io::launch_game(
-                                    name,
-                                    &sanitized,
-                                    assets,
-                                    &port.command,
-                                    iwad,
-                                    lump.target(),
-                                    lump,
-                                );
-                            }
+                            io::launch_game(
+                                assets,
+                                &port.command,
+                                iwad,
+                                d.lumps[0].target(),
+                                &d.lumps,
+                            );
                         }
                         ContextMenu::close(ui);
                     }
@@ -365,7 +351,7 @@ pub fn draw_settings_window(
                                                 - label_width
                                                 - browse_button_width
                                                 - ui.spacing().item_spacing.x
-                                                - 16.0; // frame margin
+                                                - 16.0;
                                             ui.add(
                                                 egui::TextEdit::singleline(&mut port.command)
                                                     .hint_text("Executable path or command")

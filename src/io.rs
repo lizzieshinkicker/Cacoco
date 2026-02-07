@@ -78,29 +78,35 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
     let file = fs::File::open(path).ok()?;
     let mut archive = zip::ZipArchive::new(file).ok()?;
 
-    let mut sbardef_content = String::new();
+    let mut definition_content = String::new();
     let mut found_def = false;
+
+    let valid_lumps = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE"];
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
         let name = file.name();
-        if name.eq_ignore_ascii_case("SBARDEF")
-            || name.eq_ignore_ascii_case("SBARDEF.txt")
-            || name.eq_ignore_ascii_case("SBARDEF.json")
-        {
-            if let Ok(_) = file.read_to_string(&mut sbardef_content) {
+
+        let stem = Path::new(name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+
+        if valid_lumps.iter().any(|&l| l.eq_ignore_ascii_case(stem)) {
+            if file.read_to_string(&mut definition_content).is_ok() {
                 found_def = true;
+                break;
             }
-            break;
         }
     }
 
     if !found_def {
-        eprintln!("Error: No SBARDEF file found in PK3.");
+        eprintln!("Error: No valid ID24 definition lump (SBARDEF, SKYDEFS, etc.) found in PK3.");
         return None;
     }
 
-    let parsed_file = match serde_json::from_str::<crate::models::ProjectData>(&sbardef_content) {
+    let parsed_file = match serde_json::from_str::<crate::models::ProjectData>(&definition_content)
+    {
         Ok(mut f) => {
             f.normalize_for_target();
             f
@@ -133,7 +139,7 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
 /// Internal helper to compress project data into a PK3 structure.
 fn build_pk3<W: Write + Seek>(
     writer: W,
-    project_data: &crate::models::ProjectData,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
 ) -> anyhow::Result<()> {
     let mut zip = ZipWriter::new(writer);
@@ -141,36 +147,60 @@ fn build_pk3<W: Write + Seek>(
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
-    let lump_name = project_data.standard_lump_name();
-    let json_content = project_data.to_sanitized_json(assets);
+    let has_skydefs = lumps.iter().any(|l| l.standard_lump_name() == "SKYDEFS");
 
-    zip.start_file(lump_name, options)?;
-    zip.write_all(json_content.as_bytes())?;
+    for lump in lumps {
+        zip.start_file(lump.standard_lump_name(), options)?;
+        zip.write_all(lump.to_sanitized_json(assets).as_bytes())?;
+    }
 
-    for (id, bytes) in &assets.raw_files {
-        let original_name = assets
-            .names
-            .get(id)
-            .cloned()
-            .unwrap_or_else(|| format!("{}.png", id));
+    if has_skydefs {
+        let umapinfo_text = wad::generate_simple_umapinfo(assets);
+        if !umapinfo_text.is_empty() {
+            zip.start_file("UMAPINFO", options)?;
+            zip.write_all(umapinfo_text.as_bytes())?;
+        }
+        let merged_pnames = wad::build_merged_pnames(assets);
+        let merged_texture1 = wad::build_merged_texture1(&merged_pnames, assets);
+        let pnames_data = wad::serialize_pnames(&merged_pnames);
+        zip.start_file("PNAMES", options)?;
+        zip.write_all(&pnames_data)?;
+        zip.start_file("TEXTURE1", options)?;
+        zip.write_all(&merged_texture1)?;
 
-        if original_name.contains('/') || original_name.contains('\\') {
-            zip.start_file(&original_name, options)?;
+        for (id, bytes) in &assets.raw_files {
+            let name = assets
+                .names
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("{}", id));
+            let mut stem = AssetStore::stem(&name);
+            stem.truncate(8);
+
+            zip.start_file(stem, options)?;
             zip.write_all(bytes)?;
-        } else {
-            let stem = AssetStore::stem(&original_name);
-            let ext = Path::new(&original_name)
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("png");
-
-            let tex_path = format!("textures/{}.{}", stem, ext);
-            zip.start_file(tex_path, options)?;
-            zip.write_all(bytes)?;
-
-            let graph_path = format!("graphics/{}.{}", stem, ext);
-            zip.start_file(graph_path, options)?;
-            zip.write_all(bytes)?;
+        }
+    } else {
+        for (id, bytes) in &assets.raw_files {
+            let original_name = assets
+                .names
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("{}.png", id));
+            if original_name.contains('/') || original_name.contains('\\') {
+                zip.start_file(&original_name, options)?;
+                zip.write_all(bytes)?;
+            } else {
+                let stem = AssetStore::stem(&original_name);
+                let ext = Path::new(&original_name)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("png");
+                zip.start_file(format!("textures/{}.{}", stem, ext), options)?;
+                zip.write_all(bytes)?;
+                zip.start_file(format!("graphics/{}.{}", stem, ext), options)?;
+                zip.write_all(bytes)?;
+            }
         }
     }
 
@@ -203,7 +233,7 @@ pub fn save_json_dialog(json_content: &str, opened_path: Option<String>) -> Opti
 }
 
 pub fn save_pk3_dialog(
-    project_data: &crate::models::ProjectData,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
     opened_path: Option<String>,
 ) -> Option<String> {
@@ -219,7 +249,7 @@ pub fn save_pk3_dialog(
         let mut final_name = p
             .file_name()
             .and_then(|s| s.to_str())
-            .unwrap_or("status_bar.pk3")
+            .unwrap_or("project.pk3")
             .to_string();
         let lower = final_name.to_lowercase();
         if !lower.ends_with(".pk3") && !lower.ends_with(".zip") {
@@ -227,13 +257,13 @@ pub fn save_pk3_dialog(
         }
         dialog = dialog.set_file_name(&final_name);
     } else {
-        dialog = dialog.set_file_name("status_bar.pk3");
+        dialog = dialog.set_file_name("project.pk3");
     }
 
     if let Some(path) = dialog.save_file() {
         match fs::File::create(&path) {
             Ok(fs_file) => {
-                if let Err(e) = build_pk3(fs_file, project_data, assets) {
+                if let Err(e) = build_pk3(fs_file, lumps, assets) {
                     eprintln!("Failed to build PK3: {}", e);
                 } else {
                     return Some(path.to_string_lossy().into_owned());
@@ -246,8 +276,7 @@ pub fn save_pk3_dialog(
 }
 
 pub fn save_wad_dialog(
-    lump_name: &str,
-    json_content: &str,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
     opened_path: Option<String>,
 ) -> Option<String> {
@@ -257,18 +286,15 @@ pub fn save_wad_dialog(
 
     if let Some(p_str) = opened_path {
         let p = Path::new(&p_str);
-        let stem = p
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("status_bar");
+        let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("project");
         dialog = dialog.set_file_name(format!("{}.wad", stem));
     } else {
-        dialog = dialog.set_file_name("status_bar.wad");
+        dialog = dialog.set_file_name("project.wad");
     }
 
     if let Some(path) = dialog.save_file() {
         if let Ok(mut f) = fs::File::create(&path) {
-            if wad::write_wad_to_file(&mut f, lump_name, json_content.as_bytes(), assets).is_ok() {
+            if wad::write_wad_to_file(&mut f, lumps, assets).is_ok() {
                 return Some(path.to_string_lossy().into_owned());
             }
         }
@@ -277,13 +303,13 @@ pub fn save_wad_dialog(
 }
 
 pub fn save_pk3_silent(
-    project_data: &crate::models::ProjectData,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
     path_str: &str,
 ) -> anyhow::Result<()> {
     let path = Path::new(path_str);
     let fs_file = fs::File::create(path)?;
-    build_pk3(fs_file, project_data, assets)?;
+    build_pk3(fs_file, lumps, assets)?;
     Ok(())
 }
 
@@ -321,13 +347,11 @@ pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut Asse
 /// If targeting 'Basic', it produces a temporary .WAD for KEX compatibility.
 /// Otherwise, it produces a temporary .PK3.
 pub fn launch_game(
-    lump_name: &str,
-    _json_content: &str,
     assets: &AssetStore,
     source_port: &str,
     iwad: &str,
     target: ExportTarget,
-    project_data: &crate::models::ProjectData,
+    lumps: &[crate::models::ProjectData],
 ) {
     let mut temp_path = env::temp_dir();
     let extension = if target == ExportTarget::Basic {
@@ -340,12 +364,10 @@ pub fn launch_game(
 
     match fs::File::create(&temp_path) {
         Ok(mut fs_file) => {
-            if target == ExportTarget::Basic {
-                let sanitized = project_data.to_sanitized_json(assets);
-                let _ =
-                    wad::write_wad_to_file(&mut fs_file, lump_name, sanitized.as_bytes(), assets);
+            if extension == "wad" {
+                let _ = wad::write_wad_to_file(&mut fs_file, lumps, assets);
             } else {
-                let _ = build_pk3(fs_file, project_data, assets);
+                let _ = build_pk3(fs_file, lumps, assets);
             }
         }
         Err(e) => {
@@ -459,6 +481,7 @@ mod tests {
             data: Default::default(),
         };
         let project_data = crate::models::ProjectData::StatusBar(file);
+        let lumps = vec![project_data];
 
         let mut assets = AssetStore::default();
         let dummy_bytes = vec![0u8; 10];
@@ -474,7 +497,7 @@ mod tests {
             .insert(id_path, "graphics/patch.png".to_string());
 
         let mut buffer = Cursor::new(Vec::new());
-        build_pk3(&mut buffer, &project_data, &assets).expect("Failed to build PK3");
+        build_pk3(&mut buffer, &lumps, &assets).expect("Failed to build PK3");
 
         let mut zip = zip::ZipArchive::new(buffer).expect("Failed to open built ZIP");
 

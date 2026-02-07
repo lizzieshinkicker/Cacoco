@@ -147,6 +147,23 @@ impl ProjectData {
 
         serde_json::to_string_pretty(&root).unwrap_or_default()
     }
+
+    /// Returns a list of all unique texture names referenced by this project
+    /// that require legacy TEXTURE1/PNAMES registration (mostly for SKYDEFS).
+    pub fn get_legacy_texture_names(&self) -> Vec<String> {
+        let mut names = std::collections::HashSet::new();
+        if let ProjectData::Sky(sky_file) = self {
+            for sky in &sky_file.data.skies {
+                names.insert(sky.name.to_uppercase());
+                if let Some(fore) = &sky.foregroundtex {
+                    names.insert(fore.name.to_uppercase());
+                }
+            }
+        }
+        let mut list: Vec<String> = names.into_iter().collect();
+        list.sort();
+        list
+    }
 }
 
 fn sanitize_json_value(v: &mut serde_json::Value) {

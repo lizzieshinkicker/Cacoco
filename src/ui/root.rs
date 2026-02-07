@@ -353,32 +353,27 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Save => {
             if let Some(doc) = &mut app.doc {
-                if let Some(lump) = doc.get_lump(app.active_mode) {
-                    let needs_dialog = match &doc.path {
-                        Some(p) => !Path::new(p).is_absolute(),
-                        None => true,
-                    };
-                    if needs_dialog {
-                        if let Some(p) =
-                            crate::io::save_pk3_dialog(lump, &app.assets, doc.path.clone())
-                        {
-                            doc.path = Some(p.clone());
-                            doc.dirty = false;
-                            app.add_to_recent(&p);
-                            messages::log_event(
-                                &mut app.preview_state,
-                                EditorEvent::ProjectSaved(p),
-                            );
-                        }
-                    } else {
-                        let p = doc.path.as_ref().unwrap();
-                        if crate::io::save_pk3_silent(lump, &app.assets, p).is_ok() {
-                            doc.dirty = false;
-                            messages::log_event(
-                                &mut app.preview_state,
-                                EditorEvent::ProjectSaved(p.clone()),
-                            );
-                        }
+                let needs_dialog = match &doc.path {
+                    Some(p) => !Path::new(p).is_absolute(),
+                    None => true,
+                };
+                if needs_dialog {
+                    if let Some(p) =
+                        crate::io::save_pk3_dialog(&doc.lumps, &app.assets, doc.path.clone())
+                    {
+                        doc.path = Some(p.clone());
+                        doc.dirty = false;
+                        app.add_to_recent(&p);
+                        messages::log_event(&mut app.preview_state, EditorEvent::ProjectSaved(p));
+                    }
+                } else {
+                    let p = doc.path.as_ref().unwrap();
+                    if crate::io::save_pk3_silent(&doc.lumps, &app.assets, p).is_ok() {
+                        doc.dirty = false;
+                        messages::log_event(
+                            &mut app.preview_state,
+                            EditorEvent::ProjectSaved(p.clone()),
+                        );
                     }
                 }
             }

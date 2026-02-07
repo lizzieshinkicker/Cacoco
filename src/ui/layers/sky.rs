@@ -24,10 +24,13 @@ pub fn draw_sky_layers_list(
         let id = assets.resolve_sky_id(&def.name);
         let texture = assets.textures.get(&id);
 
-        let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(ui.available_width() - 8.0, 42.0),
-            egui::Sense::click_and_drag(),
-        );
+        let response = ListRow::new(&def.name)
+            .subtitle(format!("Type: {:?}", def.sky_type))
+            .texture(texture)
+            .fallback("?")
+            .selected(is_selected)
+            .active(is_active)
+            .show(ui);
 
         if response.clicked() {
             selection.clear();
@@ -35,15 +38,9 @@ pub fn draw_sky_layers_list(
             *current_idx = i;
         }
 
-        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-            ListRow::new(&def.name)
-                .subtitle(format!("Type: {:?}", def.sky_type))
-                .texture(texture)
-                .fallback("?")
-                .selected(is_selected)
-                .active(is_active)
-                .show(ui);
-        });
+        if response.drag_started() {
+            egui::DragAndDrop::set_payload(ui.ctx(), vec![i]);
+        }
 
         let just_opened = ContextMenu::check(ui, &response);
         if let Some(menu) = ContextMenu::get(ui, response.id) {

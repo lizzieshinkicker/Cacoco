@@ -42,6 +42,12 @@ pub struct AssetStore {
     pub offsets: HashMap<AssetId, (i16, i16)>,
     /// A reverse-lookup to get the original filename (including extension).
     pub names: HashMap<AssetId, String>,
+    /// Original IWAD PNAMES lump data.
+    pub base_pnames: Vec<String>,
+    /// Original IWAD TEXTURE1 lump data.
+    pub base_texture1: Vec<u8>,
+    /// Original IWAD TEXTURE2 lump data.
+    pub base_texture2: Vec<u8>,
 }
 
 impl Default for AssetStore {
@@ -51,6 +57,9 @@ impl Default for AssetStore {
             raw_files: HashMap::new(),
             offsets: HashMap::new(),
             names: HashMap::new(),
+            base_pnames: Vec::new(),
+            base_texture1: Vec::new(),
+            base_texture2: Vec::new(),
         }
     }
 }
