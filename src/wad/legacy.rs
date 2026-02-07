@@ -1,11 +1,11 @@
 //! Handling of legacy binary tables (PNAMES and TEXTURE1/2) required for
 //! actually utilizing the SKYDEFS lump.
 //!
-//! In the immortal words of Elf Alchemist:
+//! In the immortal words of **Elf Alchemist**:
 //!
-//! "it's a very f*cky and fragile system to implement at  this moment, with
+//! *"it's a very f\*cky and fragile system to implement at  this moment, with
 //! the only viable option in the short term to just import from a currently
-//! loaded IWAD/PWAD".
+//! loaded IWAD/PWAD"*.
 
 use super::util::{get_image_dimensions, parse_lump_name};
 use crate::assets::{AssetId, AssetStore};
