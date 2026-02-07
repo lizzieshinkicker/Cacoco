@@ -155,7 +155,7 @@ fn build_pk3<W: Write + Seek>(
     }
 
     if has_skydefs {
-        let umapinfo_text = wad::generate_simple_umapinfo(assets);
+        let umapinfo_text = wad::generate_simple_umapinfo(lumps);
         if !umapinfo_text.is_empty() {
             zip.start_file("UMAPINFO", options)?;
             zip.write_all(umapinfo_text.as_bytes())?;
