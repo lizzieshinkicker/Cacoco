@@ -44,5 +44,5 @@ pub fn get_image_dimensions(bytes: &[u8]) -> (u16, u16) {
         let h = u16::from_le_bytes([bytes[2], bytes[3]]);
         return (w, h);
     }
-    (256, 128) // Default fallback for sky-sized textures
+    (256, 128)
 }

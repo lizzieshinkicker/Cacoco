@@ -3,10 +3,10 @@
 /// Generates a basic UMAPINFO text lump that assigns the first bespoke
 /// sky texture found in the project to MAP01.
 ///
-/// This acts as a bridge for ID24 SKYDEFS, allowing custom-named textures
-/// to be recognized as map skies without overwriting the default RSKY1.
+/// This acts as a TEMPORARY and hacky bridge for ID24 SKYDEFS, allowing custom-named
+/// textures to be recognized as map skies without overwriting the default RSKY1.
+/// Honestly, I'll probably just make a UMAPINFO editor soon.
 pub fn generate_simple_umapinfo(lumps: &[crate::models::ProjectData]) -> String {
-    // Search the project for a SKYDEFS lump
     let sky_lump = lumps.iter().find_map(|l| l.as_sky());
 
     if let Some(sky_file) = sky_lump {
