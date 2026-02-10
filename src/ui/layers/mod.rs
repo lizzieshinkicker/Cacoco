@@ -19,6 +19,7 @@ mod layouts;
 mod sky;
 pub mod thumbnails;
 pub(crate) mod tree;
+mod umapinfo;
 
 const TAB_STATE_KEY: &str = "cacoco_layers_tab_state";
 const LAST_TAB_STATE_KEY: &str = "cacoco_layers_last_tab_state";
@@ -542,6 +543,34 @@ pub fn draw_layers_panel(
                                 sky::draw_sky_layers_list(
                                     ui,
                                     sky_file,
+                                    selection,
+                                    current_bar_idx,
+                                    assets,
+                                    &mut actions,
+                                    confirmation_modal,
+                                );
+                            });
+                        ui.add_space(2.0);
+                    });
+            }
+            ProjectData::UmapInfo(info) => {
+                if shared::heading_action_button(&mut bottom_ui, "Maps", Some("Add Map"), false)
+                    .clicked()
+                {
+                    actions.push(LayerAction::UndoSnapshot);
+                    actions.push(LayerAction::AddMap);
+                }
+
+                egui::ScrollArea::vertical()
+                    .id_salt("umapinfo_scroll")
+                    .auto_shrink([false, false])
+                    .show(&mut bottom_ui, |ui| {
+                        egui::Frame::NONE
+                            .inner_margin(egui::Margin::symmetric(2, 0))
+                            .show(ui, |ui| {
+                                umapinfo::draw_umapinfo_layers_list(
+                                    ui,
+                                    info,
                                     selection,
                                     current_bar_idx,
                                     assets,

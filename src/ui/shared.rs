@@ -278,6 +278,20 @@ pub fn draw_scaled_texture_id(
     }
 }
 
+/// Draws a subtle horizontal divider line.
+pub fn draw_separator_line(ui: &mut egui::Ui) {
+    let stroke_color = ui.visuals().widgets.noninteractive.bg_stroke.color;
+    let (div_rect, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 2.0), egui::Sense::hover());
+    ui.painter().line_segment(
+        [
+            egui::pos2(div_rect.min.x, div_rect.center().y),
+            egui::pos2(div_rect.max.x, div_rect.center().y),
+        ],
+        egui::Stroke::new(1.0, stroke_color.gamma_multiply(0.5)),
+    );
+}
+
 pub fn truncate_path(path: &str, max_chars: usize) -> String {
     if path.len() <= max_chars {
         return path.to_string();

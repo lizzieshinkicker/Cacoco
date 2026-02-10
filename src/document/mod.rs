@@ -1,6 +1,7 @@
 mod layout;
 mod sky;
 mod tree;
+mod umapinfo;
 
 use crate::app::ProjectMode;
 use crate::history::HistoryManager;
@@ -65,6 +66,10 @@ pub enum LayerAction {
     AddSky,
     /// Deletes a sky definition by index.
     DeleteSky(usize),
+    /// Adds a new map entry to UMAPINFO.
+    AddMap,
+    /// Deletes a map entry by index.
+    DeleteMap(usize),
 }
 
 /// Manages a collection of ID24 lumps, their selection, and its modification history.
@@ -140,6 +145,9 @@ impl ProjectDocument {
                         },
                         Some(ProjectData::Sky(sky_file)) => {
                             sky::execute_sky_action(sky_file, action, selection_ref);
+                        }
+                        Some(ProjectData::UmapInfo(info)) => {
+                            umapinfo::execute_umapinfo_action(info, action, selection_ref);
                         }
                         _ => {}
                     }

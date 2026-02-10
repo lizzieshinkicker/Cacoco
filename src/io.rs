@@ -13,7 +13,7 @@ use zip::{CompressionMethod, ZipWriter};
 
 /// Container for a successfully loaded project and its assets.
 pub struct LoadedProject {
-    pub file: crate::models::ProjectData,
+    pub lumps: Vec<crate::models::ProjectData>,
     pub assets: AssetStore,
 }
 
@@ -55,10 +55,11 @@ fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
         Ok(json_content) => match serde_json::from_str::<crate::models::ProjectData>(&json_content)
         {
             Ok(mut parsed_file) => {
+                parsed_file.set_target(parsed_file.determine_target());
                 parsed_file.normalize_for_target();
 
                 Some(LoadedProject {
-                    file: parsed_file,
+                    lumps: vec![parsed_file],
                     assets: AssetStore::default(),
                 })
             }
@@ -77,51 +78,42 @@ fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
 fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
     let file = fs::File::open(path).ok()?;
     let mut archive = zip::ZipArchive::new(file).ok()?;
-
-    let mut definition_content = String::new();
-    let mut found_def = false;
-
-    let valid_lumps = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE"];
+    let mut lumps = Vec::new();
+    let valid_lumps = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE", "UMAPINFO"];
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).unwrap();
-        let name = file.name();
-
-        let stem = Path::new(name)
+        let mut f = archive.by_index(i).unwrap();
+        let name = f.name().to_string();
+        let stem = Path::new(&name)
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
         if valid_lumps.iter().any(|&l| l.eq_ignore_ascii_case(stem)) {
-            if file.read_to_string(&mut definition_content).is_ok() {
-                found_def = true;
-                break;
+            let mut content = String::new();
+            if f.read_to_string(&mut content).is_ok() {
+                if let Ok(mut parsed) = serde_json::from_str::<crate::models::ProjectData>(&content)
+                {
+                    parsed.set_target(parsed.determine_target());
+                    parsed.normalize_for_target();
+                    lumps.push(parsed);
+                } else if stem.eq_ignore_ascii_case("UMAPINFO") {
+                    lumps.push(crate::models::ProjectData::UmapInfo(
+                        crate::models::umapinfo::UmapInfoFile::from_umapinfo_text(&content),
+                    ));
+                }
             }
         }
     }
 
-    if !found_def {
-        eprintln!("Error: No valid ID24 definition lump (SBARDEF, SKYDEFS, etc.) found in PK3.");
+    if lumps.is_empty() {
         return None;
     }
-
-    let parsed_file = match serde_json::from_str::<crate::models::ProjectData>(&definition_content)
-    {
-        Ok(mut f) => {
-            f.normalize_for_target();
-            f
-        }
-        Err(e) => {
-            eprintln!("PK3 Parse Error: {}", e);
-            return None;
-        }
-    };
 
     let mut assets = AssetStore::default();
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
         let name = file.name().to_string();
-
         if name.to_lowercase().starts_with("graphics/") && !name.ends_with('/') {
             let mut buffer = Vec::new();
             if file.read_to_end(&mut buffer).is_ok() {
@@ -130,10 +122,7 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
         }
     }
 
-    Some(LoadedProject {
-        file: parsed_file,
-        assets,
-    })
+    Some(LoadedProject { lumps, assets })
 }
 
 /// Internal helper to compress project data into a PK3 structure.
@@ -147,6 +136,7 @@ fn build_pk3<W: Write + Seek>(
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
+    let has_explicit_umapinfo = lumps.iter().any(|l| l.standard_lump_name() == "UMAPINFO");
     let has_skydefs = lumps.iter().any(|l| l.standard_lump_name() == "SKYDEFS");
 
     for lump in lumps {
@@ -155,10 +145,12 @@ fn build_pk3<W: Write + Seek>(
     }
 
     if has_skydefs {
-        let umapinfo_text = wad::generate_simple_umapinfo(lumps);
-        if !umapinfo_text.is_empty() {
-            zip.start_file("UMAPINFO", options)?;
-            zip.write_all(umapinfo_text.as_bytes())?;
+        if !has_explicit_umapinfo {
+            let umapinfo_text = wad::generate_simple_umapinfo(lumps);
+            if !umapinfo_text.is_empty() {
+                zip.start_file("UMAPINFO", options)?;
+                zip.write_all(umapinfo_text.as_bytes())?;
+            }
         }
         let merged_pnames = wad::build_merged_pnames(assets);
         let merged_texture1 = wad::build_merged_texture1(&merged_pnames, assets);

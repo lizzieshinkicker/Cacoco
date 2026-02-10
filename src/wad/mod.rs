@@ -14,6 +14,7 @@ use eframe::egui;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 
+use crate::models::ProjectData;
 pub use legacy::{build_merged_pnames, build_merged_texture1, serialize_pnames};
 pub use umapinfo::generate_simple_umapinfo;
 pub use util::{is_graphic_lump, parse_lump_name};
@@ -126,7 +127,7 @@ pub fn load_wad_into_store(
 /// legacy PNAMES, TEXTURE1, and UMAPINFO lumps to ensure cross-port compatibility.
 pub fn write_wad_to_file<W: Write + Seek>(
     writer: &mut W,
-    lumps: &[crate::models::ProjectData],
+    lumps: &[ProjectData],
     assets: &AssetStore,
 ) -> anyhow::Result<()> {
     let has_skydefs = lumps.iter().any(|l| l.standard_lump_name() == "SKYDEFS");
@@ -134,7 +135,17 @@ pub fn write_wad_to_file<W: Write + Seek>(
     let merged_pnames = build_merged_pnames(assets);
     let merged_texture1 = build_merged_texture1(&merged_pnames, assets);
 
-    let umapinfo_text = generate_simple_umapinfo(lumps);
+    let umapinfo_text = if let Some(u) = lumps.iter().find_map(|l| {
+        if let ProjectData::UmapInfo(info) = l {
+            Some(info.to_umapinfo_text())
+        } else {
+            None
+        }
+    }) {
+        u
+    } else {
+        generate_simple_umapinfo(lumps)
+    };
 
     writer.write_all(b"PWAD")?;
 
@@ -155,7 +166,11 @@ pub fn write_wad_to_file<W: Write + Seek>(
     let mut records = Vec::new();
 
     for lump in lumps {
-        let content = lump.to_sanitized_json(assets);
+        let content = match lump {
+            ProjectData::UmapInfo(info) => info.to_umapinfo_text(),
+            _ => lump.to_sanitized_json(assets),
+        };
+
         let pos = writer.stream_position()? as u32;
         writer.write_all(content.as_bytes())?;
         records.push(Record {

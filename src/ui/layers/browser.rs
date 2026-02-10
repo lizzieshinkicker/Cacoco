@@ -666,7 +666,7 @@ fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
         shared::draw_drag_ghost(
             ui.ctx(),
             |ui| {
-                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false);
+                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false, false);
             },
             &label,
         );

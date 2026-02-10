@@ -426,14 +426,14 @@ fn render_row_contents(
     let is_compatible = crate::ui::properties::compatibility::is_compatible(element, file.target);
 
     let res = if element._cacoco_text.is_some() {
-        thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some("T"), !is_visible)
+        thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some("T"), !is_visible, true)
     } else if element.is_natural_container() {
         let icon = if folder_state.is_open() {
             "📂"
         } else {
             "📁"
         };
-        thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some(icon), !is_visible)
+        thumbnails::draw_thumbnail_widget(&mut thumb_ui, None, Some(icon), !is_visible, true)
     } else {
         thumbnails::draw_thumbnail(
             &mut thumb_ui,
@@ -560,11 +560,11 @@ fn render_drag_ghost(
         ui.ctx(),
         |ui| {
             if element._cacoco_text.is_some() {
-                thumbnails::draw_thumbnail_widget(ui, None, Some("T"), false);
+                thumbnails::draw_thumbnail_widget(ui, None, Some("T"), false, false);
             } else if matches!(element.data, Element::Canvas(_)) {
-                thumbnails::draw_thumbnail_widget(ui, None, Some("📁"), false);
+                thumbnails::draw_thumbnail_widget(ui, None, Some("📁"), false, false);
             } else {
-                thumbnails::draw_thumbnail(ui, element, assets, file, state, is_visible, true);
+                thumbnails::draw_thumbnail(ui, element, assets, file, state, is_visible, false);
             }
         },
         &label,

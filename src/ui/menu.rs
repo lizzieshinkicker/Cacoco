@@ -532,6 +532,7 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
         CreationModal::SkyDefs => "Create SKYDEFS Lump",
         CreationModal::Interlevel => "Create INTERLEVEL Lump",
         CreationModal::Finale => "Create FINALE Lump",
+        CreationModal::UmapInfo => "Create UMAPINFO Lump",
         _ => "Create New Project",
     };
 
@@ -585,6 +586,13 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                             ) {
                                 app.creation_modal = CreationModal::Finale;
                             }
+                            if draw_menu_card(
+                                ui,
+                                "Map Information (UMAPINFO)",
+                                "Map names, music, skies, and level progression.",
+                            ) {
+                                app.creation_modal = CreationModal::UmapInfo;
+                            }
                         }
                         _ => {
                             if draw_menu_card(ui, "Empty Project", "Start from a clean slate.") {
@@ -601,6 +609,9 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                                     ),
                                     CreationModal::Finale => {
                                         ProjectData::Finale(finale::FinaleDefFile::new_empty())
+                                    }
+                                    CreationModal::UmapInfo => {
+                                        ProjectData::UmapInfo(umapinfo::UmapInfoFile::new_empty())
                                     }
                                     _ => ProjectData::StatusBar(sbardef::SBarDefFile::new_empty()),
                                 };

@@ -38,6 +38,18 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         }
     }
 
+    let last_mode = ctx.data(|d| d.get_temp::<ProjectMode>(egui::Id::new("active_mode")));
+    if let Some(lm) = last_mode {
+        if lm != app.active_mode {
+            if let Some(doc) = &mut app.doc {
+                doc.selection.clear();
+                doc.selection_pivot = None;
+            }
+            app.preview_state.editor.grabbed_path = None;
+            app.preview_state.editor.hovered_path = None;
+        }
+    }
+
     ctx.data_mut(|d| {
         d.insert_temp(egui::Id::new("active_doc_exists"), app.doc.is_some());
         d.insert_temp(egui::Id::new("active_mode"), app.active_mode);

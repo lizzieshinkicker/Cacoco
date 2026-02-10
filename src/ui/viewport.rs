@@ -10,7 +10,7 @@ use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
 
-/// Draws the main ID24 viewport, handling background rendering and interaction logic.
+/// Draws the main viewport, handling background rendering and interaction logic.
 pub fn draw_viewport(
     ui: &mut egui::Ui,
     project: &Option<ProjectData>,
@@ -37,6 +37,7 @@ pub fn draw_viewport(
                 crate::app::ProjectMode::SkyDefs => "SKYDEFS",
                 crate::app::ProjectMode::Interlevel => "INTERLEVEL",
                 crate::app::ProjectMode::Finale => "FINALE",
+                crate::app::ProjectMode::UmapInfo => "UMAPINFO",
             };
 
             let mode_res = ui.add_sized([110.0, 28.0], |ui: &mut egui::Ui| {
@@ -72,6 +73,7 @@ pub fn draw_viewport(
                         (ProjectMode::SkyDefs, "SKYDEFS"),
                         (ProjectMode::Interlevel, "INTERLEVEL"),
                         (ProjectMode::Finale, "FINALE"),
+                        (ProjectMode::UmapInfo, "UMAPINFO"),
                     ];
 
                     for (m, lbl) in all_modes {
@@ -83,6 +85,12 @@ pub fn draw_viewport(
                                 &format!("{}{}", prefix, lbl),
                                 true,
                             ) {
+                                ui.ctx().data_mut(|d| {
+                                    d.remove::<HashSet<Vec<usize>>>(egui::Id::new("selection"))
+                                });
+                                preview_state.editor.grabbed_path = None;
+                                preview_state.editor.hovered_path = None;
+
                                 *active_mode = m;
                                 crate::ui::context_menu::ContextMenu::close(ui);
                             }
@@ -112,6 +120,7 @@ pub fn draw_viewport(
                         CreationModal::Interlevel,
                     );
                     add_lump_row("+ FINALE", ProjectMode::Finale, CreationModal::Finale);
+                    add_lump_row("+ UMAPINFO", ProjectMode::UmapInfo, CreationModal::UmapInfo);
                 });
             }
 

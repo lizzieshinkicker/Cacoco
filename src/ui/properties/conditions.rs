@@ -212,18 +212,7 @@ fn draw_condition_card(
                     });
                 });
 
-                let stroke_color = ui.visuals().widgets.noninteractive.bg_stroke.color;
-                let (div_rect, _) = ui.allocate_exact_size(
-                    egui::vec2(ui.available_width(), 2.0),
-                    egui::Sense::hover(),
-                );
-                ui.painter().line_segment(
-                    [
-                        egui::pos2(div_rect.min.x, div_rect.center().y),
-                        egui::pos2(div_rect.max.x, div_rect.center().y),
-                    ],
-                    egui::Stroke::new(1.0, stroke_color.gamma_multiply(0.5)),
-                );
+                shared::draw_separator_line(ui);
 
                 ui.horizontal(|ui| {
                     let (g_idx, _) = lookups::find_group_for_type(cond.condition);

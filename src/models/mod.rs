@@ -2,6 +2,7 @@ pub mod finale;
 pub mod interlevel;
 pub mod sbardef;
 pub mod skydefs;
+pub mod umapinfo;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +17,8 @@ pub enum ProjectData {
     Sky(skydefs::SkyDefsFile),
     #[serde(rename = "interlevel")]
     Interlevel(interlevel::InterlevelDefFile),
+    #[serde(rename = "umapinfo")]
+    UmapInfo(umapinfo::UmapInfoFile),
 }
 
 #[allow(dead_code)]
@@ -26,6 +29,7 @@ impl ProjectData {
             ProjectData::Sky(_) => "SKYDEFS",
             ProjectData::Interlevel(_) => "INTERLEVEL",
             ProjectData::Finale(_) => "FINALE",
+            ProjectData::UmapInfo(_) => "UMAPINFO",
         }
     }
 
@@ -35,6 +39,7 @@ impl ProjectData {
             ProjectData::Finale(f) => &f.version,
             ProjectData::Sky(f) => &f.version,
             ProjectData::Interlevel(f) => &f.version,
+            ProjectData::UmapInfo(f) => &f.version,
         }
     }
 
@@ -112,6 +117,14 @@ impl ProjectData {
         }
     }
 
+    pub fn as_umapinfo(&self) -> Option<&umapinfo::UmapInfoFile> {
+        if let ProjectData::UmapInfo(u) = self {
+            Some(u)
+        } else {
+            None
+        }
+    }
+
     pub fn to_sanitized_json(&self, assets: &crate::assets::AssetStore) -> String {
         match self {
             ProjectData::StatusBar(f) => f.to_sanitized_json(assets),
@@ -120,6 +133,7 @@ impl ProjectData {
                 self.wrap_lump("interlevel", &f.version, &f.metadata, &f.data)
             }
             ProjectData::Finale(f) => self.wrap_lump("finale", &f.version, &f.metadata, &f.data),
+            ProjectData::UmapInfo(f) => f.to_umapinfo_text(),
         }
     }
 

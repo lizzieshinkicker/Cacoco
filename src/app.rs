@@ -22,6 +22,7 @@ pub enum ProjectMode {
     SkyDefs,
     Interlevel,
     Finale,
+    UmapInfo,
 }
 
 impl ProjectMode {
@@ -31,6 +32,7 @@ impl ProjectMode {
             crate::models::ProjectData::Finale(_) => ProjectMode::Finale,
             crate::models::ProjectData::Sky(_) => ProjectMode::SkyDefs,
             crate::models::ProjectData::Interlevel(_) => ProjectMode::Interlevel,
+            crate::models::ProjectData::UmapInfo(_) => ProjectMode::UmapInfo,
         }
     }
 }
@@ -44,6 +46,7 @@ pub enum CreationModal {
     SkyDefs,
     Interlevel,
     Finale,
+    UmapInfo,
 }
 
 /// Actions that require user confirmation (usually due to unsaved changes).
@@ -173,11 +176,19 @@ impl CacocoApp {
 
     /// Loads a project from a file and resets the application state.
     pub fn load_project(&mut self, ctx: &egui::Context, loaded: io::LoadedProject, path_str: &str) {
-        self.active_mode = ProjectMode::from_data(&loaded.file);
-        self.doc = Some(ProjectDocument::new(
-            loaded.file,
-            Some(path_str.to_string()),
-        ));
+        if let Some(first) = loaded.lumps.first() {
+            self.active_mode = ProjectMode::from_data(first);
+        }
+
+        self.doc = Some(ProjectDocument {
+            lumps: loaded.lumps,
+            path: Some(path_str.to_string()),
+            selection: HashSet::new(),
+            selection_pivot: None,
+            history: crate::history::HistoryManager::default(),
+            dirty: false,
+        });
+
         self.assets = loaded.assets;
         self.preview_state = PreviewState::default();
 

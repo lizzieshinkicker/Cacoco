@@ -23,6 +23,7 @@ pub(crate) mod preview;
 mod skydefs;
 mod text;
 pub mod text_helper;
+mod umapinfo;
 
 use editor::PropertiesUI;
 use font_cache::FontCache;
@@ -389,6 +390,15 @@ pub fn draw_properties_panel(
                                 changed |= skydefs::draw_skydefs_editor(
                                     ui,
                                     sky_file,
+                                    path,
+                                    assets,
+                                    state
+                                );
+                            }
+                            ProjectData::UmapInfo(info) => {
+                                changed |= umapinfo::draw_umapinfo_editor(
+                                    ui,
+                                    info,
                                     path,
                                     assets,
                                     state

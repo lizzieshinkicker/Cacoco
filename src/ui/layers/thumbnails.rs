@@ -22,12 +22,16 @@ pub fn draw_thumbnail(
     file: &SBarDefFile,
     state: &PreviewState,
     is_visible: bool,
-    _is_selected: bool,
+    interactive: bool,
 ) -> egui::Response {
     let time = ui.input(|i| i.time);
+    let sense = if interactive {
+        egui::Sense::click()
+    } else {
+        egui::Sense::hover()
+    };
 
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), sense);
     draw_thumb_bg(ui, rect);
 
     let tint = if is_visible {
@@ -61,13 +65,11 @@ pub fn draw_thumbnail(
                 3 => "AUT",
                 _ => "TXT",
             };
-
             let clean_text: String = raw_text
                 .chars()
                 .filter(|c| !c.is_whitespace())
                 .take(3)
                 .collect();
-
             if let Some(stem) = find_hud_stem(file, &s.font) {
                 draw_live_patches(ui, rect, &clean_text, stem, assets, tint, false);
             } else {
@@ -89,10 +91,17 @@ pub fn draw_thumbnail_widget(
     texture: Option<&egui::TextureHandle>,
     fallback_icon: Option<&str>,
     is_dimmed: bool,
+    interactive: bool,
 ) -> egui::Response {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), egui::Sense::click());
+    let sense = if interactive {
+        egui::Sense::click()
+    } else {
+        egui::Sense::hover()
+    };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), sense);
+
     draw_thumb_bg(ui, rect);
+
     draw_static_texture_content(ui, rect, texture, fallback_icon, is_dimmed);
     response
 }
@@ -426,7 +435,13 @@ impl<'a> ListRow<'a> {
             egui::vec2(THUMB_SIZE, THUMB_SIZE),
         );
         let mut thumb_ui = ui.new_child(egui::UiBuilder::new().max_rect(thumb_rect));
-        draw_thumbnail_widget(&mut thumb_ui, self.texture, self.fallback_icon, self.dimmed);
+        draw_thumbnail_widget(
+            &mut thumb_ui,
+            self.texture,
+            self.fallback_icon,
+            self.dimmed,
+            false,
+        );
 
         let title_pos_x = rect.min.x + 44.0;
         let center_y = rect.center().y;

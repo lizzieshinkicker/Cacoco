@@ -306,7 +306,13 @@ fn draw_frame_row(
     let mut thumb_ui = ui.new_child(egui::UiBuilder::new().max_rect(thumb_rect));
 
     let id = AssetId::new(&frame.lump);
-    thumbnails::draw_thumbnail_widget(&mut thumb_ui, assets.textures.get(&id), Some("?"), false);
+    thumbnails::draw_thumbnail_widget(
+        &mut thumb_ui,
+        assets.textures.get(&id),
+        Some("?"),
+        false,
+        false,
+    );
 
     ui.painter().text(
         egui::pos2(rect.min.x + 44.0, rect.center().y),
@@ -344,7 +350,13 @@ fn draw_frame_row(
         shared::draw_drag_ghost(
             ui.ctx(),
             |ui| {
-                thumbnails::draw_thumbnail_widget(ui, assets.textures.get(&id), Some("?"), false);
+                thumbnails::draw_thumbnail_widget(
+                    ui,
+                    assets.textures.get(&id),
+                    Some("?"),
+                    false,
+                    false,
+                );
             },
             &label,
         );
