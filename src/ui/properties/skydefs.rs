@@ -1,5 +1,6 @@
-use super::editor::{LumpUI, PropertyContext};
+use super::editor::{LumpUI, PropertyContext, ViewportContext};
 use crate::assets::AssetStore;
+use crate::document::DocumentAction;
 use crate::models::skydefs::{SkyDefsFile, SkyType};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
@@ -251,5 +252,29 @@ impl LumpUI for SkyDefsFile {
             "Select a sky to edit.".into(),
             egui::Color32::TRANSPARENT,
         )
+    }
+
+    fn render_viewport(
+        &self,
+        _ui: &mut egui::Ui,
+        ctx: &mut ViewportContext,
+    ) -> Vec<DocumentAction> {
+        let sky_idx = ctx
+            .current_item_idx
+            .min(self.data.skies.len().saturating_sub(1));
+        if let Some(sky) = self.data.skies.get(sky_idx) {
+            crate::render::sky::draw_sky_view(
+                _ui.painter(),
+                sky,
+                ctx.assets,
+                ctx.state,
+                ctx.proj,
+                _ui.input(|i| i.time),
+            );
+        } else {
+            _ui.painter()
+                .rect_filled(ctx.proj.screen_rect, 0.0, egui::Color32::BLACK);
+        }
+        Vec::new()
     }
 }

@@ -189,7 +189,8 @@ impl ProjectData {
             ProjectData::StatusBar(f) => f.draw_properties(ui, ctx),
             ProjectData::Sky(f) => f.draw_properties(ui, ctx),
             ProjectData::UmapInfo(f) => f.draw_properties(ui, ctx),
-            _ => false,
+            ProjectData::Interlevel(f) => f.draw_properties(ui, ctx),
+            ProjectData::Finale(f) => f.draw_properties(ui, ctx),
         }
     }
 
@@ -202,11 +203,8 @@ impl ProjectData {
             ProjectData::StatusBar(f) => f.header_info(selection),
             ProjectData::Sky(f) => f.header_info(selection),
             ProjectData::UmapInfo(f) => f.header_info(selection),
-            _ => (
-                "Cacoco Editor".into(),
-                "No specialized editor for this lump.".into(),
-                eframe::egui::Color32::TRANSPARENT,
-            ),
+            ProjectData::Interlevel(f) => f.header_info(selection),
+            ProjectData::Finale(f) => f.header_info(selection),
         }
     }
 
@@ -219,6 +217,21 @@ impl ProjectData {
         match self {
             ProjectData::StatusBar(f) => f.get_preview_content(ui, ctx),
             _ => None,
+        }
+    }
+
+    pub fn render_viewport(
+        &self,
+        ui: &mut eframe::egui::Ui,
+        ctx: &mut crate::ui::properties::editor::ViewportContext,
+    ) -> Vec<crate::document::actions::DocumentAction> {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.render_viewport(ui, ctx),
+            ProjectData::Sky(f) => f.render_viewport(ui, ctx),
+            ProjectData::UmapInfo(f) => f.render_viewport(ui, ctx),
+            ProjectData::Interlevel(f) => f.render_viewport(ui, ctx),
+            ProjectData::Finale(f) => f.render_viewport(ui, ctx),
         }
     }
 }

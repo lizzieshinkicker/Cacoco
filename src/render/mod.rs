@@ -131,11 +131,13 @@ pub fn draw_element_wrapper(
     if is_hovered_branch || is_grabbed_branch {
         let wave = (ctx.time * std::f64::consts::PI * 4.0).cos() as f32;
         alpha *= 0.70 + (wave * 0.30);
+        ctx.painter.ctx().request_repaint();
     } else if is_selected_branch && is_strobing {
         let dur = 0.5;
         let prog = (dur - ctx.state.interaction.strobe_timer) / dur;
         let wave = (prog * std::f32::consts::PI * 4.0).cos();
         alpha *= 0.70 + (wave * 0.30);
+        ctx.painter.ctx().request_repaint();
     }
 
     let mut pos = resolve_position(ctx, common, parent_pos);

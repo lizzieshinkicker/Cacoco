@@ -26,6 +26,15 @@ pub trait LumpUI {
     fn get_preview_content(&self, _: &egui::Ui, _: &PropertyContext) -> Option<PreviewContent> {
         None
     }
+
+    /// Renders the lump content into the viewport and handles internal interactions.
+    fn render_viewport(
+        &self,
+        _ui: &mut egui::Ui,
+        _ctx: &mut ViewportContext,
+    ) -> Vec<crate::document::actions::DocumentAction> {
+        Vec::new()
+    }
 }
 
 /// A trait for any SBARDEF element that provides a user interface for editing its properties.
@@ -70,4 +79,19 @@ pub trait PropertiesUI {
     fn has_specific_fields(&self) -> bool {
         true
     }
+}
+
+/// Bundles data and interaction state for viewport rendering.
+pub struct ViewportContext<'a> {
+    pub assets: &'a AssetStore,
+    pub state: &'a mut PreviewState,
+    pub proj: &'a crate::render::projection::ViewportProjection,
+    pub selection: &'a HashSet<Vec<usize>>,
+    pub current_item_idx: usize,
+    pub is_panning: bool,
+    pub container_mode: bool,
+    pub selection_mode: bool,
+    pub primary_pressed: bool,
+    pub primary_down: bool,
+    pub viewport_res: &'a egui::Response,
 }
