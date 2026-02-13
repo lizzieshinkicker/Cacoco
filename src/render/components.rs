@@ -26,18 +26,18 @@ pub(super) fn draw_component(ctx: &RenderContext, def: &ComponentDef, pos: egui:
                         .data(|d| d.get_temp::<bool>(map_format_id).unwrap_or(true));
 
                     if is_doom2 {
-                        format!("MAP{:02}: ENTRYWAY", ctx.state.world.level)
+                        format!("MAP{:02}: ENTRYWAY", ctx.state.sim.world.level)
                     } else {
                         format!(
                             "E{}M{}: ENTRYWAY",
-                            ctx.state.world.episode, ctx.state.world.level
+                            ctx.state.sim.world.episode, ctx.state.sim.world.level
                         )
                     }
                 }
                 ComponentType::FpsCounter => format!("{:.0}", ctx.fps),
                 ComponentType::Message => ctx
                     .state
-                    .editor
+                    .interaction
                     .message_log
                     .last()
                     .cloned()
@@ -64,7 +64,7 @@ fn get_scale_adj(ctx: &RenderContext) -> f32 {
 
 /// Renders the Kills/Items/Secrets block, either horizontally or vertically.
 fn render_stat_totals(ctx: &RenderContext, def: &ComponentDef, pos: egui::Pos2, alpha: f32) {
-    let p = &ctx.state.player;
+    let p = &ctx.state.sim.player;
     let parts = [
         format!("K: {}/{}", p.kills, p.max_kills),
         format!("I: {}/{}", p.items, p.max_items),

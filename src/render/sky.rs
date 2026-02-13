@@ -29,10 +29,10 @@ pub fn draw_sky_view(
 
         let view_width_texels = 256.0 / world_scale_x;
         let scroll_x = time as f32 * sky.scrollx;
-        let yaw_offset = (state.editor.sky_yaw as f32) + scroll_x;
+        let yaw_offset = (state.viewer.sky_yaw as f32) + scroll_x;
 
         let scroll_y = time as f32 * sky.scrolly;
-        let v_center_texel = sky.mid + scroll_y + state.editor.weapon_offset_y;
+        let v_center_texel = sky.mid + scroll_y + state.viewer.weapon_offset_y;
         let v_half_extent_texels = 80.0 / world_scale_y;
 
         let mut mesh = egui::Mesh::with_texture(tex.id());

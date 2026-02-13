@@ -48,11 +48,11 @@ impl ViewportController {
 
                 let shift_x = self.move_accumulator.x.trunc() as i32;
                 if shift_x != 0 {
-                    state.editor.sky_yaw = (state.editor.sky_yaw + shift_x).rem_euclid(1024);
+                    state.viewer.sky_yaw = (state.viewer.sky_yaw + shift_x).rem_euclid(1024);
                     self.move_accumulator.x -= shift_x as f32;
                 }
 
-                state.editor.weapon_offset_y -= delta.y * sensitivity;
+                state.viewer.weapon_offset_y -= delta.y * sensitivity;
 
                 self.is_dragging = true;
             } else if !selection.is_empty() {

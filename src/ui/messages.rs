@@ -116,5 +116,5 @@ pub fn log_event(state: &mut PreviewState, event: EditorEvent) {
         .to_string(),
     };
 
-    state.push_message(msg);
+    state.interaction.push_message(msg);
 }

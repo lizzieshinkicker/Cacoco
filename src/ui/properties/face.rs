@@ -1,14 +1,14 @@
-use crate::assets::{AssetId, AssetStore};
-use crate::constants::{DOOM_W, DOOM_W_WIDE};
-use crate::models::sbardef::{ExportTarget, FaceDef};
-use crate::state::PreviewState;
-use crate::ui::shared::VIEWPORT_RECT_ID;
-use eframe::egui;
-
 use super::editor::PropertiesUI;
 use super::font_cache::FontCache;
 use super::graphics::draw_crop_editor;
 use super::preview::PreviewContent;
+use crate::assets::{AssetId, AssetStore};
+use crate::constants::{DOOM_W, DOOM_W_WIDE};
+use crate::models::sbardef::{ExportTarget, FaceDef};
+use crate::state::PreviewState;
+use crate::state::simulation::LookDirection;
+use crate::ui::shared::VIEWPORT_RECT_ID;
+use eframe::egui;
 
 impl PropertiesUI for FaceDef {
     /// Face elements only have cropping if the user explicitly enables it.
@@ -41,7 +41,7 @@ impl PropertiesUI for FaceDef {
         _: &FontCache,
         state: &PreviewState,
     ) -> Option<PreviewContent> {
-        let screen_w = if state.engine.widescreen_mode {
+        let screen_w = if state.sim.engine.widescreen_mode {
             DOOM_W_WIDE
         } else {
             DOOM_W
@@ -52,15 +52,15 @@ impl PropertiesUI for FaceDef {
             -crate::render::get_alignment_anchor_offset(self.common.alignment, screen_rect).x;
 
         let face_center_x = anchor_x + (self.common.x as f32) + 12.0;
-        let dx = state.editor.virtual_mouse_pos.x - face_center_x;
+        let dx = state.interaction.virtual_mouse_pos.x - face_center_x;
         let threshold = 30.0;
 
         let look_dir = if dx > threshold {
-            0 // Right
+            LookDirection::Right
         } else if dx < -threshold {
-            2 // Left
+            LookDirection::Left
         } else {
-            1 // Forward
+            LookDirection::Straight
         };
 
         let is_button_down = ui.input(|i| i.pointer.button_down(egui::PointerButton::Primary));
@@ -75,11 +75,11 @@ impl PropertiesUI for FaceDef {
             false
         };
 
-        Some(PreviewContent::Image(state.player.get_face_sprite(
+        Some(PreviewContent::Image(state.sim.player.get_face_sprite(
             is_ouched,
             look_dir,
-            state.editor.pain_timer,
-            state.editor.evil_timer,
+            state.viewer.pain_timer,
+            state.viewer.evil_timer,
         )))
     }
 

@@ -347,7 +347,7 @@ pub fn resolve_condition_icon(
             return Some(format!("STGNUM{}", cond.param));
         }
         ArmorGe | ArmorLt | ArmorPercentGe | ArmorPercentLt => {
-            return Some(if state.player.armor_max >= 200 {
+            return Some(if state.sim.player.armor_max >= 200 {
                 "ARM2A0".to_string()
             } else {
                 "ARM1A0".to_string()
@@ -362,8 +362,9 @@ pub fn resolve_condition_icon(
         | SelectedAmmoPercentLt
         | SelectedWeaponHasAmmo => {
             return match state
+                .sim
                 .inventory
-                .get_selected_ammo_type(state.selected_weapon_slot)
+                .get_selected_ammo_type(state.sim.selected_weapon_slot)
             {
                 0 => Some("AMMOA0".to_string()),
                 1 => Some("SHELA0".to_string()),

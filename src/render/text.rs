@@ -12,45 +12,50 @@ pub(super) fn draw_number(
     alpha: f32,
 ) {
     let mut val = match def.type_ {
-        NumberType::Health => ctx.state.player.health,
-        NumberType::Armor => ctx.state.player.armor,
+        NumberType::Health => ctx.state.sim.player.health,
+        NumberType::Armor => ctx.state.sim.player.armor,
         NumberType::Frags => 0,
-        NumberType::Ammo => ctx.state.inventory.get_ammo(def.param),
+        NumberType::Ammo => ctx.state.sim.inventory.get_ammo(def.param),
         NumberType::AmmoSelected => {
             let idx = ctx
                 .state
+                .sim
                 .inventory
-                .get_selected_ammo_type(ctx.state.selected_weapon_slot);
-            ctx.state.inventory.get_ammo(idx)
+                .get_selected_ammo_type(ctx.state.sim.selected_weapon_slot);
+            ctx.state.sim.inventory.get_ammo(idx)
         }
-        NumberType::MaxAmmo => ctx.state.inventory.get_max_ammo(def.param),
+        NumberType::MaxAmmo => ctx.state.sim.inventory.get_max_ammo(def.param),
         NumberType::AmmoWeapon => ctx
             .state
+            .sim
             .inventory
             .get_weapon_ammo_type(def.param)
-            .map_or(0, |idx| ctx.state.inventory.get_ammo(idx)),
+            .map_or(0, |idx| ctx.state.sim.inventory.get_ammo(idx)),
         NumberType::MaxAmmoWeapon => ctx
             .state
+            .sim
             .inventory
             .get_weapon_ammo_type(def.param)
-            .map_or(0, |idx| ctx.state.inventory.get_max_ammo(idx)),
-        NumberType::Kills => ctx.state.player.kills,
-        NumberType::Items => ctx.state.player.items,
-        NumberType::Secrets => ctx.state.player.secrets,
-        NumberType::MaxKills => ctx.state.player.max_kills,
-        NumberType::MaxItems => ctx.state.player.max_items,
-        NumberType::MaxSecrets => ctx.state.player.max_secrets,
+            .map_or(0, |idx| ctx.state.sim.inventory.get_max_ammo(idx)),
+        NumberType::Kills => ctx.state.sim.player.kills,
+        NumberType::Items => ctx.state.sim.player.items,
+        NumberType::Secrets => ctx.state.sim.player.secrets,
+        NumberType::MaxKills => ctx.state.sim.player.max_kills,
+        NumberType::MaxItems => ctx.state.sim.player.max_items,
+        NumberType::MaxSecrets => ctx.state.sim.player.max_secrets,
         NumberType::KillsPercent => ctx
             .state
-            .get_stat_percent(ctx.state.player.kills, ctx.state.player.max_kills),
+            .get_stat_percent(ctx.state.sim.player.kills, ctx.state.sim.player.max_kills),
         NumberType::ItemsPercent => ctx
             .state
-            .get_stat_percent(ctx.state.player.items, ctx.state.player.max_items),
-        NumberType::SecretsPercent => ctx
-            .state
-            .get_stat_percent(ctx.state.player.secrets, ctx.state.player.max_secrets),
+            .get_stat_percent(ctx.state.sim.player.items, ctx.state.sim.player.max_items),
+        NumberType::SecretsPercent => ctx.state.get_stat_percent(
+            ctx.state.sim.player.secrets,
+            ctx.state.sim.player.max_secrets,
+        ),
         NumberType::PowerupDuration => ctx
             .state
+            .sim
             .player
             .powerup_durations
             .get(&def.param)

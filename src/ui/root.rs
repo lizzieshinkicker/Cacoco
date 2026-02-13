@@ -45,8 +45,8 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 doc.selection.clear();
                 doc.selection_pivot = None;
             }
-            app.preview_state.editor.grabbed_path = None;
-            app.preview_state.editor.hovered_path = None;
+            app.preview_state.interaction.grabbed_path = None;
+            app.preview_state.interaction.hovered_path = None;
         }
     }
 

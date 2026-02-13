@@ -2,6 +2,7 @@ use super::RenderContext;
 use super::graphic::draw_simple_graphic_patch;
 use crate::assets::AssetId;
 use crate::models::sbardef::*;
+use crate::state::simulation::LookDirection;
 use eframe::egui;
 
 /// Renders the Doom player face (STF) based on current health and look direction.
@@ -12,7 +13,7 @@ pub(super) fn draw_face(
     alpha: f32,
     ouch: bool,
 ) {
-    let mut look_dir = 1;
+    let mut look_dir = LookDirection::Straight;
 
     if !ouch {
         let face_center_x = pos.x + 12.0;
@@ -20,17 +21,17 @@ pub(super) fn draw_face(
         let threshold = 30.0;
 
         if dx > threshold {
-            look_dir = 0;
+            look_dir = LookDirection::Right;
         } else if dx < -threshold {
-            look_dir = 2;
+            look_dir = LookDirection::Left;
         }
     }
 
-    let patch_name = ctx.state.player.get_face_sprite(
+    let patch_name = ctx.state.sim.player.get_face_sprite(
         ouch,
         look_dir,
-        ctx.state.editor.pain_timer,
-        ctx.state.editor.evil_timer,
+        ctx.state.viewer.pain_timer,
+        ctx.state.viewer.evil_timer,
     );
 
     let patch_id = AssetId::new(&patch_name);

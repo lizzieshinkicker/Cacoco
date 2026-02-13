@@ -296,18 +296,18 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                     .spacing(egui::vec2(4.0, 4.0))
                     .show(ui, |ui| {
                         ui.label("Health:");
-                        let old_h = state.player.health;
+                        let old_h = state.sim.player.health;
                         if ui
-                            .add(egui::DragValue::new(&mut state.player.health).range(0..=200))
+                            .add(egui::DragValue::new(&mut state.sim.player.health).range(0..=200))
                             .changed()
                         {
-                            if state.player.health > old_h {
+                            if state.sim.player.health > old_h {
                                 messages::log_event(
                                     state,
                                     EditorEvent::Pickup(MessageItem::HealthBonus),
                                 );
                             }
-                            if state.player.health == 0 {
+                            if state.sim.player.health == 0 {
                                 messages::log_event(
                                     state,
                                     EditorEvent::Pickup(MessageItem::DoomguyDeath),
@@ -317,12 +317,12 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         ui.end_row();
 
                         ui.label("Armor:");
-                        let old_a = state.player.armor;
+                        let old_a = state.sim.player.armor;
                         if ui
-                            .add(egui::DragValue::new(&mut state.player.armor).range(0..=200))
+                            .add(egui::DragValue::new(&mut state.sim.player.armor).range(0..=200))
                             .changed()
                         {
-                            if state.player.armor > old_a {
+                            if state.sim.player.armor > old_a {
                                 messages::log_event(
                                     state,
                                     EditorEvent::Pickup(MessageItem::ArmorBonus),
@@ -335,9 +335,9 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
 
             ui.vertical(|ui| {
                 ui.set_width(42.0);
-                let is_blue = state.player.armor_max == 200;
+                let is_blue = state.sim.player.armor_max == 200;
                 let patch = if is_blue { "ARM2A0" } else { "ARM1A0" };
-                let is_active = state.player.armor > 0;
+                let is_active = state.sim.player.armor > 0;
 
                 let tooltip = if is_blue {
                     "Blue Armor (Megaarmor)"
@@ -349,8 +349,8 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                     draw_icon_button(ui, assets, patch, is_active, "Armor").on_hover_text(tooltip);
 
                 if response.clicked() {
-                    state.player.armor_max = if is_blue { 100 } else { 200 };
-                    let item = if state.player.armor_max == 200 {
+                    state.sim.player.armor_max = if is_blue { 100 } else { 200 };
+                    let item = if state.sim.player.armor_max == 200 {
                         MessageItem::Megaarmor
                     } else {
                         MessageItem::GreenArmor
@@ -369,39 +369,39 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
             ui.spacing_mut().item_spacing.x = 12.0;
 
             ui.vertical(|ui| {
-                let m_bul = state.inventory.get_max_ammo(0);
-                let m_shl = state.inventory.get_max_ammo(1);
-                let m_rkt = state.inventory.get_max_ammo(3);
-                let m_cel = state.inventory.get_max_ammo(2);
+                let m_bul = state.sim.inventory.get_max_ammo(0);
+                let m_shl = state.sim.inventory.get_max_ammo(1);
+                let m_rkt = state.sim.inventory.get_max_ammo(3);
+                let m_cel = state.sim.inventory.get_max_ammo(2);
 
                 egui::Grid::new("sb_amm_grid")
                     .spacing(egui::vec2(4.0, 1.0))
                     .show(ui, |ui| {
                         ui.label("Bullets:");
-                        let old_bul = state.inventory.ammo_bullets;
+                        let old_bul = state.sim.inventory.ammo_bullets;
                         if ui
                             .add(
-                                egui::DragValue::new(&mut state.inventory.ammo_bullets)
+                                egui::DragValue::new(&mut state.sim.inventory.ammo_bullets)
                                     .range(0..=m_bul),
                             )
                             .changed()
                         {
-                            if state.inventory.ammo_bullets > old_bul {
+                            if state.sim.inventory.ammo_bullets > old_bul {
                                 messages::log_event(state, EditorEvent::Pickup(MessageItem::Clip));
                             }
                         }
                         ui.end_row();
 
                         ui.label("Shells:");
-                        let old_shl = state.inventory.ammo_shells;
+                        let old_shl = state.sim.inventory.ammo_shells;
                         if ui
                             .add(
-                                egui::DragValue::new(&mut state.inventory.ammo_shells)
+                                egui::DragValue::new(&mut state.sim.inventory.ammo_shells)
                                     .range(0..=m_shl),
                             )
                             .changed()
                         {
-                            if state.inventory.ammo_shells > old_shl {
+                            if state.sim.inventory.ammo_shells > old_shl {
                                 messages::log_event(
                                     state,
                                     EditorEvent::Pickup(MessageItem::Shells),
@@ -411,15 +411,15 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         ui.end_row();
 
                         ui.label("Rockets:");
-                        let old_rkt = state.inventory.ammo_rockets;
+                        let old_rkt = state.sim.inventory.ammo_rockets;
                         if ui
                             .add(
-                                egui::DragValue::new(&mut state.inventory.ammo_rockets)
+                                egui::DragValue::new(&mut state.sim.inventory.ammo_rockets)
                                     .range(0..=m_rkt),
                             )
                             .changed()
                         {
-                            if state.inventory.ammo_rockets > old_rkt {
+                            if state.sim.inventory.ammo_rockets > old_rkt {
                                 messages::log_event(
                                     state,
                                     EditorEvent::Pickup(MessageItem::Rocket),
@@ -429,15 +429,15 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         ui.end_row();
 
                         ui.label("Cells:");
-                        let old_cel = state.inventory.ammo_cells;
+                        let old_cel = state.sim.inventory.ammo_cells;
                         if ui
                             .add(
-                                egui::DragValue::new(&mut state.inventory.ammo_cells)
+                                egui::DragValue::new(&mut state.sim.inventory.ammo_cells)
                                     .range(0..=m_cel),
                             )
                             .changed()
                         {
-                            if state.inventory.ammo_cells > old_cel {
+                            if state.sim.inventory.ammo_cells > old_cel {
                                 messages::log_event(state, EditorEvent::Pickup(MessageItem::Cell));
                             }
                         }
@@ -447,11 +447,17 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
 
             ui.vertical(|ui| {
                 ui.set_width(42.0);
-                if draw_icon_button(ui, assets, "BPAKA0", state.inventory.has_backpack, "Pack")
-                    .clicked()
+                if draw_icon_button(
+                    ui,
+                    assets,
+                    "BPAKA0",
+                    state.sim.inventory.has_backpack,
+                    "Pack",
+                )
+                .clicked()
                 {
-                    state.inventory.has_backpack = !state.inventory.has_backpack;
-                    if state.inventory.has_backpack {
+                    state.sim.inventory.has_backpack = !state.sim.inventory.has_backpack;
+                    if state.sim.inventory.has_backpack {
                         messages::log_event(state, EditorEvent::Pickup(MessageItem::Backpack));
                     }
                 }
@@ -481,20 +487,20 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                     draw_stat_row(
                         ui,
                         "Kills:",
-                        &mut state.player.kills,
-                        &mut state.player.max_kills,
+                        &mut state.sim.player.kills,
+                        &mut state.sim.player.max_kills,
                     );
                     draw_stat_row(
                         ui,
                         "Items:",
-                        &mut state.player.items,
-                        &mut state.player.max_items,
+                        &mut state.sim.player.items,
+                        &mut state.sim.player.max_items,
                     );
                     draw_stat_row(
                         ui,
                         "Secrets:",
-                        &mut state.player.secrets,
-                        &mut state.player.max_secrets,
+                        &mut state.sim.player.secrets,
+                        &mut state.sim.player.max_secrets,
                     );
                 });
         });
@@ -511,7 +517,7 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                 .show(ui, |ui| {
                     ui.label("Mode:");
                     egui::ComboBox::from_id_salt("sb_mode_dd")
-                        .selected_text(match state.world.session_type {
+                        .selected_text(match state.sim.world.session_type {
                             0 => "Single Player",
                             1 => "Cooperative",
                             2 => "Deathmatch",
@@ -519,33 +525,49 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         })
                         .width(110.0)
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut state.world.session_type, 0, "Single Player");
-                            ui.selectable_value(&mut state.world.session_type, 1, "Cooperative");
-                            ui.selectable_value(&mut state.world.session_type, 2, "Deathmatch");
+                            ui.selectable_value(
+                                &mut state.sim.world.session_type,
+                                0,
+                                "Single Player",
+                            );
+                            ui.selectable_value(
+                                &mut state.sim.world.session_type,
+                                1,
+                                "Cooperative",
+                            );
+                            ui.selectable_value(&mut state.sim.world.session_type, 2, "Deathmatch");
                         });
                     ui.end_row();
 
                     ui.label("Feature Set:");
                     egui::ComboBox::from_id_salt("sb_ver_dd")
-                        .selected_text(format!("{:?}", state.world.game_version))
+                        .selected_text(format!("{:?}", state.sim.world.game_version))
                         .width(110.0)
                         .show_ui(ui, |ui| {
                             use crate::models::sbardef::FeatureLevel::*;
-                            ui.selectable_value(&mut state.world.game_version, Doom19, "Doom 1.9");
                             ui.selectable_value(
-                                &mut state.world.game_version,
+                                &mut state.sim.world.game_version,
+                                Doom19,
+                                "Doom 1.9",
+                            );
+                            ui.selectable_value(
+                                &mut state.sim.world.game_version,
                                 LimitRemoving,
                                 "Limit Removing",
                             );
-                            ui.selectable_value(&mut state.world.game_version, Boom, "Boom 2.02");
                             ui.selectable_value(
-                                &mut state.world.game_version,
+                                &mut state.sim.world.game_version,
+                                Boom,
+                                "Boom 2.02",
+                            );
+                            ui.selectable_value(
+                                &mut state.sim.world.game_version,
                                 Complevel9,
                                 "Comp Lvl 9",
                             );
-                            ui.selectable_value(&mut state.world.game_version, MBF, "MBF");
-                            ui.selectable_value(&mut state.world.game_version, MBF21, "MBF21");
-                            ui.selectable_value(&mut state.world.game_version, ID24, "ID24");
+                            ui.selectable_value(&mut state.sim.world.game_version, MBF, "MBF");
+                            ui.selectable_value(&mut state.sim.world.game_version, MBF21, "MBF21");
+                            ui.selectable_value(&mut state.sim.world.game_version, ID24, "ID24");
                         });
                     ui.end_row();
 
@@ -554,18 +576,18 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                         ui.spacing_mut().item_spacing.x = 2.0;
                         if is_doom2 {
                             ui.add(
-                                egui::DragValue::new(&mut state.world.level)
+                                egui::DragValue::new(&mut state.sim.world.level)
                                     .range(1..=999)
                                     .prefix("MAP"),
                             );
                         } else {
                             ui.add(
-                                egui::DragValue::new(&mut state.world.episode)
+                                egui::DragValue::new(&mut state.sim.world.episode)
                                     .prefix("E")
                                     .range(1..=9),
                             );
                             ui.add(
-                                egui::DragValue::new(&mut state.world.level)
+                                egui::DragValue::new(&mut state.sim.world.level)
                                     .prefix("M")
                                     .range(1..=32),
                             );
@@ -586,16 +608,16 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
             ui.add_space((ui.available_width() - 200.0).max(0.0) / 2.0);
             ui.label("Slot Mapping:");
             egui::ComboBox::from_id_salt("slot_map_dd")
-                .selected_text(format!("{:?}", state.engine.slot_mapping))
+                .selected_text(format!("{:?}", state.sim.engine.slot_mapping))
                 .width(100.0)
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
-                        &mut state.engine.slot_mapping,
+                        &mut state.sim.engine.slot_mapping,
                         crate::state::SlotMapping::Vanilla,
                         "Vanilla",
                     );
                     ui.selectable_value(
-                        &mut state.engine.slot_mapping,
+                        &mut state.sim.engine.slot_mapping,
                         crate::state::SlotMapping::Extended,
                         "Extended (8/9)",
                     );
@@ -603,21 +625,21 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
         });
 
         ui.add_space(4.0);
-        ui.checkbox(&mut state.engine.widescreen_mode, "Widescreen Mode");
+        ui.checkbox(&mut state.sim.engine.widescreen_mode, "Widescreen Mode");
 
         ui.horizontal(|ui| {
             ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
             ui.label("Automap:");
             if ui
-                .toggle_value(&mut state.engine.automap_active, "Active")
+                .toggle_value(&mut state.sim.engine.automap_active, "Active")
                 .changed()
             {
-                if !state.engine.automap_active {
-                    state.engine.automap_overlay = false;
+                if !state.sim.engine.automap_active {
+                    state.sim.engine.automap_overlay = false;
                 }
             }
-            ui.add_enabled(state.engine.automap_active, |ui: &mut egui::Ui| {
-                ui.toggle_value(&mut state.engine.automap_overlay, "Overlay")
+            ui.add_enabled(state.sim.engine.automap_active, |ui: &mut egui::Ui| {
+                ui.toggle_value(&mut state.sim.engine.automap_overlay, "Overlay")
             });
         });
 
@@ -646,18 +668,19 @@ fn item_btn(
 
     let is_owned = if let Some(id) = pwr_id {
         state
+            .sim
             .player
             .powerup_durations
             .get(&id)
             .map_or(false, |v| *v > 0.0)
     } else {
         match item_id {
-            ItemId::BlueCard => state.inventory.has_blue_card,
-            ItemId::YellowCard => state.inventory.has_yellow_card,
-            ItemId::RedCard => state.inventory.has_red_card,
-            ItemId::BlueSkull => state.inventory.has_blue_skull,
-            ItemId::YellowSkull => state.inventory.has_yellow_skull,
-            ItemId::RedSkull => state.inventory.has_red_skull,
+            ItemId::BlueCard => state.sim.inventory.has_blue_card,
+            ItemId::YellowCard => state.sim.inventory.has_yellow_card,
+            ItemId::RedCard => state.sim.inventory.has_red_card,
+            ItemId::BlueSkull => state.sim.inventory.has_blue_skull,
+            ItemId::YellowSkull => state.sim.inventory.has_yellow_skull,
+            ItemId::RedSkull => state.sim.inventory.has_red_skull,
             _ => false,
         }
     };
@@ -686,15 +709,15 @@ fn item_btn(
                 } else {
                     0.0
                 };
-                state.player.powerup_durations.insert(id, dur);
+                state.sim.player.powerup_durations.insert(id, dur);
             } else {
                 match item_id {
-                    ItemId::BlueCard => state.inventory.has_blue_card = new_val,
-                    ItemId::YellowCard => state.inventory.has_yellow_card = new_val,
-                    ItemId::RedCard => state.inventory.has_red_card = new_val,
-                    ItemId::BlueSkull => state.inventory.has_blue_skull = new_val,
-                    ItemId::YellowSkull => state.inventory.has_yellow_skull = new_val,
-                    ItemId::RedSkull => state.inventory.has_red_skull = new_val,
+                    ItemId::BlueCard => state.sim.inventory.has_blue_card = new_val,
+                    ItemId::YellowCard => state.sim.inventory.has_yellow_card = new_val,
+                    ItemId::RedCard => state.sim.inventory.has_red_card = new_val,
+                    ItemId::BlueSkull => state.sim.inventory.has_blue_skull = new_val,
+                    ItemId::YellowSkull => state.sim.inventory.has_yellow_skull = new_val,
+                    ItemId::RedSkull => state.sim.inventory.has_red_skull = new_val,
                     _ => {}
                 }
             }
@@ -703,6 +726,7 @@ fn item_btn(
         let mut display_label = label.to_string();
         if let Some(id) = pwr_id {
             let dur = state
+                .sim
                 .player
                 .powerup_durations
                 .get(&id)
@@ -728,21 +752,21 @@ fn weapon_complex_btn(
     label: &str,
 ) {
     let owned = match item_id {
-        ItemId::Chainsaw => state.inventory.has_chainsaw,
-        ItemId::Pistol => state.inventory.has_pistol,
-        ItemId::Shotgun => state.inventory.has_shotgun,
-        ItemId::SuperShotgun => state.inventory.has_super_shotgun,
-        ItemId::Chaingun => state.inventory.has_chaingun,
-        ItemId::RocketLauncher => state.inventory.has_rocket_launcher,
-        ItemId::PlasmaGun => state.inventory.has_plasma_gun,
-        ItemId::BFG => state.inventory.has_bfg,
+        ItemId::Chainsaw => state.sim.inventory.has_chainsaw,
+        ItemId::Pistol => state.sim.inventory.has_pistol,
+        ItemId::Shotgun => state.sim.inventory.has_shotgun,
+        ItemId::SuperShotgun => state.sim.inventory.has_super_shotgun,
+        ItemId::Chaingun => state.sim.inventory.has_chaingun,
+        ItemId::RocketLauncher => state.sim.inventory.has_rocket_launcher,
+        ItemId::PlasmaGun => state.sim.inventory.has_plasma_gun,
+        ItemId::BFG => state.sim.inventory.has_bfg,
         _ => false,
     };
 
-    let is_selected_slot = state.selected_weapon_slot == slot;
+    let is_selected_slot = state.sim.selected_weapon_slot == slot;
     let is_ssg_variant = item_id == ItemId::SuperShotgun;
     let is_truly_selected = if slot == 3 {
-        is_selected_slot && state.use_super_shotgun == is_ssg_variant
+        is_selected_slot && state.sim.use_super_shotgun == is_ssg_variant
     } else {
         is_selected_slot
     };
@@ -764,22 +788,22 @@ fn weapon_complex_btn(
             }
 
             match item_id {
-                ItemId::Chainsaw => state.inventory.has_chainsaw = new_owned,
-                ItemId::Pistol => state.inventory.has_pistol = new_owned,
-                ItemId::Shotgun => state.inventory.has_shotgun = new_owned,
-                ItemId::SuperShotgun => state.inventory.has_super_shotgun = new_owned,
-                ItemId::Chaingun => state.inventory.has_chaingun = new_owned,
-                ItemId::RocketLauncher => state.inventory.has_rocket_launcher = new_owned,
-                ItemId::PlasmaGun => state.inventory.has_plasma_gun = new_owned,
-                ItemId::BFG => state.inventory.has_bfg = new_owned,
+                ItemId::Chainsaw => state.sim.inventory.has_chainsaw = new_owned,
+                ItemId::Pistol => state.sim.inventory.has_pistol = new_owned,
+                ItemId::Shotgun => state.sim.inventory.has_shotgun = new_owned,
+                ItemId::SuperShotgun => state.sim.inventory.has_super_shotgun = new_owned,
+                ItemId::Chaingun => state.sim.inventory.has_chaingun = new_owned,
+                ItemId::RocketLauncher => state.sim.inventory.has_rocket_launcher = new_owned,
+                ItemId::PlasmaGun => state.sim.inventory.has_plasma_gun = new_owned,
+                ItemId::BFG => state.sim.inventory.has_bfg = new_owned,
                 _ => {}
             }
         }
 
         if response.secondary_clicked() {
-            state.selected_weapon_slot = if is_truly_selected { 0 } else { slot };
+            state.sim.selected_weapon_slot = if is_truly_selected { 0 } else { slot };
             if slot == 3 {
-                state.use_super_shotgun = is_ssg_variant;
+                state.sim.use_super_shotgun = is_ssg_variant;
             }
         }
 

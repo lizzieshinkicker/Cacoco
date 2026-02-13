@@ -1,6 +1,7 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::models::sbardef::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
 use crate::state::PreviewState;
+use crate::state::simulation::LookDirection;
 use crate::ui::shared;
 use eframe::egui;
 
@@ -161,15 +162,15 @@ fn draw_live_number_thumbnail(
     };
 
     let val = match number_def.type_ {
-        NumberType::Health => state.player.health,
-        NumberType::Armor => state.player.armor,
+        NumberType::Health => state.sim.player.health,
+        NumberType::Armor => state.sim.player.armor,
         NumberType::AmmoSelected => {
-            let slot = state.selected_weapon_slot;
-            let idx = state.inventory.get_selected_ammo_type(slot);
-            state.inventory.get_ammo(idx)
+            let slot = state.sim.selected_weapon_slot;
+            let idx = state.sim.inventory.get_selected_ammo_type(slot);
+            state.sim.inventory.get_ammo(idx)
         }
-        NumberType::Ammo => state.inventory.get_ammo(number_def.param),
-        NumberType::MaxAmmo => state.inventory.get_max_ammo(number_def.param),
+        NumberType::Ammo => state.sim.inventory.get_ammo(number_def.param),
+        NumberType::MaxAmmo => state.sim.inventory.get_max_ammo(number_def.param),
         _ => 0,
     };
 
@@ -234,7 +235,7 @@ fn draw_live_component_thumbnail(
         ComponentType::Coordinates => "XYZ",
         ComponentType::FpsCounter => {
             ui.ctx().request_repaint();
-            text_buf = format!("{:.0}", state.editor.display_fps);
+            text_buf = format!("{:.0}", state.viewer.display_fps);
             &text_buf
         }
         _ => "TXT",
@@ -318,11 +319,11 @@ pub fn get_preview_texture<'a>(
         Element::Graphic(g) => Some(AssetId::new(&g.patch)),
         Element::Animation(a) => a.frames.first().map(|f| AssetId::new(&f.lump)),
         Element::Face(_) => {
-            let sprite = state.player.get_face_sprite(
+            let sprite = state.sim.player.get_face_sprite(
                 ouch,
-                1,
-                state.editor.pain_timer,
-                state.editor.evil_timer,
+                LookDirection::Straight,
+                state.viewer.pain_timer,
+                state.viewer.evil_timer,
             );
             Some(AssetId::new(&sprite))
         }

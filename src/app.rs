@@ -293,7 +293,7 @@ impl CacocoApp {
             doc.execute_actions(actions, self.active_mode);
 
             if doc.selection != old_selection {
-                self.preview_state.editor.strobe_timer = 0.5;
+                self.preview_state.interaction.strobe_timer = 0.5;
             }
 
             if doc.selection.len() == 1 {
@@ -322,7 +322,7 @@ impl eframe::App for CacocoApp {
 
         if let Some(doc) = &self.doc {
             if doc.selection != self.last_selection {
-                self.preview_state.editor.strobe_timer = 0.5;
+                self.preview_state.interaction.strobe_timer = 0.5;
                 self.last_selection = doc.selection.clone();
             }
         } else if !self.last_selection.is_empty() {
