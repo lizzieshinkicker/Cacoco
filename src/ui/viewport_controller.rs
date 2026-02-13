@@ -1,4 +1,4 @@
-use crate::document::LayerAction;
+use crate::document::actions::{DocumentAction, TreeAction};
 use crate::render::projection::ViewportProjection;
 use eframe::egui;
 use std::collections::HashSet;
@@ -32,7 +32,7 @@ impl ViewportController {
         is_panning: bool,
         active_mode: crate::app::ProjectMode,
         state: &mut crate::state::PreviewState,
-    ) -> Vec<LayerAction> {
+    ) -> Vec<DocumentAction> {
         let mut actions = Vec::new();
 
         if is_panning {
@@ -60,7 +60,7 @@ impl ViewportController {
                 self.is_dragging = true;
 
                 if viewport_res.drag_started() {
-                    actions.push(LayerAction::UndoSnapshot);
+                    actions.push(DocumentAction::UndoSnapshot);
                 }
 
                 let delta = ui.input(|i| i.pointer.delta());
@@ -75,11 +75,11 @@ impl ViewportController {
                     self.move_accumulator.x -= move_x as f32;
                     self.move_accumulator.y -= move_y as f32;
 
-                    actions.push(LayerAction::TranslateSelection {
+                    actions.push(DocumentAction::Tree(TreeAction::Translate {
                         paths: selection.iter().cloned().collect(),
                         dx: move_x,
                         dy: move_y,
-                    });
+                    }));
                 }
             }
         } else if viewport_res.drag_stopped() {

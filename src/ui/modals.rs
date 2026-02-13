@@ -1,6 +1,6 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::assets::AssetId;
-use crate::document;
+use crate::document::actions::{DocumentAction, SBarAction, SkyAction, TreeAction};
 use crate::ui::messages::{self, EditorEvent};
 use eframe::egui;
 
@@ -137,22 +137,22 @@ pub fn draw_confirmation_modal(
         match request {
             ConfirmationRequest::DeleteStatusBar(idx) => {
                 app.execute_actions(vec![
-                    document::LayerAction::UndoSnapshot,
-                    document::LayerAction::DeleteStatusBar(*idx),
+                    DocumentAction::UndoSnapshot,
+                    DocumentAction::SBar(SBarAction::DeleteStatusBar(*idx)),
                 ]);
                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
             ConfirmationRequest::DeleteSky(idx) => {
                 app.execute_actions(vec![
-                    document::LayerAction::UndoSnapshot,
-                    document::LayerAction::DeleteSky(*idx),
+                    DocumentAction::UndoSnapshot,
+                    DocumentAction::Sky(SkyAction::Delete(*idx)),
                 ]);
                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
             ConfirmationRequest::DeleteLayers(paths) => {
                 app.execute_actions(vec![
-                    document::LayerAction::UndoSnapshot,
-                    document::LayerAction::DeleteSelection(paths.clone()),
+                    DocumentAction::UndoSnapshot,
+                    DocumentAction::Tree(TreeAction::Delete(paths.clone())),
                 ]);
                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
             }
@@ -190,7 +190,7 @@ pub fn draw_confirmation_modal(
             }
             ConfirmationRequest::DowngradeTarget(t) => {
                 if let Some(doc) = &mut app.doc {
-                    doc.execute_actions(vec![document::LayerAction::UndoSnapshot], app.active_mode);
+                    doc.execute_actions(vec![DocumentAction::UndoSnapshot], app.active_mode);
                     if let Some(lump) = doc.get_lump_mut(app.active_mode) {
                         lump.set_target(*t);
                         lump.normalize_for_target();

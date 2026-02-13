@@ -1,14 +1,14 @@
-use crate::document::LayerAction;
+use crate::document::actions::SkyAction;
 use crate::models::skydefs::{SkyDef, SkyDefsFile};
 use std::collections::HashSet;
 
 pub fn execute_sky_action(
     file: &mut SkyDefsFile,
-    action: LayerAction,
+    action: SkyAction,
     selection: &mut HashSet<Vec<usize>>,
 ) {
     match action {
-        LayerAction::AddSky => {
+        SkyAction::Add => {
             file.data.skies.push(SkyDef {
                 name: "SKY1".to_string(),
                 scalex: 1.0,
@@ -20,12 +20,11 @@ pub fn execute_sky_action(
             selection.clear();
             selection.insert(vec![new_idx]);
         }
-        LayerAction::DeleteSky(idx) => {
+        SkyAction::Delete(idx) => {
             if idx < file.data.skies.len() {
                 file.data.skies.remove(idx);
                 selection.clear();
             }
         }
-        _ => {}
     }
 }

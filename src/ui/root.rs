@@ -87,7 +87,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                             ui.input(|i| i.pointer.any_pressed()) && ui.ui_contains_pointer();
 
                         if mouse_clicked || (has_focus && tab_pressed) {
-                            app.execute_actions(vec![document::LayerAction::UndoSnapshot]);
+                            app.execute_actions(vec![document::DocumentAction::UndoSnapshot]);
                         }
                     }
 
@@ -336,7 +336,7 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
 
 /// Dispatches keyboard shortcuts to application actions.
 fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui::Context) {
-    use crate::document::LayerAction;
+    use crate::document::actions::{DocumentAction, SBarAction, TreeAction};
     use crate::hotkeys::Action;
     use crate::models::ProjectData;
 
@@ -444,8 +444,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         let pasted = doc.history.prepare_bar_clipboard_for_paste();
                         doc.execute_actions(
                             vec![
-                                LayerAction::UndoSnapshot,
-                                LayerAction::PasteStatusBars(pasted),
+                                DocumentAction::UndoSnapshot,
+                                DocumentAction::SBar(SBarAction::PasteStatusBars(pasted)),
                             ],
                             app.active_mode,
                         );
@@ -463,12 +463,12 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         );
                         doc.execute_actions(
                             vec![
-                                LayerAction::UndoSnapshot,
-                                LayerAction::Paste {
+                                DocumentAction::UndoSnapshot,
+                                DocumentAction::Tree(TreeAction::Paste {
                                     parent_path: p,
                                     insert_idx: i,
                                     elements: pasted,
-                                },
+                                }),
                             ],
                             app.active_mode,
                         );
@@ -488,9 +488,11 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     let mut actions = Vec::new();
                     for path in paths {
                         if path.len() == 1 {
-                            actions.push(LayerAction::DuplicateStatusBar(path[0]));
+                            actions.push(DocumentAction::SBar(SBarAction::DuplicateStatusBar(
+                                path[0],
+                            )));
                         } else {
-                            actions.push(LayerAction::DuplicateSelection(vec![path]));
+                            actions.push(DocumentAction::Tree(TreeAction::Duplicate(vec![path])));
                         }
                     }
                     doc.execute_actions(actions, app.active_mode);
@@ -512,7 +514,9 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                                 return;
                             } else if sbar.data.status_bars.len() > 1 {
                                 doc.execute_actions(
-                                    vec![LayerAction::DeleteStatusBar(bar_idx)],
+                                    vec![DocumentAction::SBar(SBarAction::DeleteStatusBar(
+                                        bar_idx,
+                                    ))],
                                     app.active_mode,
                                 );
                                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
@@ -535,8 +539,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         } else {
                             doc.execute_actions(
                                 vec![
-                                    LayerAction::UndoSnapshot,
-                                    LayerAction::DeleteSelection(paths),
+                                    DocumentAction::UndoSnapshot,
+                                    DocumentAction::Tree(TreeAction::Delete(paths)),
                                 ],
                                 app.active_mode,
                             );
@@ -584,7 +588,10 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
                     }
                 }
 
-                doc.execute_actions(vec![document::LayerAction::UndoSnapshot], app.active_mode);
+                doc.execute_actions(
+                    vec![document::DocumentAction::UndoSnapshot],
+                    app.active_mode,
+                );
                 if let Some(l) = doc.get_lump_mut(app.active_mode) {
                     l.set_target(t);
                     l.normalize_for_target();
@@ -614,6 +621,8 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
 mod tests {
     use super::*;
     use crate::app::{CacocoApp, ConfirmationRequest, PendingAction, ProjectMode};
+    use crate::document::DocumentAction;
+    use crate::document::actions::SBarAction;
     use crate::hotkeys::Action;
     use crate::models::ProjectData;
     use crate::models::sbardef::{
@@ -702,8 +711,8 @@ mod tests {
         };
 
         app.execute_actions(vec![
-            document::LayerAction::UndoSnapshot,
-            document::LayerAction::DeleteStatusBar(idx_to_delete),
+            DocumentAction::UndoSnapshot,
+            DocumentAction::SBar(SBarAction::DeleteStatusBar(idx_to_delete)),
         ]);
 
         let final_count = app.doc.as_ref().unwrap().lumps[0]

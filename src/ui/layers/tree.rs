@@ -1,6 +1,6 @@
 use crate::assets::AssetStore;
 use crate::conditions;
-use crate::document::LayerAction;
+use crate::document::actions::{DocumentAction, TreeAction};
 use crate::models::sbardef::{Element, ElementWrapper, SBarDefFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
@@ -27,7 +27,7 @@ pub fn draw_layer_tree_root(
     selection_pivot: &mut Option<Vec<usize>>,
     assets: &AssetStore,
     state: &PreviewState,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     ui.style_mut().spacing.item_spacing.y = 1.0;
@@ -62,7 +62,7 @@ pub fn draw_layer_tree_recursive(
     assets: &AssetStore,
     file: &SBarDefFile,
     state: &PreviewState,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     for (idx, element) in elements.iter().enumerate() {
@@ -138,7 +138,7 @@ fn draw_layer_row(
     folder_state: &mut egui::collapsing_header::CollapsingState,
     assets: &AssetStore,
     file: &SBarDefFile,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     is_first: bool,
     is_last: bool,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
@@ -270,7 +270,7 @@ fn handle_drop_logic(
     is_last: bool,
     selection: &HashSet<Vec<usize>>,
     element: &ElementWrapper,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
 ) {
     let is_dragging_anything = ui.ctx().dragged_id().is_some();
     let nesting_mode =
@@ -296,12 +296,12 @@ fn handle_drop_logic(
                         if !is_noop {
                             shared::draw_yellow_line(ui, rect, line_y);
                             if ui.input(|i| i.pointer.any_released()) {
-                                actions.push(LayerAction::UndoSnapshot);
-                                actions.push(LayerAction::MoveSelection {
+                                actions.push(DocumentAction::UndoSnapshot);
+                                actions.push(DocumentAction::Tree(TreeAction::MoveSelection {
                                     sources: selection.iter().cloned().collect(),
                                     target_parent: parent_path.to_vec(),
                                     insert_idx,
-                                });
+                                }));
                                 egui::DragAndDrop::clear_payload(ui.ctx());
                             }
                         }
@@ -314,12 +314,12 @@ fn handle_drop_logic(
                             egui::StrokeKind::Inside,
                         );
                         if ui.input(|i| i.pointer.any_released()) {
-                            actions.push(LayerAction::UndoSnapshot);
-                            actions.push(LayerAction::MoveSelection {
+                            actions.push(DocumentAction::UndoSnapshot);
+                            actions.push(DocumentAction::Tree(TreeAction::MoveSelection {
                                 sources: selection.iter().cloned().collect(),
                                 target_parent: my_path.to_vec(),
                                 insert_idx: element.children().len(),
-                            });
+                            }));
                             egui::DragAndDrop::clear_payload(ui.ctx());
                         }
                     }
@@ -337,13 +337,13 @@ fn handle_drop_logic(
                     DropTarget::Sibling(mut insert_idx, line_y) => {
                         shared::draw_yellow_line(ui, rect, line_y);
                         if ui.input(|i| i.pointer.any_released()) {
-                            actions.push(LayerAction::UndoSnapshot);
+                            actions.push(DocumentAction::UndoSnapshot);
                             for key in asset_keys.iter() {
-                                actions.push(LayerAction::Add {
+                                actions.push(DocumentAction::Tree(TreeAction::Add {
                                     parent_path: parent_path.to_vec(),
                                     insert_idx,
                                     element: crate::models::sbardef::wrap_graphic(key, 0, 0),
-                                });
+                                }));
                                 insert_idx += 1;
                             }
                             egui::DragAndDrop::clear_payload(ui.ctx());
@@ -357,14 +357,14 @@ fn handle_drop_logic(
                             egui::StrokeKind::Inside,
                         );
                         if ui.input(|i| i.pointer.any_released()) {
-                            actions.push(LayerAction::UndoSnapshot);
+                            actions.push(DocumentAction::UndoSnapshot);
                             let mut append_idx = element.children().len();
                             for key in asset_keys.iter() {
-                                actions.push(LayerAction::Add {
+                                actions.push(DocumentAction::Tree(TreeAction::Add {
                                     parent_path: my_path.to_vec(),
                                     insert_idx: append_idx,
                                     element: crate::models::sbardef::wrap_graphic(key, 0, 0),
-                                });
+                                }));
                                 append_idx += 1;
                             }
                             egui::DragAndDrop::clear_payload(ui.ctx());
@@ -479,17 +479,17 @@ fn render_row_contents(
 
 fn handle_context_menu(
     ui: &egui::Ui,
-    response: &egui::Response,
+    combined_res: &egui::Response,
     my_path: &[usize],
     selection: &mut HashSet<Vec<usize>>,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     is_first: bool,
     is_last: bool,
     file: &SBarDefFile,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
-    let just_opened = ContextMenu::check(ui, response);
-    if let Some(menu) = ContextMenu::get(ui, response.id) {
+    let just_opened = ContextMenu::check(ui, combined_res);
+    if let Some(menu) = ContextMenu::get(ui, combined_res.id) {
         if !selection.contains(my_path) {
             selection.clear();
             selection.insert(my_path.to_vec());
@@ -497,30 +497,30 @@ fn handle_context_menu(
         ContextMenu::show(ui, menu, just_opened, |ui| {
             let can_group = !selection.is_empty() && selection.iter().all(|p| p.len() >= 2);
             if ContextMenu::button(ui, "Group in New Canvas", can_group) {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::GroupSelection(
+                actions.push(DocumentAction::UndoSnapshot);
+                actions.push(DocumentAction::Tree(TreeAction::Group(
                     selection.iter().cloned().collect(),
-                ));
+                )));
                 ContextMenu::close(ui);
             }
             ui.separator();
             if ContextMenu::button(ui, "Duplicate", true) {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::DuplicateSelection(
+                actions.push(DocumentAction::UndoSnapshot);
+                actions.push(DocumentAction::Tree(TreeAction::Duplicate(
                     selection.iter().cloned().collect(),
-                ));
+                )));
                 ContextMenu::close(ui);
             }
             ui.separator();
             let single = selection.len() == 1;
             if ContextMenu::button(ui, "Move Up", single && !is_first) {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::MoveUp(my_path.to_vec()));
+                actions.push(DocumentAction::UndoSnapshot);
+                actions.push(DocumentAction::Tree(TreeAction::MoveUp(my_path.to_vec())));
                 ContextMenu::close(ui);
             }
             if ContextMenu::button(ui, "Move Down", single && !is_last) {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::MoveDown(my_path.to_vec()));
+                actions.push(DocumentAction::UndoSnapshot);
+                actions.push(DocumentAction::Tree(TreeAction::MoveDown(my_path.to_vec())));
                 ContextMenu::close(ui);
             }
             ui.separator();
@@ -530,10 +530,10 @@ fn handle_context_menu(
                     *confirmation_modal =
                         Some(crate::app::ConfirmationRequest::DeleteLayers(paths));
                 } else {
-                    actions.push(LayerAction::UndoSnapshot);
-                    actions.push(LayerAction::DeleteSelection(
+                    actions.push(DocumentAction::UndoSnapshot);
+                    actions.push(DocumentAction::Tree(TreeAction::Delete(
                         selection.iter().cloned().collect(),
-                    ));
+                    )));
                 }
                 ContextMenu::close(ui);
             }
@@ -679,7 +679,7 @@ fn draw_terminal_drop_zone(
     parent_path: Vec<usize>,
     insert_idx: usize,
     selection: &HashSet<Vec<usize>>,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
 ) {
     if ui.input(|i| i.modifiers.command || i.modifiers.ctrl) {
         return;
@@ -702,12 +702,12 @@ fn draw_terminal_drop_zone(
         if !is_noop && !parent_path.starts_with(&*dragged) && ui.rect_contains_pointer(rect) {
             shared::draw_yellow_line(ui, rect, rect.center().y);
             if ui.input(|i| i.pointer.any_released()) {
-                actions.push(LayerAction::UndoSnapshot);
-                actions.push(LayerAction::MoveSelection {
+                actions.push(DocumentAction::UndoSnapshot);
+                actions.push(DocumentAction::Tree(TreeAction::MoveSelection {
                     sources: selection.iter().cloned().collect(),
                     target_parent: parent_path.clone(),
                     insert_idx,
-                });
+                }));
                 egui::DragAndDrop::clear_payload(ui.ctx());
             }
         }
@@ -717,14 +717,14 @@ fn draw_terminal_drop_zone(
         if ui.rect_contains_pointer(rect) {
             shared::draw_yellow_line(ui, rect, rect.center().y);
             if ui.input(|i| i.pointer.any_released()) {
-                actions.push(LayerAction::UndoSnapshot);
+                actions.push(DocumentAction::UndoSnapshot);
                 let mut current_insert = insert_idx;
                 for key in asset_keys.iter() {
-                    actions.push(LayerAction::Add {
+                    actions.push(DocumentAction::Tree(TreeAction::Add {
                         parent_path: parent_path.clone(),
                         insert_idx: current_insert,
                         element: crate::models::sbardef::wrap_graphic(key, 0, 0),
-                    });
+                    }));
                     current_insert += 1;
                 }
                 egui::DragAndDrop::clear_payload(ui.ctx());

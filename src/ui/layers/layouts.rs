@@ -1,4 +1,4 @@
-use crate::document::LayerAction;
+use crate::document::actions::{DocumentAction, SBarAction};
 use crate::models::sbardef::SBarDefFile;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::layers::thumbnails::ListRow;
@@ -11,14 +11,14 @@ pub fn draw_layouts_browser(
     file: &mut SBarDefFile,
     selection: &mut HashSet<Vec<usize>>,
     current_bar_idx: &mut usize,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) -> bool {
     let mut changed = false;
 
     if shared::heading_action_button(ui, "Layouts", Some("New Layout"), false).clicked() {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::AddStatusBar);
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::AddStatusBar));
         changed = true;
     }
 
@@ -143,18 +143,21 @@ pub fn draw_layouts_browser(
     });
 
     if let Some((source, target)) = move_request {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::MoveStatusBar { source, target });
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::MoveStatusBar {
+            source,
+            target,
+        }));
         changed = true;
     }
     if let Some(idx) = duplicate_request {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::DuplicateStatusBar(idx));
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::DuplicateStatusBar(idx)));
         changed = true;
     }
     if let Some(idx) = delete_request {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::DeleteStatusBar(idx));
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::DeleteStatusBar(idx)));
         changed = true;
     }
 

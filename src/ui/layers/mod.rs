@@ -1,5 +1,8 @@
 use crate::assets::AssetStore;
-use crate::document::{self, LayerAction};
+use crate::document::actions::SkyAction::Add;
+use crate::document::actions::UmapAction::AddMap;
+use crate::document::actions::{DocumentAction, TreeAction};
+use crate::document::{self};
 use crate::models::ProjectData;
 use crate::models::sbardef::{
     AnimationDef, CanvasDef, ComponentDef, ComponentType, Element, ElementWrapper, ExportTarget,
@@ -46,7 +49,7 @@ pub fn draw_layers_panel(
     state: &mut PreviewState,
     wizard_state: &mut Option<FontWizardState>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
-) -> (Vec<LayerAction>, bool) {
+) -> (Vec<DocumentAction>, bool) {
     let mut changed = false;
     let split_id = ui.make_persistent_id("layers_panel_split");
 
@@ -487,12 +490,12 @@ pub fn draw_layers_panel(
                                             selection,
                                             *current_bar_idx,
                                         );
-                                    actions.push(LayerAction::UndoSnapshot);
-                                    actions.push(LayerAction::Add {
+                                    actions.push(DocumentAction::UndoSnapshot);
+                                    actions.push(DocumentAction::Tree(TreeAction::Add {
                                         parent_path,
                                         insert_idx,
                                         element,
-                                    });
+                                    }));
                                     ContextMenu::close(ui);
                                 }
                             },
@@ -529,8 +532,8 @@ pub fn draw_layers_panel(
                 if shared::heading_action_button(&mut bottom_ui, "Skies", Some("Add Sky"), false)
                     .clicked()
                 {
-                    actions.push(LayerAction::UndoSnapshot);
-                    actions.push(LayerAction::AddSky);
+                    actions.push(DocumentAction::UndoSnapshot);
+                    actions.push(DocumentAction::Sky(Add));
                 }
 
                 egui::ScrollArea::vertical()
@@ -557,8 +560,8 @@ pub fn draw_layers_panel(
                 if shared::heading_action_button(&mut bottom_ui, "Maps", Some("Add Map"), false)
                     .clicked()
                 {
-                    actions.push(LayerAction::UndoSnapshot);
-                    actions.push(LayerAction::AddMap);
+                    actions.push(DocumentAction::UndoSnapshot);
+                    actions.push(DocumentAction::Umap(AddMap));
                 }
 
                 egui::ScrollArea::vertical()

@@ -1,7 +1,8 @@
 use crate::assets::AssetStore;
 use crate::cheats::CheatEngine;
 use crate::config::AppConfig;
-use crate::document::{LayerAction, ProjectDocument};
+use crate::document::ProjectDocument;
+use crate::document::actions::DocumentAction;
 use crate::io;
 use crate::state::PreviewState;
 use crate::ui;
@@ -286,7 +287,7 @@ impl CacocoApp {
     }
 
     /// Delegation helper to execute actions on the current document.
-    pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
+    pub fn execute_actions(&mut self, actions: Vec<DocumentAction>) {
         if let Some(doc) = &mut self.doc {
             let old_selection = doc.selection.clone();
             doc.execute_actions(actions, self.active_mode);

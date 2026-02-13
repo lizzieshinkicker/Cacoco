@@ -1,6 +1,6 @@
 use super::thumbnails::ListRow;
 use crate::assets::AssetStore;
-use crate::document::LayerAction;
+use crate::document::actions::DocumentAction;
 use crate::models::skydefs::SkyDefsFile;
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
@@ -12,7 +12,7 @@ pub fn draw_sky_layers_list(
     selection: &mut HashSet<Vec<usize>>,
     current_idx: &mut usize,
     assets: &AssetStore,
-    _actions: &mut Vec<LayerAction>,
+    _actions: &mut Vec<DocumentAction>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     ui.spacing_mut().item_spacing.y = 1.0;

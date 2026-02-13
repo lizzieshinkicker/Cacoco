@@ -1,5 +1,6 @@
 use crate::assets::{AssetId, AssetStore};
-use crate::document::{LayerAction, determine_insertion_point};
+use crate::document::actions::{DocumentAction, TreeAction};
+use crate::document::determine_insertion_point;
 use crate::models::ProjectData;
 use crate::models::sbardef::*;
 use crate::render::projection::ViewportProjection;
@@ -20,7 +21,7 @@ pub fn draw_viewport(
     selection: &HashSet<Vec<usize>>,
     current_bar_idx: usize,
     active_mode: &mut crate::app::ProjectMode,
-) -> Vec<LayerAction> {
+) -> Vec<DocumentAction> {
     let mut actions = Vec::new();
 
     let mut estimate_rect = ui.available_rect_before_wrap();
@@ -312,9 +313,11 @@ pub fn draw_viewport(
                     if let Some(path) = preview_state.editor.hovered_path.clone() {
                         preview_state.editor.grabbed_path = Some(path.clone());
                         if ui.input(|i| i.modifiers.shift) {
-                            actions.push(LayerAction::ToggleSelection(vec![path]));
+                            actions.push(DocumentAction::Tree(TreeAction::ToggleSelection(vec![
+                                path,
+                            ])));
                         } else {
-                            actions.push(LayerAction::Select(vec![path]));
+                            actions.push(DocumentAction::Tree(TreeAction::Select(vec![path])));
                         }
                     }
                 }
@@ -471,11 +474,11 @@ pub fn draw_viewport(
                         let (parent_path, mut insert_idx) =
                             determine_insertion_point(sbar, selection, bar_idx);
                         for key in asset_keys.iter() {
-                            actions.push(LayerAction::Add {
+                            actions.push(DocumentAction::Tree(TreeAction::Add {
                                 parent_path: parent_path.clone(),
                                 insert_idx,
                                 element: wrap_graphic(key, final_x, final_y),
-                            });
+                            }));
                             insert_idx += 1;
                         }
                         egui::DragAndDrop::clear_payload(ui.ctx());

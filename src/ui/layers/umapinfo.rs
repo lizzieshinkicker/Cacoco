@@ -1,6 +1,6 @@
 use super::thumbnails::ListRow;
 use crate::assets::AssetStore;
-use crate::document::LayerAction;
+use crate::document::actions::{DocumentAction, UmapAction};
 use crate::models::umapinfo::{UmapField, UmapInfoFile};
 use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
@@ -13,7 +13,7 @@ pub fn draw_umapinfo_layers_list(
     selection: &mut HashSet<Vec<usize>>,
     current_idx: &mut usize,
     _assets: &AssetStore,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     _confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) {
     ui.spacing_mut().item_spacing.y = 1.0;
@@ -57,8 +57,8 @@ pub fn draw_umapinfo_layers_list(
 
             ContextMenu::show(ui, menu, just_opened, |ui| {
                 if ContextMenu::button(ui, "Delete Map Entry", true) {
-                    actions.push(LayerAction::UndoSnapshot);
-                    actions.push(LayerAction::DeleteMap(i));
+                    actions.push(DocumentAction::UndoSnapshot);
+                    actions.push(DocumentAction::Umap(UmapAction::DeleteMap(i)));
                     ContextMenu::close(ui);
                 }
             });
