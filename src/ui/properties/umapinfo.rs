@@ -1,3 +1,4 @@
+use super::editor::{LumpUI, PropertyContext};
 use crate::assets::AssetStore;
 use crate::models::umapinfo::{MapEntry, UmapField, UmapInfoFile};
 use crate::state::PreviewState;
@@ -5,6 +6,7 @@ use crate::ui::context_menu::ContextMenu;
 use crate::ui::properties::common;
 use crate::ui::shared;
 use eframe::egui;
+use std::collections::HashSet;
 
 /// Metadata for a UMAPINFO field type to facilitate UI lookups and creation.
 struct FieldMetadata {
@@ -422,5 +424,31 @@ fn create_default_field(key: &str) -> UmapField {
             key: "e".into(),
         },
         _ => UmapField::LevelName(String::new()),
+    }
+}
+
+impl LumpUI for UmapInfoFile {
+    fn draw_properties(&mut self, ui: &mut egui::Ui, ctx: &PropertyContext) -> bool {
+        if let Some(path) = ctx.selection.iter().next() {
+            return draw_umapinfo_editor(ui, self, path, ctx.assets, ctx.state);
+        }
+        false
+    }
+
+    fn header_info(&self, selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32) {
+        if let Some(path) = selection.iter().next() {
+            if let Some(map) = self.data.maps.get(path[0]) {
+                return (
+                    format!("Map: {}", map.mapname),
+                    "Configure UMAPINFO fields for this level.".into(),
+                    egui::Color32::from_rgb(60, 40, 40),
+                );
+            }
+        }
+        (
+            "UMAPINFO".into(),
+            "Select a map entry to edit.".into(),
+            egui::Color32::TRANSPARENT,
+        )
     }
 }

@@ -1,9 +1,11 @@
+use super::editor::{LumpUI, PropertyContext};
 use crate::assets::AssetStore;
 use crate::models::skydefs::{SkyDefsFile, SkyType};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::properties::common;
 use eframe::egui;
+use std::collections::HashSet;
 
 /// Renders the specialized editor for SKYDEFS lumps.
 pub fn draw_skydefs_editor(
@@ -224,4 +226,30 @@ pub fn draw_skydefs_editor(
     }
 
     changed
+}
+
+impl LumpUI for SkyDefsFile {
+    fn draw_properties(&mut self, ui: &mut egui::Ui, ctx: &PropertyContext) -> bool {
+        if let Some(path) = ctx.selection.iter().next() {
+            return draw_skydefs_editor(ui, self, path, ctx.assets, ctx.state);
+        }
+        false
+    }
+
+    fn header_info(&self, selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32) {
+        if let Some(path) = selection.iter().next() {
+            if let Some(s) = self.data.skies.get(path[0]) {
+                return (
+                    format!("Sky: {}", s.name),
+                    "Configuration for this sky definition.".to_string(),
+                    egui::Color32::from_rgb(40, 40, 60),
+                );
+            }
+        }
+        (
+            "Sky Definitions".into(),
+            "Select a sky to edit.".into(),
+            egui::Color32::TRANSPARENT,
+        )
+    }
 }

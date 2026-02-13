@@ -178,6 +178,49 @@ impl ProjectData {
         list.sort();
         list
     }
+
+    pub fn draw_properties(
+        &mut self,
+        ui: &mut eframe::egui::Ui,
+        ctx: &crate::ui::properties::editor::PropertyContext,
+    ) -> bool {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.draw_properties(ui, ctx),
+            ProjectData::Sky(f) => f.draw_properties(ui, ctx),
+            ProjectData::UmapInfo(f) => f.draw_properties(ui, ctx),
+            _ => false,
+        }
+    }
+
+    pub fn get_header(
+        &self,
+        selection: &std::collections::HashSet<Vec<usize>>,
+    ) -> (String, String, eframe::egui::Color32) {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.header_info(selection),
+            ProjectData::Sky(f) => f.header_info(selection),
+            ProjectData::UmapInfo(f) => f.header_info(selection),
+            _ => (
+                "Cacoco Editor".into(),
+                "No specialized editor for this lump.".into(),
+                eframe::egui::Color32::TRANSPARENT,
+            ),
+        }
+    }
+
+    pub fn get_preview(
+        &self,
+        ui: &eframe::egui::Ui,
+        ctx: &crate::ui::properties::editor::PropertyContext,
+    ) -> Option<crate::ui::properties::preview::PreviewContent> {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.get_preview_content(ui, ctx),
+            _ => None,
+        }
+    }
 }
 
 fn sanitize_json_value(v: &mut serde_json::Value) {

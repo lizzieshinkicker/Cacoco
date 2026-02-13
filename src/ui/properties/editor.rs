@@ -1,8 +1,32 @@
 use super::font_cache::FontCache;
 use super::preview::PreviewContent;
 use crate::assets::AssetStore;
+use crate::models::sbardef::ExportTarget;
 use crate::state::PreviewState;
 use eframe::egui;
+use std::collections::HashSet;
+
+/// Bundles common data needed by all property editors.
+pub struct PropertyContext<'a> {
+    pub selection: &'a HashSet<Vec<usize>>,
+    pub assets: &'a AssetStore,
+    pub state: &'a PreviewState,
+    pub target: ExportTarget,
+}
+
+/// A trait for any ID24 lump that provides a user interface for editing its properties.
+pub trait LumpUI {
+    /// Draws the property editor for this lump. Returns true if data was modified.
+    fn draw_properties(&mut self, ui: &mut egui::Ui, ctx: &PropertyContext) -> bool;
+
+    /// Returns the header information (Title, Description, Background Color) for the panel.
+    fn header_info(&self, selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32);
+
+    /// (Optional) Returns visual content to be rendered in the top preview panel.
+    fn get_preview_content(&self, _: &egui::Ui, _: &PropertyContext) -> Option<PreviewContent> {
+        None
+    }
+}
 
 /// A trait for any SBARDEF element that provides a user interface for editing its properties.
 ///

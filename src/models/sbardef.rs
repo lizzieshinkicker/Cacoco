@@ -27,8 +27,10 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ExportTarget {
     #[default]
-    Basic, // SBARDEF 1.0.0 (KEX Compatible)
-    Extended, // SBARDEF 1.2.0 (Community Ports)
+    /// SBARDEF 1.0.0 (KEX Compatible)
+    Basic,
+    /// SBARDEF 1.2.0 (Extensions for community ports, such as Helion, Woof)
+    Extended,
 }
 
 bitflags! {
