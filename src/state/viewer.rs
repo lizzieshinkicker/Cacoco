@@ -1,4 +1,7 @@
+use crate::assets::AssetId;
 use crate::constants::DOOM_TICS_PER_SEC;
+use crate::render::fire::FireSimulation;
+use std::collections::HashMap;
 
 /// Handles transient visual state for the viewport preview.
 #[derive(Debug, Clone)]
@@ -12,6 +15,7 @@ pub struct ViewerState {
     pub display_super_shotgun: bool,
     pub weapon_offset_y: f32,
     pub sky_yaw: i32,
+    pub fire_sims: HashMap<AssetId, FireSimulation>,
 }
 
 impl Default for ViewerState {
@@ -26,13 +30,13 @@ impl Default for ViewerState {
             display_super_shotgun: true,
             weapon_offset_y: 0.0,
             sky_yaw: 0,
+            fire_sims: HashMap::new(),
         }
     }
 }
 
 impl ViewerState {
     pub fn update(&mut self, dt: f32, target_slot: u8, use_ssg: bool) {
-        // FPS Smoothing logic
         if dt > 0.0 {
             let instant_fps = 1.0 / dt;
             self.smoothed_fps = (instant_fps * 0.05) + (self.smoothed_fps * 0.95);
@@ -45,11 +49,9 @@ impl ViewerState {
             self.fps_update_timer = 0.0;
         }
 
-        // Face timers
         self.evil_timer = (self.evil_timer - dt).max(0.0);
         self.pain_timer = (self.pain_timer - dt).max(0.0);
 
-        // Weapon animation logic
         let speed = 600.0 * dt;
         let clear_height = 150.0;
 

@@ -59,6 +59,8 @@ pub enum SBarAction {
 pub enum SkyAction {
     Add,
     Delete(usize),
+    Move { source: usize, target: usize },
+    Duplicate(usize),
 }
 
 #[derive(Debug, Clone)]

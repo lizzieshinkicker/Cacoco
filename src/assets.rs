@@ -48,6 +48,8 @@ pub struct AssetStore {
     pub base_texture1: Vec<u8>,
     /// Original IWAD TEXTURE2 lump data.
     pub base_texture2: Vec<u8>,
+    /// Original IWAD palette data.
+    pub palette: crate::render::palette::DoomPalette,
 }
 
 impl Default for AssetStore {
@@ -60,6 +62,7 @@ impl Default for AssetStore {
             base_pnames: Vec::new(),
             base_texture1: Vec::new(),
             base_texture2: Vec::new(),
+            palette: crate::render::palette::DoomPalette::default(),
         }
     }
 }

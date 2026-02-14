@@ -299,3 +299,69 @@ pub fn truncate_path(path: &str, max_chars: usize) -> String {
     let half = (max_chars - 3) / 2;
     format!("{}...{}", &path[..half], &path[path.len() - half..])
 }
+
+/// Helper for list reordering.
+/// Determines if the mouse is hovering over the top or bottom half of the rect,
+/// draws the insertion line, and returns the target insertion index if dropped.
+pub fn handle_list_drag_zone(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    my_idx: usize,
+    count: usize,
+) -> Option<usize> {
+    if !ui.rect_contains_pointer(rect) {
+        return None;
+    }
+
+    let pos = ui.input(|i| i.pointer.latest_pos())?;
+    let center_y = rect.center().y;
+    let is_top = pos.y < center_y;
+
+    let target_idx = if is_top { my_idx } else { my_idx + 1 };
+
+    let safe_target = target_idx.min(count);
+
+    let line_y = if is_top { rect.top() } else { rect.bottom() };
+    draw_yellow_line(ui, rect, line_y);
+
+    if ui.input(|i| i.pointer.any_released()) {
+        return Some(safe_target);
+    }
+
+    None
+}
+
+/// Handles the full reorder lifecycle: checking payload, hit testing, and index calculation.
+pub fn check_list_reorder(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    i: usize,
+    count: usize,
+) -> Option<(usize, usize)> {
+    if let Some(source_idx) = egui::DragAndDrop::payload::<usize>(ui.ctx()) {
+        if *source_idx != i {
+            if let Some(target_idx) = handle_list_drag_zone(ui, rect, i, count) {
+                return Some((*source_idx, target_idx));
+            }
+        }
+    }
+    None
+}
+
+/// Specialized DragValue for percentages (0.0 - 1.0 internally, 0 - 100 in UI).
+pub fn drag_percentage(ui: &mut egui::Ui, label: &str, value: &mut f32) -> bool {
+    let mut pct = *value * 100.0;
+    ui.label(label);
+    if ui
+        .add(
+            egui::DragValue::new(&mut pct)
+                .range(1.0..=1000.0)
+                .suffix("%"),
+        )
+        .changed()
+    {
+        *value = pct / 100.0;
+        return true;
+    }
+    false
+}

@@ -183,6 +183,7 @@ impl CacocoApp {
 
         self.doc = Some(ProjectDocument {
             lumps: loaded.lumps,
+            passthrough_lumps: loaded.passthrough_lumps,
             path: Some(path_str.to_string()),
             selection: HashSet::new(),
             selection_pivot: None,
@@ -211,7 +212,7 @@ impl CacocoApp {
     /// Initializes a new empty project.
     pub fn new_project(&mut self, ctx: &egui::Context, data: crate::models::ProjectData) {
         self.active_mode = ProjectMode::from_data(&data);
-        self.doc = Some(ProjectDocument::new(data, None));
+        self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
         self.assets = AssetStore::default();
         self.preview_state = PreviewState::default();
 
@@ -255,7 +256,7 @@ impl CacocoApp {
                     doc.lumps.push(data);
                     doc.dirty = true;
                 } else {
-                    self.doc = Some(ProjectDocument::new(data, None));
+                    self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
                     self.assets = AssetStore::default();
                     self.preview_state = PreviewState::default();
 
@@ -317,6 +318,51 @@ impl CacocoApp {
 
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let time = ctx.input(|i| i.time);
+
+        if let Some(doc) = &self.doc {
+            if let Some(sky_file) = doc.get_lump(ProjectMode::SkyDefs).and_then(|l| l.as_sky()) {
+                for sky in &sky_file.data.skies {
+                    if sky.sky_type == crate::models::skydefs::SkyType::Fire {
+                        if let Some(fire_def) = &sky.fire {
+                            let sky_id = self.assets.resolve_sky_id(&sky.name);
+
+                            let sim = self
+                                .preview_state
+                                .viewer
+                                .fire_sims
+                                .entry(sky_id)
+                                .or_insert_with(|| {
+                                    let (w, h) =
+                                        if let Some(tex) = self.assets.textures.get(&sky_id) {
+                                            (tex.size()[0] as u32, tex.size()[1] as u32)
+                                        } else {
+                                            (256, 128)
+                                        };
+                                    crate::render::fire::FireSimulation::new(w, h, time)
+                                });
+
+                            if time - sim.last_step_time >= fire_def.updatetime as f64 {
+                                sim.step();
+                                sim.last_step_time = time;
+                                let rgba =
+                                    sim.generate_rgba(&fire_def.palette, &self.assets.palette);
+                                let dynamic_key = format!("_FIRE_ANIM_{}", sky.name);
+                                self.assets.load_rgba(
+                                    ctx,
+                                    &dynamic_key,
+                                    sim.width,
+                                    sim.height,
+                                    &rgba,
+                                );
+                                ctx.request_repaint();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         ctx.set_visuals(egui::Visuals::dark());
         ui::draw_root_ui(ctx, self);
 

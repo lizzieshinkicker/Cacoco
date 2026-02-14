@@ -11,8 +11,10 @@ use std::collections::HashSet;
 
 /// Manages a collection of ID24 lumps, their selection, and its modification history.
 pub struct ProjectDocument {
-    /// All lumps contained in this project (SBARDEF, SKYDEFS, etc.)
+    /// All lumps contained in this project that Cacoco understands (SBARDEF, SKYDEFS, etc.)
     pub lumps: Vec<ProjectData>,
+    /// All lumps contained in this project that Cacoco passes through (MAPs and whatnot)
+    pub passthrough_lumps: Vec<crate::wad::RawLump>,
     /// The filesystem path where this document is saved.
     pub path: Option<String>,
     /// The set of tree-paths currently selected by the user.
@@ -27,9 +29,14 @@ pub struct ProjectDocument {
 
 impl ProjectDocument {
     /// Creates a new document from an initial lump and optional path.
-    pub fn new(initial_lump: ProjectData, path: Option<String>) -> Self {
+    pub fn new(
+        initial_lump: ProjectData,
+        passthrough: Vec<crate::wad::RawLump>,
+        path: Option<String>,
+    ) -> Self {
         Self {
             lumps: vec![initial_lump],
+            passthrough_lumps: passthrough,
             path,
             selection: HashSet::new(),
             selection_pivot: None,

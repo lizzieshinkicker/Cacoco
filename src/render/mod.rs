@@ -9,6 +9,7 @@ pub mod animation;
 pub mod canvas;
 pub mod components;
 pub mod face;
+pub mod fire;
 pub mod graphic;
 pub mod list;
 pub mod palette;

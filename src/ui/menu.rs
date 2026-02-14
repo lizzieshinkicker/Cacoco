@@ -140,7 +140,9 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(path) = io::save_pk3_dialog(&d.lumps, assets, d.path.clone()) {
+                    if let Some(path) =
+                        io::save_pk3_dialog(&d.lumps, assets, &d.passthrough_lumps, d.path.clone())
+                    {
                         action = MenuAction::SaveDone(path);
                     }
                 }
@@ -159,7 +161,9 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Export WAD...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(path) = io::save_wad_dialog(&d.lumps, assets, d.path.clone()) {
+                    if let Some(path) =
+                        io::save_wad_dialog(&d.lumps, assets, &d.passthrough_lumps, d.path.clone())
+                    {
                         action = MenuAction::ExportDone(path);
                     }
                 }
@@ -202,6 +206,7 @@ pub fn draw_menu_bar(
                                 iwad,
                                 d.lumps[0].target(),
                                 &d.lumps,
+                                &d.passthrough_lumps,
                             );
                         }
                         ContextMenu::close(ui);

@@ -87,26 +87,8 @@ pub fn draw_layouts_browser(
                 egui::DragAndDrop::set_payload(ui.ctx(), i);
             }
 
-            if let Some(source_idx) = egui::DragAndDrop::payload::<usize>(ui.ctx()) {
-                if ui.rect_contains_pointer(response.rect) && *source_idx != i {
-                    let pos = ui.input(|i| i.pointer.latest_pos().unwrap_or_default());
-                    let is_top = pos.y < response.rect.center().y;
-
-                    let target_idx = if is_top { i } else { i + 1 };
-
-                    if target_idx > 0 && target_idx < bar_count {
-                        let target_y = if is_top {
-                            response.rect.top()
-                        } else {
-                            response.rect.bottom()
-                        };
-                        shared::draw_yellow_line(ui, response.rect, target_y);
-
-                        if ui.input(|i| i.pointer.any_released()) {
-                            move_request = Some((*source_idx, target_idx));
-                        }
-                    }
-                }
+            if let Some(indices) = shared::check_list_reorder(ui, response.rect, i, bar_count) {
+                move_request = Some(indices);
             }
 
             let just_opened = ContextMenu::check(ui, &response);

@@ -51,13 +51,25 @@ pub struct SkyDef {
     pub foregroundtex: Option<ForegroundTexDef>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FireSkyDef {
     pub palette: Vec<i32>,
     pub updatetime: f32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+impl Default for FireSkyDef {
+    fn default() -> Self {
+        Self {
+            palette: vec![
+                0, 47, 191, 187, 235, 234, 232, 167, 166, 165, 223, 221, 220, 219, 217, 216, 215,
+                214, 213, 164, 163, 162, 161, 160, 231, 230, 229, 228, 227, 226, 225, 224,
+            ],
+            updatetime: 0.05715,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ForegroundTexDef {
     pub name: String,
     pub mid: f32,
@@ -65,6 +77,19 @@ pub struct ForegroundTexDef {
     pub scrolly: f32,
     pub scalex: f32,
     pub scaley: f32,
+}
+
+impl Default for ForegroundTexDef {
+    fn default() -> Self {
+        Self {
+            name: "SKY2".to_string(),
+            mid: 100.0,
+            scrollx: 0.0,
+            scrolly: 0.0,
+            scalex: 1.0,
+            scaley: 1.0,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

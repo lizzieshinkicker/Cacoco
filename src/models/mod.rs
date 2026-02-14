@@ -234,6 +234,22 @@ impl ProjectData {
             ProjectData::Finale(f) => f.render_viewport(ui, ctx),
         }
     }
+
+    /// Centralized lump parser for ID24 JSON and UMAPINFO text formats.
+    pub fn parse_lump(name: &str, data: &[u8]) -> Option<Self> {
+        let content = String::from_utf8_lossy(data);
+        if let Ok(mut parsed) = serde_json::from_str::<Self>(&content) {
+            parsed.set_target(parsed.determine_target());
+            parsed.normalize_for_target();
+            Some(parsed)
+        } else if name.eq_ignore_ascii_case("UMAPINFO") {
+            Some(Self::UmapInfo(umapinfo::UmapInfoFile::from_umapinfo_text(
+                &content,
+            )))
+        } else {
+            None
+        }
+    }
 }
 
 fn sanitize_json_value(v: &mut serde_json::Value) {

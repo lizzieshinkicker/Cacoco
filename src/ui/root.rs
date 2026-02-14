@@ -370,9 +370,12 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     None => true,
                 };
                 if needs_dialog {
-                    if let Some(p) =
-                        crate::io::save_pk3_dialog(&doc.lumps, &app.assets, doc.path.clone())
-                    {
+                    if let Some(p) = crate::io::save_pk3_dialog(
+                        &doc.lumps,
+                        &app.assets,
+                        &doc.passthrough_lumps,
+                        doc.path.clone(),
+                    ) {
                         doc.path = Some(p.clone());
                         doc.dirty = false;
                         app.add_to_recent(&p);
@@ -380,7 +383,14 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     }
                 } else {
                     let p = doc.path.as_ref().unwrap();
-                    if crate::io::save_pk3_silent(&doc.lumps, &app.assets, p).is_ok() {
+                    if crate::io::save_pk3_silent(
+                        &doc.lumps,
+                        &app.assets,
+                        &doc.passthrough_lumps,
+                        p,
+                    )
+                    .is_ok()
+                    {
                         doc.dirty = false;
                         messages::log_event(
                             &mut app.preview_state,
@@ -645,6 +655,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(sbar),
+            Vec::new(),
             None,
         ));
         app.active_mode = ProjectMode::SBarDef;
@@ -666,6 +677,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(SBarDefFile::new_empty()),
+            Vec::new(),
             None,
         ));
         app.doc.as_mut().unwrap().dirty = true;
@@ -695,6 +707,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(sbar),
+            Vec::new(),
             None,
         ));
         app.active_mode = ProjectMode::SBarDef;
@@ -747,6 +760,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(sbar),
+            Vec::new(),
             None,
         ));
         app.active_mode = ProjectMode::SBarDef;
@@ -768,8 +782,11 @@ mod tests {
         let ctx = egui::Context::default();
         let mut app = CacocoApp::default();
 
-        let mut doc =
-            document::ProjectDocument::new(ProjectData::StatusBar(SBarDefFile::new_empty()), None);
+        let mut doc = document::ProjectDocument::new(
+            ProjectData::StatusBar(SBarDefFile::new_empty()),
+            Vec::new(),
+            None,
+        );
         doc.lumps.push(ProjectData::Sky(
             crate::models::skydefs::SkyDefsFile::new_empty(),
         ));
