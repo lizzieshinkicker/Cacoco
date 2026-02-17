@@ -49,7 +49,8 @@ pub struct InterlevelAnim {
 pub struct InterlevelFrame {
     pub image: String,
     #[serde(rename = "type")]
-    pub frame_type: i32, // Bitfield: 1-Infinite, 2-Fixed, 4-Random, 0x1000-RandomFirst, 0x8000000-Widescreen
+    /// Bitfield: 1-Infinite, 2-Fixed, 4-Random, 0x1000-RandomFirst, 0x8000000-Widescreen
+    pub frame_type: i32,
     pub duration: f64,
     #[serde(default)]
     pub maxduration: f64,

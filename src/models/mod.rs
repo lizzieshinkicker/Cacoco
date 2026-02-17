@@ -194,6 +194,32 @@ impl ProjectData {
         }
     }
 
+    pub fn tick(&self, ctx: &mut crate::ui::properties::editor::TickContext) {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.tick(ctx),
+            ProjectData::Sky(f) => f.tick(ctx),
+            ProjectData::UmapInfo(f) => f.tick(ctx),
+            ProjectData::Interlevel(f) => f.tick(ctx),
+            ProjectData::Finale(f) => f.tick(ctx),
+        }
+    }
+
+    pub fn draw_layer_list(
+        &mut self,
+        ui: &mut eframe::egui::Ui,
+        ctx: &mut crate::ui::properties::editor::LayerContext,
+    ) -> (Vec<crate::document::actions::DocumentAction>, bool) {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::Sky(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::UmapInfo(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::Interlevel(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::Finale(f) => f.draw_layer_list(ui, ctx),
+        }
+    }
+
     pub fn get_header(
         &self,
         selection: &std::collections::HashSet<Vec<usize>>,

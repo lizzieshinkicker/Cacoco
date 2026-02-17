@@ -1,4 +1,4 @@
-use super::editor::{LumpUI, PropertyContext, ViewportContext};
+use super::editor::{LayerContext, LumpUI, PropertyContext, TickContext, ViewportContext};
 use crate::assets::AssetStore;
 use crate::document::DocumentAction;
 use crate::models::skydefs::{SkyDefsFile, SkyType};
@@ -23,7 +23,7 @@ fn draw_sky_params_fields(
     let mut changed = false;
 
     ui.horizontal(|ui| {
-        ui.add_space((ui.available_width() - 210.0).max(0.0) / 2.0);
+        ui.add_space((ui.available_width() - 185.0).max(0.0) / 2.0);
         ui.label("Texture:");
         let mut buf = name.clone();
         if ui
@@ -43,7 +43,7 @@ fn draw_sky_params_fields(
                         suffix: &str,
                         speed: f32| {
         ui.horizontal(|ui| {
-            ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
+            ui.add_space((ui.available_width() - 110.0).max(0.0) / 2.0);
             ui.label(label);
             changed |= ui
                 .add(
@@ -57,15 +57,15 @@ fn draw_sky_params_fields(
     };
 
     draw_row("Mid Texel: ", mid, 0.0..=2048.0, "", 1.0);
-    draw_row("Scroll X:  ", sx, -1024.0..=1024.0, "", 1.0);
-    draw_row("Scroll Y:  ", sy, -1024.0..=1024.0, "", 1.0);
+    draw_row("Scroll X:     ", sx, -1024.0..=1024.0, "", 1.0);
+    draw_row("Scroll Y:     ", sy, -1024.0..=1024.0, "", 1.0);
 
     ui.horizontal(|ui| {
-        ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
+        ui.add_space((ui.available_width() - 110.0).max(0.0) / 2.0);
         changed |= shared::drag_percentage(ui, "Scale X %: ", scx);
     });
     ui.horizontal(|ui| {
-        ui.add_space((ui.available_width() - 150.0).max(0.0) / 2.0);
+        ui.add_space((ui.available_width() - 110.0).max(0.0) / 2.0);
         changed |= shared::drag_percentage(ui, "Scale Y %: ", scy);
     });
 
@@ -81,6 +81,18 @@ pub fn draw_skydefs_editor(
     _state: &PreviewState,
 ) -> bool {
     let mut changed = false;
+
+    let slot_id = egui::Id::new("FIRE_PICKER_ID");
+    let stored_slot: isize = ui.ctx().data(|d| d.get_temp(slot_id).unwrap_or(-1));
+    let mut active_slot = if stored_slot >= 0 {
+        Some(stored_slot as usize)
+    } else {
+        None
+    };
+
+    if active_slot.is_some() {
+        ui.ctx().request_repaint();
+    }
 
     if let Some(s) = file.data.skies.get_mut(selection_path[0]) {
         ui.vertical_centered(|ui| {
@@ -152,56 +164,80 @@ pub fn draw_skydefs_editor(
                         ui.heading("Fire Simulation");
 
                         ui.horizontal(|ui| {
+                            ui.add_space((ui.available_width() - 130.0).max(0.0) / 2.0);
                             ui.label("Update Delay:");
-
                             let mut tics = (fire.updatetime * 35.0).round() as i32;
-                            let res = ui.add(
-                                egui::DragValue::new(&mut tics)
-                                    .range(1..=35)
-                                    .suffix(" tics"),
-                            );
-
-                            if res.changed() {
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut tics)
+                                        .range(1..=35)
+                                        .suffix(" tics"),
+                                )
+                                .changed()
+                            {
                                 fire.updatetime = tics as f32 / 35.0;
                                 changed = true;
                             }
-
-                            ui.add_space(8.0);
-                            ui.label(
-                                egui::RichText::new(format!("({:.5}s)", fire.updatetime))
-                                    .weak()
-                                    .size(10.0),
-                            );
                         });
 
-                        ui.add_space(8.0);
-                        ui.label("Decay Palette Ramp:");
+                        ui.label(
+                            egui::RichText::new(format!("({:.5}s)", fire.updatetime))
+                                .weak()
+                                .size(10.0),
+                        );
+
+                        ui.add_space(12.0);
+                        ui.label("Decay Palette Ramp");
                         ui.label(
                             egui::RichText::new("Cooling (left) to Ignition (right)")
                                 .weak()
                                 .size(10.0),
                         );
+                        ui.add_space(4.0);
 
                         let ramp_h = 32.0;
-                        let (rect, _) = ui.allocate_exact_size(
-                            egui::vec2(ui.available_width(), ramp_h),
-                            egui::Sense::hover(),
+                        let (rect, response) = ui.allocate_exact_size(
+                            egui::vec2((ui.available_width() - 20.0).max(0.0), ramp_h),
+                            egui::Sense::click(),
                         );
 
                         if !fire.palette.is_empty() {
                             let step_w = rect.width() / fire.palette.len() as f32;
+                            if response.clicked() {
+                                if let Some(pos) = response.interact_pointer_pos() {
+                                    let idx = ((pos.x - rect.min.x) / step_w).floor() as usize;
+                                    let idx = idx.min(fire.palette.len() - 1);
+
+                                    active_slot = Some(idx);
+                                    ui.ctx().data_mut(|d| d.insert_temp(slot_id, idx as isize));
+                                    ui.ctx().request_repaint();
+                                }
+                            }
+
                             for (i, &idx) in fire.palette.iter().enumerate() {
                                 let color = _assets.palette.get(idx as u8);
                                 let step_rect = egui::Rect::from_min_size(
                                     rect.min + egui::vec2(i as f32 * step_w, 0.0),
                                     egui::vec2(step_w, ramp_h),
                                 );
+
+                                let is_editing = active_slot == Some(i);
                                 ui.painter().rect_filled(step_rect, 0.0, color);
+                                if is_editing {
+                                    ui.painter().rect_stroke(
+                                        step_rect,
+                                        0.0,
+                                        egui::Stroke::new(2.0, egui::Color32::WHITE),
+                                        egui::StrokeKind::Inside,
+                                    );
+                                }
                             }
                         }
 
+                        ui.add_space(8.0);
                         ui.horizontal(|ui| {
-                            if ui.button("+ Add Step").clicked() {
+                            ui.add_space((ui.available_width() - 155.0).max(0.0) / 2.0);
+                            if ui.button("+ Add").clicked() {
                                 fire.palette.push(0);
                                 changed = true;
                             }
@@ -209,7 +245,7 @@ pub fn draw_skydefs_editor(
                                 fire.palette.pop();
                                 changed = true;
                             }
-                            if ui.button("↺ Reset Ramp").clicked() {
+                            if ui.button("Reset").clicked() {
                                 fire.palette = vec![
                                     0, 47, 191, 187, 235, 234, 232, 167, 166, 165, 223, 221, 220,
                                     219, 217, 216, 215, 214, 213, 164, 163, 162, 161, 160, 231,
@@ -217,18 +253,8 @@ pub fn draw_skydefs_editor(
                                 ];
                                 fire.updatetime = 0.05715;
                                 changed = true;
+                                ui.ctx().data_mut(|d| d.insert_temp(slot_id, -1isize));
                             }
-                        });
-
-                        ui.add_space(4.0);
-                        ui.label("Raw Indices:");
-                        egui::ScrollArea::horizontal().show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                for val in fire.palette.iter_mut() {
-                                    changed |=
-                                        ui.add(egui::DragValue::new(val).range(0..=255)).changed();
-                                }
-                            });
                         });
                     }
                 }
@@ -259,35 +285,33 @@ pub fn draw_skydefs_editor(
 
             ui.add_space(12.0);
             ui.separator();
-
-            ui.horizontal(|ui| {
-                ui.heading("Global Flat Mappings");
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(2.0);
-                    if ui.button("+ Add Mapping").clicked() {
-                        let list = file.data.flatmapping.get_or_insert(Vec::new());
-                        list.push(crate::models::skydefs::FlatMap {
-                            flat: "F_SKY1".to_string(),
-                            sky: s.name.clone(),
-                        });
-                        changed = true;
-                    }
-                });
-            });
+            ui.heading("Global Flat Mappings");
             ui.label(
                 egui::RichText::new("Redirect any floor/ceiling flat to this Sky.")
                     .weak()
                     .size(10.0),
             );
 
+            ui.add_space(4.0);
+            if ui.button("+ Add Mapping").clicked() {
+                let list = file.data.flatmapping.get_or_insert(Vec::new());
+                list.push(crate::models::skydefs::FlatMap {
+                    flat: "F_SKY1".to_string(),
+                    sky: s.name.clone(),
+                });
+                changed = true;
+            }
+
             if let Some(mappings) = &mut file.data.flatmapping {
                 let mut to_remove = None;
                 ui.add_space(4.0);
+                let row_width = ui.available_width();
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 4.0;
                     for (idx, map) in mappings.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
-                            ui.add_space(8.0);
+                            ui.add_space((row_width - 265.0).max(0.0) / 2.0);
+
                             if ui.add_sized([20.0, 20.0], egui::Button::new("X")).clicked() {
                                 to_remove = Some(idx);
                             }
@@ -320,6 +344,34 @@ pub fn draw_skydefs_editor(
                 }
             }
         });
+
+        if let Some(slot_idx) = active_slot {
+            if let Some(fire) = &mut s.fire {
+                if slot_idx < fire.palette.len() {
+                    let mut is_open = true;
+                    egui::Window::new("Select Fire Color")
+                        .id(egui::Id::new("CACOCO_GLOBAL_FIRE_WINDOW"))
+                        .resizable(false)
+                        .collapsible(false)
+                        .open(&mut is_open)
+                        .show(ui.ctx(), |ui| {
+                            let current = fire.palette[slot_idx] as u8;
+                            if let Some(new_color) = super::palette_picker::draw_palette_grid(
+                                ui,
+                                &_assets.palette,
+                                current,
+                            ) {
+                                fire.palette[slot_idx] = new_color as i32;
+                                changed = true;
+                            }
+                        });
+
+                    if !is_open {
+                        ui.ctx().data_mut(|d| d.insert_temp(slot_id, -1isize));
+                    }
+                }
+            }
+        }
     }
 
     changed
@@ -331,6 +383,65 @@ impl LumpUI for SkyDefsFile {
             return draw_skydefs_editor(ui, self, path, ctx.assets, ctx.state);
         }
         false
+    }
+
+    fn tick(&self, ctx: &mut TickContext) {
+        for sky in &self.data.skies {
+            if sky.sky_type == SkyType::Fire {
+                if let Some(fire_def) = &sky.fire {
+                    let sky_id = ctx.assets.resolve_sky_id(&sky.name);
+
+                    let sim = ctx.state.viewer.fire_sims.entry(sky_id).or_insert_with(|| {
+                        let (w, h) = if let Some(tex) = ctx.assets.textures.get(&sky_id) {
+                            (tex.size()[0] as u32, tex.size()[1] as u32)
+                        } else {
+                            (256, 128)
+                        };
+                        crate::render::fire::FireSimulation::new(w, h, ctx.time)
+                    });
+
+                    if ctx.time - sim.last_step_time >= fire_def.updatetime as f64 {
+                        sim.step();
+                        sim.last_step_time = ctx.time;
+                        let rgba = sim.generate_rgba(&fire_def.palette, &ctx.assets.palette);
+                        let dynamic_key = format!("_FIRE_ANIM_{}", sky.name);
+                        ctx.assets
+                            .load_rgba(ctx.ctx, &dynamic_key, sim.width, sim.height, &rgba);
+                        ctx.ctx.request_repaint();
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw_layer_list(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &mut LayerContext,
+    ) -> (Vec<DocumentAction>, bool) {
+        let mut actions = Vec::new();
+        if shared::heading_action_button(ui, "Skies", Some("Add Sky"), false).clicked() {
+            actions.push(DocumentAction::UndoSnapshot);
+            actions.push(DocumentAction::Sky(
+                crate::document::actions::SkyAction::Add,
+            ));
+        }
+
+        egui::ScrollArea::vertical()
+            .id_salt("sky_scroll")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                crate::ui::layers::sky::draw_sky_layers_list(
+                    ui,
+                    self,
+                    ctx.selection,
+                    ctx.current_item_idx,
+                    ctx.assets,
+                    &mut actions,
+                    ctx.confirmation_modal,
+                );
+            });
+        (actions, false)
     }
 
     fn header_info(&self, selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32) {

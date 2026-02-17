@@ -1,5 +1,6 @@
-use super::editor::{LumpUI, PropertyContext};
+use super::editor::{LayerContext, LumpUI, PropertyContext};
 use crate::assets::AssetStore;
+use crate::document::DocumentAction;
 use crate::models::umapinfo::{MapEntry, UmapField, UmapInfoFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
@@ -433,6 +434,36 @@ impl LumpUI for UmapInfoFile {
             return draw_umapinfo_editor(ui, self, path, ctx.assets, ctx.state);
         }
         false
+    }
+
+    fn draw_layer_list(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &mut LayerContext,
+    ) -> (Vec<DocumentAction>, bool) {
+        let mut actions = Vec::new();
+        if shared::heading_action_button(ui, "Maps", Some("Add Map"), false).clicked() {
+            actions.push(DocumentAction::UndoSnapshot);
+            actions.push(DocumentAction::Umap(
+                crate::document::actions::UmapAction::AddMap,
+            ));
+        }
+
+        egui::ScrollArea::vertical()
+            .id_salt("umapinfo_scroll")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                crate::ui::layers::umapinfo::draw_umapinfo_layers_list(
+                    ui,
+                    self,
+                    ctx.selection,
+                    ctx.current_item_idx,
+                    ctx.assets,
+                    &mut actions,
+                    ctx.confirmation_modal,
+                );
+            });
+        (actions, false)
     }
 
     fn header_info(&self, selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32) {

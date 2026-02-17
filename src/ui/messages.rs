@@ -3,21 +3,21 @@ use crate::state::PreviewState;
 /// All possible items and weapons that can trigger a message.
 #[derive(Debug, Clone, Copy)]
 pub enum MessageItem {
-    // Keys
+    // --- Keys ---
     BlueCard,
     YellowCard,
     RedCard,
     BlueSkull,
     YellowSkull,
     RedSkull,
-    // Powerups
+    // --- Powerups ---
     Invisibility,
     Invulnerability,
     Berserk,
     Map,
     Radsuit,
     Liteamp,
-    // Weapons
+    // --- Weapons ---
     Chainsaw,
     Pistol,
     Shotgun,
@@ -26,13 +26,13 @@ pub enum MessageItem {
     RocketLauncher,
     PlasmaGun,
     BFG,
-    // Ammo
+    // --- Ammo ---
     Clip,
     Shells,
     Rocket,
     Cell,
     Backpack,
-    // Vitals
+    // --- Vitals ---
     HealthBonus,
     ArmorBonus,
     GreenArmor,

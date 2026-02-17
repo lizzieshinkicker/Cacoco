@@ -20,6 +20,7 @@ mod graphics;
 mod interlevel;
 mod list;
 mod lookups;
+pub mod palette_picker;
 pub(crate) mod preview;
 mod sbardef;
 mod skydefs;

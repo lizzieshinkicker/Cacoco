@@ -37,7 +37,6 @@ pub enum TreeAction {
     },
     Select(Vec<Vec<usize>>),
     ToggleSelection(Vec<Vec<usize>>),
-    // SBAR-specific for now, but genericized later
     Add {
         parent_path: Vec<usize>,
         insert_idx: usize,

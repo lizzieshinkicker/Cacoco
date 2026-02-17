@@ -62,7 +62,8 @@ pub struct CastRollCallDef {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CastMember {
-    pub name: String, // DeHackEd mnemonic
+    /// For DeHackEd
+    pub name: String,
     pub sound: String,
     pub alive: Vec<CastFrame>,
     pub dead: Vec<CastFrame>,

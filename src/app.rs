@@ -320,46 +320,15 @@ impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let time = ctx.input(|i| i.time);
 
-        if let Some(doc) = &self.doc {
-            if let Some(sky_file) = doc.get_lump(ProjectMode::SkyDefs).and_then(|l| l.as_sky()) {
-                for sky in &sky_file.data.skies {
-                    if sky.sky_type == crate::models::skydefs::SkyType::Fire {
-                        if let Some(fire_def) = &sky.fire {
-                            let sky_id = self.assets.resolve_sky_id(&sky.name);
-
-                            let sim = self
-                                .preview_state
-                                .viewer
-                                .fire_sims
-                                .entry(sky_id)
-                                .or_insert_with(|| {
-                                    let (w, h) =
-                                        if let Some(tex) = self.assets.textures.get(&sky_id) {
-                                            (tex.size()[0] as u32, tex.size()[1] as u32)
-                                        } else {
-                                            (256, 128)
-                                        };
-                                    crate::render::fire::FireSimulation::new(w, h, time)
-                                });
-
-                            if time - sim.last_step_time >= fire_def.updatetime as f64 {
-                                sim.step();
-                                sim.last_step_time = time;
-                                let rgba =
-                                    sim.generate_rgba(&fire_def.palette, &self.assets.palette);
-                                let dynamic_key = format!("_FIRE_ANIM_{}", sky.name);
-                                self.assets.load_rgba(
-                                    ctx,
-                                    &dynamic_key,
-                                    sim.width,
-                                    sim.height,
-                                    &rgba,
-                                );
-                                ctx.request_repaint();
-                            }
-                        }
-                    }
-                }
+        if let Some(doc) = &mut self.doc {
+            let mut tick_ctx = ui::properties::editor::TickContext {
+                ctx,
+                assets: &mut self.assets,
+                state: &mut self.preview_state,
+                time,
+            };
+            for lump in &doc.lumps {
+                lump.tick(&mut tick_ctx);
             }
         }
 

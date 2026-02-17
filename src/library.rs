@@ -19,8 +19,10 @@ pub struct Template {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FontSource {
-    Internal, // Found in base IWAD (e.g. STCFN)
-    Package,  // Built into Cacoco's library
+    /// Found in base IWAD (e.g. STCFN)
+    Internal,
+    /// Built into Cacoco's library
+    Package,
 }
 
 pub struct FontDefinition {

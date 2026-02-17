@@ -429,7 +429,7 @@ impl<'a> ListRow<'a> {
             egui::Stroke::NONE
         };
         ui.painter()
-            .rect(rect, 4.0, bg, stroke, egui::StrokeKind::Outside);
+            .rect(rect, 4.0, bg, stroke, egui::StrokeKind::Inside);
 
         let thumb_rect = egui::Rect::from_center_size(
             egui::pos2(rect.min.x + 22.0, rect.center().y),
