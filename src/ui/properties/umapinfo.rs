@@ -308,20 +308,6 @@ fn draw_field_card(
                             changed = true;
                         }
                     }
-                    UmapField::InterText(lines) => {
-                        let mut text_buf = lines.join("\n");
-                        if ui
-                            .add(
-                                egui::TextEdit::multiline(&mut text_buf)
-                                    .desired_width(ui.available_width())
-                                    .desired_rows(3),
-                            )
-                            .changed()
-                        {
-                            *lines = text_buf.lines().map(|s| s.to_string()).collect();
-                            changed = true;
-                        }
-                    }
                     UmapField::BossAction {
                         thing,
                         special,

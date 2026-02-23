@@ -240,7 +240,7 @@ impl UmapInfoFile {
         let mut pending_key: Option<String> = None;
         let mut pending_values: Vec<String> = Vec::new();
 
-        let mut flush_pending = |map: &mut MapEntry, key: &str, values: &mut Vec<String>| {
+        let flush_pending = |map: &mut MapEntry, key: &str, values: &mut Vec<String>| {
             if values.is_empty() {
                 return;
             }
