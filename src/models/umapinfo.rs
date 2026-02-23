@@ -22,7 +22,7 @@ pub enum UmapField {
     /// Can be a string or "clear"
     Label(String),
     /// Can be a string or "clear"
-    InterTextSecret(String),
+    InterTextSecret(Vec<String>),
     ParTime(i32),
     EndGame(bool),
     EndBunny(bool),
@@ -145,11 +145,11 @@ impl UmapInfoFile {
             out.push_str(&format!("map {}\n{{\n", map.mapname));
             for field in &map.fields {
                 match field {
-                    UmapField::InterText(lines) => {
+                    UmapField::InterText(lines) | UmapField::InterTextSecret(lines) => {
                         if lines.len() == 1 && lines[0] == "clear" {
-                            out.push_str("\tintertext = clear\n");
+                            out.push_str(&format!("\t{} = clear\n", field.key_name()));
                         } else {
-                            out.push_str("\tintertext = ");
+                            out.push_str(&format!("\t{} = ", field.key_name()));
                             for (i, line) in lines.iter().enumerate() {
                                 let sep = if i == 0 { "" } else { ",\n\t\t" };
                                 out.push_str(&format!("{}\"{}\"", sep, line));
@@ -166,6 +166,26 @@ impl UmapInfoFile {
                                 patch, name, key
                             ));
                         }
+                    }
+                    UmapField::Label(v) => {
+                        if v == "clear" {
+                            out.push_str("\tlabel = clear\n");
+                        } else {
+                            out.push_str(&format!("\tlabel = \"{}\"\n", v));
+                        }
+                    }
+                    UmapField::ParTime(v) => {
+                        out.push_str(&format!("\t{} = {}\n", field.key_name(), v))
+                    }
+                    UmapField::EndGame(v)
+                    | UmapField::EndBunny(v)
+                    | UmapField::EndCast(v)
+                    | UmapField::NoIntermission(v) => {
+                        out.push_str(&format!(
+                            "\t{} = {}\n",
+                            field.key_name(),
+                            if *v { "true" } else { "false" }
+                        ));
                     }
                     UmapField::BossAction {
                         thing,
@@ -184,25 +204,8 @@ impl UmapInfoFile {
                             ednum, special, tag
                         ));
                     }
-                    UmapField::ParTime(v) => {
-                        out.push_str(&format!("\t{} = {}\n", field.key_name(), v))
-                    }
-                    UmapField::EndGame(v)
-                    | UmapField::EndBunny(v)
-                    | UmapField::EndCast(v)
-                    | UmapField::NoIntermission(v) => {
-                        let bool_val = if *v { "true" } else { "false" };
-                        out.push_str(&format!("\t{} = {}\n", field.key_name(), bool_val));
-                    }
-                    UmapField::Label(v) | UmapField::InterTextSecret(v) => {
-                        if v == "clear" {
-                            out.push_str(&format!("\t{} = clear\n", field.key_name()));
-                        } else {
-                            out.push_str(&format!("\t{} = \"{}\"\n", field.key_name(), v));
-                        }
-                    }
                     _ => {
-                        let val_str = match field {
+                        if let Some(s) = match field {
                             UmapField::LevelName(s)
                             | UmapField::Author(s)
                             | UmapField::SkyTexture(s)
@@ -214,10 +217,11 @@ impl UmapInfoFile {
                             | UmapField::InterBackdrop(s)
                             | UmapField::InterMusic(s)
                             | UmapField::Next(s)
-                            | UmapField::NextSecret(s) => s,
-                            _ => "",
-                        };
-                        out.push_str(&format!("\t{} = \"{}\"\n", field.key_name(), val_str));
+                            | UmapField::NextSecret(s) => Some(s),
+                            _ => None,
+                        } {
+                            out.push_str(&format!("\t{} = \"{}\"\n", field.key_name(), s));
+                        }
                     }
                 }
             }
@@ -233,6 +237,117 @@ impl UmapInfoFile {
             ..Default::default()
         };
         let mut current_map: Option<MapEntry> = None;
+        let mut pending_key: Option<String> = None;
+        let mut pending_values: Vec<String> = Vec::new();
+
+        let mut flush_pending = |map: &mut MapEntry, key: &str, values: &mut Vec<String>| {
+            if values.is_empty() {
+                return;
+            }
+
+            let clean_segment = |s: &str| -> String {
+                s.trim()
+                    .trim_matches(',')
+                    .trim()
+                    .trim_matches('"')
+                    .to_string()
+            };
+
+            let val_joined = values.join(" ");
+            let val_clean = clean_segment(&val_joined);
+
+            let field = match key {
+                "levelname" => Some(UmapField::LevelName(val_clean)),
+                "author" => Some(UmapField::Author(val_clean)),
+                "skytexture" => Some(UmapField::SkyTexture(val_clean)),
+                "music" => Some(UmapField::Music(val_clean)),
+                "levelpic" => Some(UmapField::LevelPic(val_clean)),
+                "next" => Some(UmapField::Next(val_clean)),
+                "nextsecret" => Some(UmapField::NextSecret(val_clean)),
+                "label" => Some(UmapField::Label(val_clean)),
+                "exitpic" => Some(UmapField::ExitPic(val_clean)),
+                "enterpic" => Some(UmapField::EnterPic(val_clean)),
+                "endpic" => Some(UmapField::EndPic(val_clean)),
+                "interbackdrop" => Some(UmapField::InterBackdrop(val_clean)),
+                "intermusic" => Some(UmapField::InterMusic(val_clean)),
+                "partime" => val_clean.parse::<i32>().ok().map(UmapField::ParTime),
+                "endgame" => Some(UmapField::EndGame(val_clean.to_lowercase() == "true")),
+                "endbunny" => Some(UmapField::EndBunny(val_clean.to_lowercase() == "true")),
+                "endcast" => Some(UmapField::EndCast(val_clean.to_lowercase() == "true")),
+                "nointermission" => Some(UmapField::NoIntermission(
+                    val_clean.to_lowercase() == "true",
+                )),
+                "intertext" | "intertextsecret" => {
+                    if val_clean.to_lowercase() == "clear" {
+                        let f = if key == "intertext" {
+                            UmapField::InterText(vec!["clear".into()])
+                        } else {
+                            UmapField::InterTextSecret(vec!["clear".into()])
+                        };
+                        Some(f)
+                    } else {
+                        let lines = values
+                            .iter()
+                            .map(|s| clean_segment(s))
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                        if key == "intertext" {
+                            Some(UmapField::InterText(lines))
+                        } else {
+                            Some(UmapField::InterTextSecret(lines))
+                        }
+                    }
+                }
+                "episode" => {
+                    if val_clean.to_lowercase() == "clear" {
+                        Some(UmapField::Episode {
+                            patch: "clear".into(),
+                            name: "".into(),
+                            key: "".into(),
+                        })
+                    } else {
+                        let parts: Vec<String> =
+                            val_joined.split(',').map(|s| clean_segment(s)).collect();
+                        if parts.len() >= 3 {
+                            Some(UmapField::Episode {
+                                patch: parts[0].clone(),
+                                name: parts[1].clone(),
+                                key: parts[2].clone(),
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                }
+                "bossaction" | "bossactionednum" => {
+                    let parts: Vec<String> =
+                        val_joined.split(',').map(|s| clean_segment(s)).collect();
+                    if parts.len() >= 3 {
+                        if key == "bossaction" {
+                            Some(UmapField::BossAction {
+                                thing: parts[0].clone(),
+                                special: parts[1].parse().unwrap_or(0),
+                                tag: parts[2].parse().unwrap_or(0),
+                            })
+                        } else {
+                            Some(UmapField::BossActionEdNum {
+                                ednum: parts[0].clone(),
+                                special: parts[1].parse().unwrap_or(0),
+                                tag: parts[2].parse().unwrap_or(0),
+                            })
+                        }
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
+            if let Some(f) = field {
+                map.fields.push(f);
+            }
+            values.clear();
+        };
 
         for line in text.lines() {
             let line = line.trim();
@@ -241,7 +356,10 @@ impl UmapInfoFile {
             }
 
             if line.to_uppercase().starts_with("MAP") {
-                if let Some(m) = current_map.take() {
+                if let Some(mut m) = current_map.take() {
+                    if let Some(k) = pending_key.take() {
+                        flush_pending(&mut m, &k, &mut pending_values);
+                    }
                     file.data.maps.push(m);
                 }
                 let name = line[3..].trim().trim_matches('{').trim().to_string();
@@ -254,73 +372,23 @@ impl UmapInfoFile {
 
             if let Some(m) = current_map.as_mut() {
                 if line == "}" {
+                    if let Some(k) = pending_key.take() {
+                        flush_pending(m, &k, &mut pending_values);
+                    }
                     file.data.maps.push(current_map.take().unwrap());
                     continue;
                 }
 
                 if let Some((key, val)) = line.split_once('=') {
-                    let key = key.trim().to_lowercase();
-                    let val_raw = val.trim();
-
-                    let val_clean = val_raw.trim_matches('"').to_string();
-
-                    let field = match key.as_str() {
-                        "levelname" => Some(UmapField::LevelName(val_clean)),
-                        "author" => Some(UmapField::Author(val_clean)),
-                        "skytexture" => Some(UmapField::SkyTexture(val_clean)),
-                        "music" => Some(UmapField::Music(val_clean)),
-                        "levelpic" => Some(UmapField::LevelPic(val_clean)),
-                        "next" => Some(UmapField::Next(val_clean)),
-                        "nextsecret" => Some(UmapField::NextSecret(val_clean)),
-                        "label" => Some(UmapField::Label(val_clean)),
-                        "intertextsecret" => Some(UmapField::InterTextSecret(val_clean)),
-                        "exitpic" => Some(UmapField::ExitPic(val_clean)),
-                        "enterpic" => Some(UmapField::EnterPic(val_clean)),
-                        "endpic" => Some(UmapField::EndPic(val_clean)),
-                        "interbackdrop" => Some(UmapField::InterBackdrop(val_clean)),
-                        "intermusic" => Some(UmapField::InterMusic(val_clean)),
-                        "partime" => val_clean.parse::<i32>().ok().map(UmapField::ParTime),
-                        "endgame" => Some(UmapField::EndGame(val_clean.to_lowercase() == "true")),
-                        "endbunny" => Some(UmapField::EndBunny(val_clean.to_lowercase() == "true")),
-                        "endcast" => Some(UmapField::EndCast(val_clean.to_lowercase() == "true")),
-                        "nointermission" => Some(UmapField::NoIntermission(
-                            val_clean.to_lowercase() == "true",
-                        )),
-                        "episode" => {
-                            if val_clean.to_lowercase() == "clear" {
-                                Some(UmapField::Episode {
-                                    patch: "clear".into(),
-                                    name: "".into(),
-                                    key: "".into(),
-                                })
-                            } else {
-                                let parts: Vec<String> = val_raw
-                                    .split(',')
-                                    .map(|s| s.trim().trim_matches('"').to_string())
-                                    .collect();
-                                if parts.len() >= 3 {
-                                    Some(UmapField::Episode {
-                                        patch: parts[0].clone(),
-                                        name: parts[1].clone(),
-                                        key: parts[2].clone(),
-                                    })
-                                } else {
-                                    None
-                                }
-                            }
-                        }
-                        _ => None,
-                    };
-
-                    if let Some(f) = field {
-                        m.fields.push(f);
+                    if let Some(prev_key) = pending_key.take() {
+                        flush_pending(m, &prev_key, &mut pending_values);
                     }
+                    pending_key = Some(key.trim().to_lowercase());
+                    pending_values.push(val.trim().to_string());
+                } else if pending_key.is_some() {
+                    pending_values.push(line.to_string());
                 }
             }
-        }
-
-        if let Some(m) = current_map {
-            file.data.maps.push(m);
         }
         file
     }

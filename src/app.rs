@@ -242,24 +242,28 @@ impl CacocoApp {
 
     /// Applies a library template as the current project.
     pub fn apply_template(&mut self, ctx: &egui::Context, template: &crate::library::Template) {
-        match serde_json::from_str::<crate::models::sbardef::SBarDefFile>(template.json_content) {
-            Ok(mut parsed_file) => {
-                parsed_file.normalize_paths();
-                parsed_file.target = parsed_file.determine_target();
-                parsed_file.normalize_for_target();
+        match serde_json::from_str::<crate::models::ProjectData>(template.json_content) {
+            Ok(mut data) => {
+                match &mut data {
+                    crate::models::ProjectData::StatusBar(s) => {
+                        s.normalize_paths();
+                        s.target = s.determine_target();
+                        s.normalize_for_target();
+                    }
+                    _ => {}
+                }
 
-                let data = crate::models::ProjectData::StatusBar(parsed_file);
-                self.active_mode = ProjectMode::from_data(&data);
+                let mode = ProjectMode::from_data(&data);
+                self.active_mode = mode;
+
                 if let Some(doc) = &mut self.doc {
-                    doc.lumps
-                        .retain(|l| !matches!(l, crate::models::ProjectData::StatusBar(_)));
+                    doc.lumps.retain(|l| ProjectMode::from_data(l) != mode);
                     doc.lumps.push(data);
                     doc.dirty = true;
                 } else {
                     self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
                     self.assets = AssetStore::default();
                     self.preview_state = PreviewState::default();
-
                     self.load_system_assets(ctx);
                     if let Some(path) = &self.config.base_wad_path {
                         io::load_wad_from_path(ctx, path, &mut self.assets);

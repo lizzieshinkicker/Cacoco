@@ -352,6 +352,12 @@ pub const TEMPLATES: &[Template] = &[
         json_content: include_str!("../assets/templates/nightkicker.json"),
         required_prefixes: NIGHTKICKER_PREFIXES,
     },
+    Template {
+        name: "Doom II Original",
+        description: "A complete UMAPINFO definition for Doom II.",
+        json_content: include_str!("../assets/templates/doom2umapinfo.json"),
+        required_prefixes: &[],
+    },
 ];
 
 pub const FONTS: &[FontDefinition] = &[

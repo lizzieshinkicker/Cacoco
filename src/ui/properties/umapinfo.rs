@@ -103,6 +103,11 @@ const FIELD_REGISTRY: &[FieldMetadata] = &[
         group: "Advanced",
     },
     FieldMetadata {
+        label: "Inter. Text (Secret)",
+        key_name: "intertextsecret",
+        group: "Advanced",
+    },
+    FieldMetadata {
         label: "Boss Action",
         key_name: "bossaction",
         group: "Advanced",
@@ -238,7 +243,7 @@ fn draw_field_card(
                 }
             } else {
                 match field {
-                    UmapField::Label(s) | UmapField::InterTextSecret(s) => {
+                    UmapField::Label(s) => {
                         ui.horizontal(|ui| {
                             let mut is_clear = s == "clear";
                             if ui.checkbox(&mut is_clear, "Clear").changed() {
@@ -257,6 +262,34 @@ fn draw_field_card(
                                     )
                                     .changed()
                                 {
+                                    changed = true;
+                                }
+                            }
+                        });
+                    }
+                    UmapField::InterText(lines) | UmapField::InterTextSecret(lines) => {
+                        ui.vertical(|ui| {
+                            let mut is_clear = lines.len() == 1 && lines[0] == "clear";
+                            if ui.checkbox(&mut is_clear, "Clear / Disable").changed() {
+                                if is_clear {
+                                    *lines = vec!["clear".to_string()];
+                                } else {
+                                    *lines = vec!["New intermission text...".to_string()];
+                                }
+                                changed = true;
+                            }
+
+                            if !is_clear {
+                                let mut text_buf = lines.join("\n");
+                                if ui
+                                    .add(
+                                        egui::TextEdit::multiline(&mut text_buf)
+                                            .desired_width(ui.available_width())
+                                            .desired_rows(3),
+                                    )
+                                    .changed()
+                                {
+                                    *lines = text_buf.lines().map(|s| s.to_string()).collect();
                                     changed = true;
                                 }
                             }
@@ -402,13 +435,13 @@ fn create_default_field(key: &str) -> UmapField {
         "next" => UmapField::Next(String::new()),
         "nextsecret" => UmapField::NextSecret(String::new()),
         "label" => UmapField::Label("clear".to_string()),
-        "intertextsecret" => UmapField::InterTextSecret("clear".to_string()),
+        "intertextsecret" => UmapField::InterTextSecret(vec!["clear".to_string()]),
         "partime" => UmapField::ParTime(0),
         "endgame" => UmapField::EndGame(true),
         "endbunny" => UmapField::EndBunny(true),
         "endcast" => UmapField::EndCast(true),
         "nointermission" => UmapField::NoIntermission(true),
-        "intertext" => UmapField::InterText(vec![]),
+        "intertext" => UmapField::InterText(vec!["clear".to_string()]),
         "bossaction" => UmapField::BossAction {
             thing: "Cyberdemon".into(),
             special: 0,

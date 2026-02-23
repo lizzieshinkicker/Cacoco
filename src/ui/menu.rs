@@ -629,16 +629,35 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                                 app.creation_modal = CreationModal::None;
                             }
 
-                            if app.creation_modal == CreationModal::SBarDef {
-                                ui.add_space(4.0);
-                                ui.label(
-                                    egui::RichText::new("Templates").weak().italics().size(11.0),
-                                );
+                            let target_type_key = match app.creation_modal {
+                                CreationModal::SBarDef => Some("\"type\": \"statusbar\""),
+                                CreationModal::UmapInfo => Some("\"type\": \"umapinfo\""),
+                                CreationModal::SkyDefs => Some("\"type\": \"skydefs\""),
+                                CreationModal::Interlevel => Some("\"type\": \"interlevel\""),
+                                CreationModal::Finale => Some("\"type\": \"finale\""),
+                                _ => None,
+                            };
 
-                                for template in crate::library::TEMPLATES {
-                                    if draw_menu_card(ui, template.name, template.description) {
-                                        app.apply_template(ctx, template);
-                                        app.creation_modal = CreationModal::None;
+                            if let Some(key) = target_type_key {
+                                let relevant_templates: Vec<_> = crate::library::TEMPLATES
+                                    .iter()
+                                    .filter(|t| t.json_content.contains(key))
+                                    .collect();
+
+                                if !relevant_templates.is_empty() {
+                                    ui.add_space(4.0);
+                                    ui.label(
+                                        egui::RichText::new("Templates")
+                                            .weak()
+                                            .italics()
+                                            .size(11.0),
+                                    );
+
+                                    for template in relevant_templates {
+                                        if draw_menu_card(ui, template.name, template.description) {
+                                            app.apply_template(ctx, template);
+                                            app.creation_modal = CreationModal::None;
+                                        }
                                     }
                                 }
                             }
