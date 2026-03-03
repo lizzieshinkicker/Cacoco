@@ -73,8 +73,10 @@ pub fn draw_viewport(
                     let all_modes = [
                         (ProjectMode::SBarDef, "SBARDEF"),
                         (ProjectMode::SkyDefs, "SKYDEFS"),
+                        /* TODO: Not quite ready yet...
                         (ProjectMode::Interlevel, "INTERLEVEL"),
                         (ProjectMode::Finale, "FINALE"),
+                        */
                         (ProjectMode::UmapInfo, "UMAPINFO"),
                     ];
 
@@ -116,12 +118,14 @@ pub fn draw_viewport(
 
                     add_lump_row("+ SBARDEF", ProjectMode::SBarDef, CreationModal::SBarDef);
                     add_lump_row("+ SKYDEFS", ProjectMode::SkyDefs, CreationModal::SkyDefs);
+                    /* TODO: Not quite ready yet...
                     add_lump_row(
                         "+ INTERLEVEL",
                         ProjectMode::Interlevel,
                         CreationModal::Interlevel,
                     );
                     add_lump_row("+ FINALE", ProjectMode::Finale, CreationModal::Finale);
+                    */
                     add_lump_row("+ UMAPINFO", ProjectMode::UmapInfo, CreationModal::UmapInfo);
                 });
             }

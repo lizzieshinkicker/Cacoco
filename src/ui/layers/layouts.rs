@@ -17,9 +17,12 @@ pub fn draw_layouts_browser(
     let mut changed = false;
 
     if shared::heading_action_button(ui, "Layouts", Some("New Layout"), false).clicked() {
-        actions.push(DocumentAction::UndoSnapshot);
-        actions.push(DocumentAction::SBar(SBarAction::AddStatusBar));
-        changed = true;
+        ui.data_mut(|d| {
+            d.insert_temp(
+                egui::Id::new("creation_modal_type"),
+                crate::app::CreationModal::LayoutTemplate,
+            )
+        });
     }
 
     let mut move_request = None;

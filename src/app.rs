@@ -45,9 +45,12 @@ pub enum CreationModal {
     LumpSelector,
     SBarDef,
     SkyDefs,
+    #[allow(dead_code)]
     Interlevel,
+    #[allow(dead_code)]
     Finale,
     UmapInfo,
+    LayoutTemplate,
 }
 
 /// Actions that require user confirmation (usually due to unsaved changes).
