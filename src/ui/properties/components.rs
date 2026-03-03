@@ -88,7 +88,7 @@ impl PropertiesUI for ComponentDef {
                 format!(":{:02}", total_seconds % 60)
             }
             ComponentType::LevelTitle => "MAP01: ENTRYWAY".to_string(),
-            ComponentType::FpsCounter => format!("{:.0}", state.editor.display_fps),
+            ComponentType::FpsCounter => format!("{:.0}", state.viewer.display_fps),
             ComponentType::Coordinates => "X: ### Y: ###".to_string(),
             ComponentType::StatTotals => "K:0/0".to_string(),
             ComponentType::Message => "You got the Shotgun!".to_string(),

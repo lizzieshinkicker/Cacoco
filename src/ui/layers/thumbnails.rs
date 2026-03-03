@@ -1,6 +1,7 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::models::sbardef::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
 use crate::state::PreviewState;
+use crate::state::simulation::LookDirection;
 use crate::ui::shared;
 use eframe::egui;
 
@@ -22,12 +23,16 @@ pub fn draw_thumbnail(
     file: &SBarDefFile,
     state: &PreviewState,
     is_visible: bool,
-    _is_selected: bool,
+    interactive: bool,
 ) -> egui::Response {
     let time = ui.input(|i| i.time);
+    let sense = if interactive {
+        egui::Sense::click()
+    } else {
+        egui::Sense::hover()
+    };
 
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), sense);
     draw_thumb_bg(ui, rect);
 
     let tint = if is_visible {
@@ -61,13 +66,11 @@ pub fn draw_thumbnail(
                 3 => "AUT",
                 _ => "TXT",
             };
-
             let clean_text: String = raw_text
                 .chars()
                 .filter(|c| !c.is_whitespace())
                 .take(3)
                 .collect();
-
             if let Some(stem) = find_hud_stem(file, &s.font) {
                 draw_live_patches(ui, rect, &clean_text, stem, assets, tint, false);
             } else {
@@ -89,10 +92,17 @@ pub fn draw_thumbnail_widget(
     texture: Option<&egui::TextureHandle>,
     fallback_icon: Option<&str>,
     is_dimmed: bool,
+    interactive: bool,
 ) -> egui::Response {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), egui::Sense::click());
+    let sense = if interactive {
+        egui::Sense::click()
+    } else {
+        egui::Sense::hover()
+    };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(THUMB_SIZE, THUMB_SIZE), sense);
+
     draw_thumb_bg(ui, rect);
+
     draw_static_texture_content(ui, rect, texture, fallback_icon, is_dimmed);
     response
 }
@@ -152,15 +162,15 @@ fn draw_live_number_thumbnail(
     };
 
     let val = match number_def.type_ {
-        NumberType::Health => state.player.health,
-        NumberType::Armor => state.player.armor,
+        NumberType::Health => state.sim.player.health,
+        NumberType::Armor => state.sim.player.armor,
         NumberType::AmmoSelected => {
-            let slot = state.selected_weapon_slot;
-            let idx = state.inventory.get_selected_ammo_type(slot);
-            state.inventory.get_ammo(idx)
+            let slot = state.sim.selected_weapon_slot;
+            let idx = state.sim.inventory.get_selected_ammo_type(slot);
+            state.sim.inventory.get_ammo(idx)
         }
-        NumberType::Ammo => state.inventory.get_ammo(number_def.param),
-        NumberType::MaxAmmo => state.inventory.get_max_ammo(number_def.param),
+        NumberType::Ammo => state.sim.inventory.get_ammo(number_def.param),
+        NumberType::MaxAmmo => state.sim.inventory.get_max_ammo(number_def.param),
         _ => 0,
     };
 
@@ -225,7 +235,7 @@ fn draw_live_component_thumbnail(
         ComponentType::Coordinates => "XYZ",
         ComponentType::FpsCounter => {
             ui.ctx().request_repaint();
-            text_buf = format!("{:.0}", state.editor.display_fps);
+            text_buf = format!("{:.0}", state.viewer.display_fps);
             &text_buf
         }
         _ => "TXT",
@@ -309,11 +319,11 @@ pub fn get_preview_texture<'a>(
         Element::Graphic(g) => Some(AssetId::new(&g.patch)),
         Element::Animation(a) => a.frames.first().map(|f| AssetId::new(&f.lump)),
         Element::Face(_) => {
-            let sprite = state.player.get_face_sprite(
+            let sprite = state.sim.player.get_face_sprite(
                 ouch,
-                1,
-                state.editor.pain_timer,
-                state.editor.evil_timer,
+                LookDirection::Straight,
+                state.viewer.pain_timer,
+                state.viewer.evil_timer,
             );
             Some(AssetId::new(&sprite))
         }
@@ -419,14 +429,20 @@ impl<'a> ListRow<'a> {
             egui::Stroke::NONE
         };
         ui.painter()
-            .rect(rect, 4.0, bg, stroke, egui::StrokeKind::Outside);
+            .rect(rect, 4.0, bg, stroke, egui::StrokeKind::Inside);
 
         let thumb_rect = egui::Rect::from_center_size(
             egui::pos2(rect.min.x + 22.0, rect.center().y),
             egui::vec2(THUMB_SIZE, THUMB_SIZE),
         );
         let mut thumb_ui = ui.new_child(egui::UiBuilder::new().max_rect(thumb_rect));
-        draw_thumbnail_widget(&mut thumb_ui, self.texture, self.fallback_icon, self.dimmed);
+        draw_thumbnail_widget(
+            &mut thumb_ui,
+            self.texture,
+            self.fallback_icon,
+            self.dimmed,
+            false,
+        );
 
         let title_pos_x = rect.min.x + 44.0;
         let center_y = rect.center().y;

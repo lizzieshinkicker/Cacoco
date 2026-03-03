@@ -1,21 +1,21 @@
-use crate::document::LayerAction;
+use crate::document::actions::SBarAction;
 use crate::models::sbardef::{SBarDefFile, StatusBarLayout};
 use std::collections::HashSet;
 
 /// Processes actions that target the top-level Status Bar layout list.
 pub fn execute_layout_action(
     file: &mut SBarDefFile,
-    action: LayerAction,
+    action: SBarAction,
     selection: &mut HashSet<Vec<usize>>,
 ) {
     match action {
-        LayerAction::AddStatusBar => {
+        SBarAction::AddStatusBar => {
             file.data.status_bars.push(StatusBarLayout::default());
             let new_idx = file.data.status_bars.len() - 1;
             selection.clear();
             selection.insert(vec![new_idx]);
         }
-        LayerAction::DuplicateStatusBar(idx) => {
+        SBarAction::DuplicateStatusBar(idx) => {
             if let Some(bar) = file.data.status_bars.get(idx) {
                 let mut new_bar = bar.clone();
                 new_bar.reassign_all_uids();
@@ -24,7 +24,7 @@ pub fn execute_layout_action(
                 selection.insert(vec![idx + 1]);
             }
         }
-        LayerAction::MoveStatusBar { source, target } => {
+        SBarAction::MoveStatusBar { source, target } => {
             if source < file.data.status_bars.len() {
                 let element = file.data.status_bars.remove(source);
                 let mut final_target = target;
@@ -37,13 +37,13 @@ pub fn execute_layout_action(
                 selection.insert(vec![safe_target]);
             }
         }
-        LayerAction::DeleteStatusBar(idx) => {
+        SBarAction::DeleteStatusBar(idx) => {
             if file.data.status_bars.len() > 1 && idx < file.data.status_bars.len() {
                 file.data.status_bars.remove(idx);
                 selection.clear();
             }
         }
-        LayerAction::PasteStatusBars(bars) => {
+        SBarAction::PasteStatusBars(bars) => {
             selection.clear();
             for mut bar in bars {
                 bar.reassign_all_uids();
@@ -51,6 +51,5 @@ pub fn execute_layout_action(
                 selection.insert(vec![file.data.status_bars.len() - 1]);
             }
         }
-        _ => {}
     }
 }

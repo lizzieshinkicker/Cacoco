@@ -1,4 +1,4 @@
-use crate::document::LayerAction;
+use crate::document::actions::TreeAction;
 use crate::models::sbardef::{CanvasDef, CommonAttrs, Element, ElementWrapper, SBarDefFile};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -9,45 +9,44 @@ use std::collections::{HashMap, HashSet};
 /// mutations to specialized private operation handlers.
 pub fn execute_tree_action(
     file: &mut SBarDefFile,
-    action: LayerAction,
+    action: TreeAction,
     selection: &mut HashSet<Vec<usize>>,
 ) {
     match action {
-        LayerAction::DeleteSelection(paths) => op_delete(file, selection, paths),
-        LayerAction::DuplicateSelection(paths) => op_duplicate(file, selection, paths),
-        LayerAction::MoveUp(path) => op_move_up(file, selection, path),
-        LayerAction::MoveDown(path) => op_move_down(file, selection, path),
-        LayerAction::MoveSelection {
+        TreeAction::Delete(paths) => op_delete(file, selection, paths),
+        TreeAction::Duplicate(paths) => op_duplicate(file, selection, paths),
+        TreeAction::MoveUp(path) => op_move_up(file, selection, path),
+        TreeAction::MoveDown(path) => op_move_down(file, selection, path),
+        TreeAction::MoveSelection {
             sources,
             target_parent,
             insert_idx,
         } => op_move_selection(file, selection, sources, target_parent, insert_idx),
-        LayerAction::Add {
+        TreeAction::Add {
             parent_path,
             insert_idx,
             element,
         } => op_add(file, selection, parent_path, insert_idx, element),
-        LayerAction::Paste {
+        TreeAction::Paste {
             parent_path,
             insert_idx,
             elements,
         } => op_paste(file, selection, parent_path, insert_idx, elements),
-        LayerAction::TranslateSelection { paths, dx, dy } => op_translate(file, paths, dx, dy),
-        LayerAction::GroupSelection(paths) => op_group(file, selection, paths),
-        LayerAction::Select(paths) => {
+        TreeAction::Translate { paths, dx, dy } => op_translate(file, paths, dx, dy),
+        TreeAction::Group(paths) => op_group(file, selection, paths),
+        TreeAction::Select(paths) => {
             selection.clear();
             for path in paths {
                 selection.insert(path);
             }
         }
-        LayerAction::ToggleSelection(paths) => {
+        TreeAction::ToggleSelection(paths) => {
             for path in paths {
                 if !selection.remove(&path) {
                     selection.insert(path);
                 }
             }
         }
-        _ => {}
     }
 }
 

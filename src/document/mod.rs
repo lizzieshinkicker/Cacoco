@@ -1,71 +1,20 @@
+pub mod actions;
 mod layout;
+mod sky;
 mod tree;
+mod umapinfo;
 
 use crate::app::ProjectMode;
 use crate::history::HistoryManager;
 use crate::models::ProjectData;
-use crate::models::sbardef::{ElementWrapper, StatusBarLayout};
 use std::collections::HashSet;
-
-/// Actions that can be performed on the document's layer hierarchy or layouts.
-#[derive(Debug, Clone)]
-pub enum LayerAction {
-    /// Forces an undo snapshot to be taken before the next mutation.
-    UndoSnapshot,
-    /// Deletes the specified paths from the tree.
-    DeleteSelection(Vec<Vec<usize>>),
-    /// Duplicates the specified paths at their current locations.
-    DuplicateSelection(Vec<Vec<usize>>),
-    /// Moves an element one index up within its parent list.
-    MoveUp(Vec<usize>),
-    /// Moves an element one index down within its parent list.
-    MoveDown(Vec<usize>),
-    /// Performs a move operation, potentially changing the parent of the elements.
-    MoveSelection {
-        sources: Vec<Vec<usize>>,
-        target_parent: Vec<usize>,
-        insert_idx: usize,
-    },
-    /// Adds a new element at the specified location.
-    Add {
-        parent_path: Vec<usize>,
-        insert_idx: usize,
-        element: ElementWrapper,
-    },
-    /// Pastes a list of elements from the clipboard.
-    Paste {
-        parent_path: Vec<usize>,
-        insert_idx: usize,
-        elements: Vec<ElementWrapper>,
-    },
-    /// Offsets the X/Y coordinates of the specified elements.
-    TranslateSelection {
-        paths: Vec<Vec<usize>>,
-        dx: i32,
-        dy: i32,
-    },
-    /// Adds a new status bar layout to the project.
-    AddStatusBar,
-    /// Duplicates an existing status bar layout.
-    DuplicateStatusBar(usize),
-    /// Reorders status bar layouts.
-    MoveStatusBar { source: usize, target: usize },
-    /// Deletes a status bar layout.
-    DeleteStatusBar(usize),
-    /// Pastes layouts from the clipboard.
-    PasteStatusBars(Vec<StatusBarLayout>),
-    /// Wraps the current selection in a new Canvas group.
-    GroupSelection(Vec<Vec<usize>>),
-    /// Replaces the current selection with a new set of paths.
-    Select(Vec<Vec<usize>>),
-    /// Toggles the selection state of specific paths (Multi-select support).
-    ToggleSelection(Vec<Vec<usize>>),
-}
 
 /// Manages a collection of ID24 lumps, their selection, and its modification history.
 pub struct ProjectDocument {
-    /// All lumps contained in this project (SBARDEF, SKYDEFS, etc.)
+    /// All lumps contained in this project that Cacoco understands (SBARDEF, SKYDEFS, etc.)
     pub lumps: Vec<ProjectData>,
+    /// All lumps contained in this project that Cacoco passes through (MAPs and whatnot)
+    pub passthrough_lumps: Vec<crate::wad::RawLump>,
     /// The filesystem path where this document is saved.
     pub path: Option<String>,
     /// The set of tree-paths currently selected by the user.
@@ -80,9 +29,14 @@ pub struct ProjectDocument {
 
 impl ProjectDocument {
     /// Creates a new document from an initial lump and optional path.
-    pub fn new(initial_lump: ProjectData, path: Option<String>) -> Self {
+    pub fn new(
+        initial_lump: ProjectData,
+        passthrough: Vec<crate::wad::RawLump>,
+        path: Option<String>,
+    ) -> Self {
         Self {
             lumps: vec![initial_lump],
+            passthrough_lumps: passthrough,
             path,
             selection: HashSet::new(),
             selection_pivot: None,
@@ -106,10 +60,10 @@ impl ProjectDocument {
     }
 
     /// Primary entry point for mutating project data via user actions.
-    pub fn execute_actions(&mut self, actions: Vec<LayerAction>, active_mode: ProjectMode) {
+    pub fn execute_actions(&mut self, actions: Vec<DocumentAction>, active_mode: ProjectMode) {
         for action in actions {
             match action {
-                LayerAction::UndoSnapshot => {
+                DocumentAction::UndoSnapshot => {
                     self.history.take_snapshot(&self.lumps, &self.selection);
                 }
                 _ => {
@@ -120,19 +74,28 @@ impl ProjectDocument {
                         .iter_mut()
                         .find(|l| ProjectMode::from_data(l) == active_mode);
 
-                    if let Some(ProjectData::StatusBar(sbar)) = active_lump {
-                        match action {
-                            LayerAction::AddStatusBar
-                            | LayerAction::DuplicateStatusBar(_)
-                            | LayerAction::MoveStatusBar { .. }
-                            | LayerAction::DeleteStatusBar(_)
-                            | LayerAction::PasteStatusBars(_) => {
-                                layout::execute_layout_action(sbar, action, selection_ref);
-                            }
-                            _ => {
-                                tree::execute_tree_action(sbar, action, selection_ref);
+                    match action {
+                        DocumentAction::SBar(sbar_act) => {
+                            if let Some(ProjectData::StatusBar(sbar)) = active_lump {
+                                layout::execute_layout_action(sbar, sbar_act, selection_ref);
                             }
                         }
+                        DocumentAction::Tree(tree_act) => {
+                            if let Some(ProjectData::StatusBar(sbar)) = active_lump {
+                                tree::execute_tree_action(sbar, tree_act, selection_ref);
+                            }
+                        }
+                        DocumentAction::Sky(sky_act) => {
+                            if let Some(ProjectData::Sky(sky_file)) = active_lump {
+                                sky::execute_sky_action(sky_file, sky_act, selection_ref);
+                            }
+                        }
+                        DocumentAction::Umap(umap_act) => {
+                            if let Some(ProjectData::UmapInfo(info)) = active_lump {
+                                umapinfo::execute_umapinfo_action(info, umap_act, selection_ref);
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -156,5 +119,6 @@ impl ProjectDocument {
     }
 }
 
+pub(crate) use crate::document::actions::DocumentAction;
 /// Re-export helper for external UI components.
 pub use tree::determine_insertion_point;

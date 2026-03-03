@@ -18,10 +18,13 @@ impl DoomPalette {
     pub fn from_raw(data: &[u8]) -> Self {
         let mut colors = [Color32::BLACK; 256];
         for i in 0..256 {
-            let r = data[i * 3];
-            let g = data[i * 3 + 1];
-            let b = data[i * 3 + 2];
-            colors[i] = Color32::from_rgb(r, g, b);
+            let base = i * 3;
+            if base + 2 < data.len() {
+                let r = data[base];
+                let g = data[base + 1];
+                let b = data[base + 2];
+                colors[i] = Color32::from_rgb(r, g, b);
+            }
         }
         Self { colors }
     }

@@ -1,4 +1,4 @@
-use crate::document::LayerAction;
+use crate::document::actions::{DocumentAction, TreeAction};
 use crate::render::projection::ViewportProjection;
 use eframe::egui;
 use std::collections::HashSet;
@@ -30,38 +30,57 @@ impl ViewportController {
         selection: &HashSet<Vec<usize>>,
         viewport_res: &egui::Response,
         is_panning: bool,
-    ) -> Vec<LayerAction> {
+        active_mode: crate::app::ProjectMode,
+        state: &mut crate::state::PreviewState,
+    ) -> Vec<DocumentAction> {
         let mut actions = Vec::new();
 
         if is_panning {
             return actions;
         }
 
-        if viewport_res.dragged_by(egui::PointerButton::Primary) && !selection.is_empty() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-            self.is_dragging = true;
+        if viewport_res.dragged_by(egui::PointerButton::Primary) {
+            if active_mode == crate::app::ProjectMode::SkyDefs {
+                let delta = ui.input(|i| i.pointer.delta());
+                let sensitivity = 2.0;
 
-            if viewport_res.drag_started() {
-                actions.push(LayerAction::UndoSnapshot);
-            }
+                self.move_accumulator.x += delta.x * sensitivity;
 
-            let delta = ui.input(|i| i.pointer.delta());
+                let shift_x = self.move_accumulator.x.trunc() as i32;
+                if shift_x != 0 {
+                    state.viewer.sky_yaw = (state.viewer.sky_yaw + shift_x).rem_euclid(1024);
+                    self.move_accumulator.x -= shift_x as f32;
+                }
 
-            self.move_accumulator.x += delta.x / proj.final_scale_x;
-            self.move_accumulator.y += delta.y / proj.final_scale_y;
+                state.viewer.weapon_offset_y -= delta.y * sensitivity;
 
-            let move_x = self.move_accumulator.x.trunc() as i32;
-            let move_y = self.move_accumulator.y.trunc() as i32;
+                self.is_dragging = true;
+            } else if !selection.is_empty() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+                self.is_dragging = true;
 
-            if move_x != 0 || move_y != 0 {
-                self.move_accumulator.x -= move_x as f32;
-                self.move_accumulator.y -= move_y as f32;
+                if viewport_res.drag_started() {
+                    actions.push(DocumentAction::UndoSnapshot);
+                }
 
-                actions.push(LayerAction::TranslateSelection {
-                    paths: selection.iter().cloned().collect(),
-                    dx: move_x,
-                    dy: move_y,
-                });
+                let delta = ui.input(|i| i.pointer.delta());
+
+                self.move_accumulator.x += delta.x / proj.final_scale_x;
+                self.move_accumulator.y += delta.y / proj.final_scale_y;
+
+                let move_x = self.move_accumulator.x.trunc() as i32;
+                let move_y = self.move_accumulator.y.trunc() as i32;
+
+                if move_x != 0 || move_y != 0 {
+                    self.move_accumulator.x -= move_x as f32;
+                    self.move_accumulator.y -= move_y as f32;
+
+                    actions.push(DocumentAction::Tree(TreeAction::Translate {
+                        paths: selection.iter().cloned().collect(),
+                        dx: move_x,
+                        dy: move_y,
+                    }));
+                }
             }
         } else if viewport_res.drag_stopped() {
             self.reset();

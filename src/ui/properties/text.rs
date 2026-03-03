@@ -115,40 +115,43 @@ impl PropertiesUI for NumberDef {
     ) -> Option<PreviewContent> {
         let stem = fonts.get_number_stem(&self.font);
         let val = match self.type_ {
-            NumberType::Health => state.player.health,
-            NumberType::Armor => state.player.armor,
+            NumberType::Health => state.sim.player.health,
+            NumberType::Armor => state.sim.player.armor,
             NumberType::Frags => 0,
             NumberType::AmmoSelected => {
-                let slot = state.selected_weapon_slot;
-                let idx = state.inventory.get_selected_ammo_type(slot);
-                state.inventory.get_ammo(idx)
+                let slot = state.sim.selected_weapon_slot;
+                let idx = state.sim.inventory.get_selected_ammo_type(slot);
+                state.sim.inventory.get_ammo(idx)
             }
-            NumberType::Ammo => state.inventory.get_ammo(self.param),
-            NumberType::MaxAmmo => state.inventory.get_max_ammo(self.param),
+            NumberType::Ammo => state.sim.inventory.get_ammo(self.param),
+            NumberType::MaxAmmo => state.sim.inventory.get_max_ammo(self.param),
             NumberType::AmmoWeapon => state
+                .sim
                 .inventory
                 .get_weapon_ammo_type(self.param)
-                .map_or(0, |idx| state.inventory.get_ammo(idx)),
+                .map_or(0, |idx| state.sim.inventory.get_ammo(idx)),
             NumberType::MaxAmmoWeapon => state
+                .sim
                 .inventory
                 .get_weapon_ammo_type(self.param)
-                .map_or(0, |idx| state.inventory.get_max_ammo(idx)),
-            NumberType::Kills => state.player.kills,
-            NumberType::Items => state.player.items,
-            NumberType::Secrets => state.player.secrets,
-            NumberType::MaxKills => state.player.max_kills,
-            NumberType::MaxItems => state.player.max_items,
-            NumberType::MaxSecrets => state.player.max_secrets,
+                .map_or(0, |idx| state.sim.inventory.get_max_ammo(idx)),
+            NumberType::Kills => state.sim.player.kills,
+            NumberType::Items => state.sim.player.items,
+            NumberType::Secrets => state.sim.player.secrets,
+            NumberType::MaxKills => state.sim.player.max_kills,
+            NumberType::MaxItems => state.sim.player.max_items,
+            NumberType::MaxSecrets => state.sim.player.max_secrets,
             NumberType::KillsPercent => {
-                state.get_stat_percent(state.player.kills, state.player.max_kills)
+                state.get_stat_percent(state.sim.player.kills, state.sim.player.max_kills)
             }
             NumberType::ItemsPercent => {
-                state.get_stat_percent(state.player.items, state.player.max_items)
+                state.get_stat_percent(state.sim.player.items, state.sim.player.max_items)
             }
             NumberType::SecretsPercent => {
-                state.get_stat_percent(state.player.secrets, state.player.max_secrets)
+                state.get_stat_percent(state.sim.player.secrets, state.sim.player.max_secrets)
             }
             NumberType::PowerupDuration => state
+                .sim
                 .player
                 .powerup_durations
                 .get(&self.param)

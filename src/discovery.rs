@@ -20,12 +20,10 @@ const IWAD_NAMES: &[&str] = &[
 
 /// Attempts to find a valid Doom IWAD automatically.
 pub fn find_iwad() -> Option<PathBuf> {
-    // Check Environment Variables (The most standard way)
     if let Some(path) = check_env_vars() {
         return Some(path);
     }
 
-    // Check Platform Specifics (Registry or hardcoded paths)
     if let Some(path) = check_platform_defaults() {
         return Some(path);
     }
@@ -34,14 +32,12 @@ pub fn find_iwad() -> Option<PathBuf> {
 }
 
 fn check_env_vars() -> Option<PathBuf> {
-    // Check DOOMWADDIR (Single directory)
     if let Ok(val) = env::var("DOOMWADDIR") {
         if let Some(found) = scan_dir_for_iwad(Path::new(&val)) {
             return Some(found);
         }
     }
 
-    // Check DOOMWADPATH (List of directories)
     if let Ok(val) = env::var("DOOMWADPATH") {
         let sep = if cfg!(windows) { ';' } else { ':' };
         for path_str in val.split(sep) {
@@ -57,7 +53,7 @@ fn check_env_vars() -> Option<PathBuf> {
 fn check_platform_defaults() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        // Steam App IDs: Doom II, Ultimate Doom, Final Doom, Master Levels, BFG, Eternal
+        // --- Steam App IDs: Doom II, Ultimate Doom, Final Doom, Master Levels, BFG, Eternal ---
         let steam_apps = ["2300", "2280", "2290", "9160", "208200", "782330"];
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
 
@@ -75,7 +71,7 @@ fn check_platform_defaults() -> Option<PathBuf> {
             }
         }
 
-        // GOG IDs (Woof style)
+        // --- GOG IDs (What Woof does) ---
         let gog_apps = [
             "1435848814",
             "1135892318",
@@ -136,8 +132,6 @@ fn scan_dir_for_iwad(dir: &Path) -> Option<PathBuf> {
         let mut candidate = dir.to_path_buf();
         candidate.push(name);
 
-        // On Unix systems, filenames are case-sensitive.
-        // If the exact match fails, we manually scan the directory for a case-insensitive match.
         if !candidate.exists() {
             if let Ok(entries) = dir.read_dir() {
                 for entry in entries.flatten() {

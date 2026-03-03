@@ -3,9 +3,11 @@ use crate::app::ConfirmationRequest;
 use crate::assets::{AssetId, AssetStore};
 use crate::library::{self, FontDefinition, FontSource};
 use crate::models::sbardef::{HudFontDef, NumberFontDef, SBarDefFile};
+use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::font_wizard::FontWizardState;
-use crate::ui::shared;
+use crate::ui::messages::EditorEvent;
+use crate::ui::{messages, shared};
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -163,6 +165,7 @@ fn draw_registered_font_row(
 pub fn draw_filtered_browser(
     ui: &mut egui::Ui,
     assets: &mut AssetStore,
+    state: &mut PreviewState,
     file: &mut Option<SBarDefFile>,
     zoom: f32,
     show_project_assets: bool,
@@ -268,6 +271,7 @@ pub fn draw_filtered_browser(
     draw_asset_grid(
         ui,
         assets,
+        state,
         &display_names,
         zoom,
         wizard_state,
@@ -355,7 +359,8 @@ fn draw_unified_font_row(
 
 fn draw_asset_grid(
     ui: &mut egui::Ui,
-    assets: &AssetStore,
+    assets: &mut AssetStore,
+    state: &mut PreviewState,
     names: &[String],
     zoom: f32,
     wizard_state: &mut Option<FontWizardState>,
@@ -375,8 +380,9 @@ fn draw_asset_grid(
 
         for (idx, name) in names.iter().enumerate() {
             let id = AssetId::new(name);
-            let texture = assets.textures.get(&id);
             let is_selected = selection.contains(name);
+
+            let texture_data = assets.textures.get(&id).map(|t| (t.id(), t.size_vec2()));
 
             let (rect, response) =
                 ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click_and_drag());
@@ -423,13 +429,13 @@ fn draw_asset_grid(
                 thumbnails::draw_thumb_bg(ui, rect);
             }
 
-            if let Some(tex) = texture {
+            if let Some((tex_id, tex_size)) = texture_data {
                 let tint = if is_selected {
                     egui::Color32::WHITE
                 } else {
                     egui::Color32::from_gray(200)
                 };
-                shared::draw_scaled_image(ui, rect.shrink(2.0), tex, tint, 10.0);
+                shared::draw_scaled_texture_id(ui, rect.shrink(2.0), tex_id, tex_size, tint, 10.0);
             }
 
             let just_opened = ContextMenu::check(ui, &response);
@@ -441,6 +447,21 @@ fn draw_asset_grid(
                 }
 
                 ContextMenu::show(ui, menu, just_opened, |ui| {
+                    if ContextMenu::button(ui, "Flip Horizontally", is_project_tab) {
+                        let list: Vec<String> = names
+                            .iter()
+                            .filter(|n| selection.contains(*n))
+                            .cloned()
+                            .collect();
+                        let count = list.len();
+                        for n in list {
+                            assets.flip_asset_horizontal(ui.ctx(), AssetId::new(&n));
+                        }
+                        messages::log_event(state, EditorEvent::AssetsFlipped(count));
+                        ui.ctx().request_repaint();
+                        ContextMenu::close(ui);
+                    }
+
                     if ContextMenu::button(ui, "Auto-Detect and Create Font", true) {
                         let list = names
                             .iter()
@@ -459,7 +480,6 @@ fn draw_asset_grid(
                         } else {
                             format!("Delete {} Assets", count)
                         };
-
                         if ContextMenu::button(ui, &label, true) {
                             let list = names
                                 .iter()
@@ -490,8 +510,8 @@ fn draw_asset_grid(
             if response.hovered() {
                 response.on_hover_ui(|ui| {
                     ui.label(egui::RichText::new(name).strong());
-                    if let Some(t) = texture {
-                        ui.label(format!("{}x{}", t.size()[0], t.size()[1]));
+                    if let Some((_, size)) = texture_data {
+                        ui.label(format!("{:.0}x{:.0}", size.x, size.y));
                     }
                 });
             }
@@ -574,7 +594,8 @@ fn draw_library_item(
     let mut changed = false;
     let stem = AssetStore::stem(lib_asset.name);
     let id = AssetId::new(&stem);
-    let texture = assets.textures.get(&id);
+
+    let texture_data = assets.textures.get(&id).map(|t| (t.id(), t.size_vec2()));
     let is_project = assets.raw_files.contains_key(&id);
 
     let (rect, response) =
@@ -587,13 +608,13 @@ fn draw_library_item(
         thumbnails::draw_thumb_bg(ui, rect);
     }
 
-    if let Some(tex) = texture {
+    if let Some((tex_id, tex_size)) = texture_data {
         let tint = if is_project {
             egui::Color32::WHITE
         } else {
             egui::Color32::from_gray(160)
         };
-        shared::draw_scaled_image(ui, rect.shrink(2.0), tex, tint, 10.0);
+        shared::draw_scaled_texture_id(ui, rect.shrink(2.0), tex_id, tex_size, tint, 10.0);
     }
 
     if response.drag_started() {
@@ -645,7 +666,7 @@ fn render_asset_drag_ghost(ui: &egui::Ui, assets: &AssetStore) {
         shared::draw_drag_ghost(
             ui.ctx(),
             |ui| {
-                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false);
+                thumbnails::draw_thumbnail_widget(ui, texture, Some("?"), false, false);
             },
             &label,
         );

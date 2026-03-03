@@ -1,7 +1,8 @@
 use crate::assets::AssetStore;
 use crate::cheats::CheatEngine;
 use crate::config::AppConfig;
-use crate::document::{LayerAction, ProjectDocument};
+use crate::document::ProjectDocument;
+use crate::document::actions::DocumentAction;
 use crate::io;
 use crate::state::PreviewState;
 use crate::ui;
@@ -22,6 +23,7 @@ pub enum ProjectMode {
     SkyDefs,
     Interlevel,
     Finale,
+    UmapInfo,
 }
 
 impl ProjectMode {
@@ -31,6 +33,7 @@ impl ProjectMode {
             crate::models::ProjectData::Finale(_) => ProjectMode::Finale,
             crate::models::ProjectData::Sky(_) => ProjectMode::SkyDefs,
             crate::models::ProjectData::Interlevel(_) => ProjectMode::Interlevel,
+            crate::models::ProjectData::UmapInfo(_) => ProjectMode::UmapInfo,
         }
     }
 }
@@ -42,8 +45,12 @@ pub enum CreationModal {
     LumpSelector,
     SBarDef,
     SkyDefs,
+    #[allow(dead_code)]
     Interlevel,
+    #[allow(dead_code)]
     Finale,
+    UmapInfo,
+    LayoutTemplate,
 }
 
 /// Actions that require user confirmation (usually due to unsaved changes).
@@ -59,6 +66,7 @@ pub enum PendingAction {
 #[allow(dead_code)]
 pub enum ConfirmationRequest {
     DeleteStatusBar(usize),
+    DeleteSky(usize),
     DeleteLayers(Vec<Vec<usize>>),
     DeleteAssets(Vec<String>),
     DiscardChanges(PendingAction),
@@ -172,11 +180,20 @@ impl CacocoApp {
 
     /// Loads a project from a file and resets the application state.
     pub fn load_project(&mut self, ctx: &egui::Context, loaded: io::LoadedProject, path_str: &str) {
-        self.active_mode = ProjectMode::from_data(&loaded.file);
-        self.doc = Some(ProjectDocument::new(
-            loaded.file,
-            Some(path_str.to_string()),
-        ));
+        if let Some(first) = loaded.lumps.first() {
+            self.active_mode = ProjectMode::from_data(first);
+        }
+
+        self.doc = Some(ProjectDocument {
+            lumps: loaded.lumps,
+            passthrough_lumps: loaded.passthrough_lumps,
+            path: Some(path_str.to_string()),
+            selection: HashSet::new(),
+            selection_pivot: None,
+            history: crate::history::HistoryManager::default(),
+            dirty: false,
+        });
+
         self.assets = loaded.assets;
         self.preview_state = PreviewState::default();
 
@@ -198,7 +215,7 @@ impl CacocoApp {
     /// Initializes a new empty project.
     pub fn new_project(&mut self, ctx: &egui::Context, data: crate::models::ProjectData) {
         self.active_mode = ProjectMode::from_data(&data);
-        self.doc = Some(ProjectDocument::new(data, None));
+        self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
         self.assets = AssetStore::default();
         self.preview_state = PreviewState::default();
 
@@ -228,24 +245,28 @@ impl CacocoApp {
 
     /// Applies a library template as the current project.
     pub fn apply_template(&mut self, ctx: &egui::Context, template: &crate::library::Template) {
-        match serde_json::from_str::<crate::models::sbardef::SBarDefFile>(template.json_content) {
-            Ok(mut parsed_file) => {
-                parsed_file.normalize_paths();
-                parsed_file.target = parsed_file.determine_target();
-                parsed_file.normalize_for_target();
+        match serde_json::from_str::<crate::models::ProjectData>(template.json_content) {
+            Ok(mut data) => {
+                match &mut data {
+                    crate::models::ProjectData::StatusBar(s) => {
+                        s.normalize_paths();
+                        s.target = s.determine_target();
+                        s.normalize_for_target();
+                    }
+                    _ => {}
+                }
 
-                let data = crate::models::ProjectData::StatusBar(parsed_file);
-                self.active_mode = ProjectMode::from_data(&data);
+                let mode = ProjectMode::from_data(&data);
+                self.active_mode = mode;
+
                 if let Some(doc) = &mut self.doc {
-                    doc.lumps
-                        .retain(|l| !matches!(l, crate::models::ProjectData::StatusBar(_)));
+                    doc.lumps.retain(|l| ProjectMode::from_data(l) != mode);
                     doc.lumps.push(data);
                     doc.dirty = true;
                 } else {
-                    self.doc = Some(ProjectDocument::new(data, None));
+                    self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
                     self.assets = AssetStore::default();
                     self.preview_state = PreviewState::default();
-
                     self.load_system_assets(ctx);
                     if let Some(path) = &self.config.base_wad_path {
                         io::load_wad_from_path(ctx, path, &mut self.assets);
@@ -274,18 +295,18 @@ impl CacocoApp {
     }
 
     /// Delegation helper to execute actions on the current document.
-    pub fn execute_actions(&mut self, actions: Vec<LayerAction>) {
+    pub fn execute_actions(&mut self, actions: Vec<DocumentAction>) {
         if let Some(doc) = &mut self.doc {
             let old_selection = doc.selection.clone();
             doc.execute_actions(actions, self.active_mode);
 
             if doc.selection != old_selection {
-                self.preview_state.editor.strobe_timer = 0.5;
+                self.preview_state.interaction.strobe_timer = 0.5;
             }
 
             if doc.selection.len() == 1 {
                 let path = doc.selection.iter().next().unwrap();
-                if path.len() == 1 && self.active_mode == ProjectMode::SBarDef {
+                if path.len() == 1 {
                     self.current_statusbar_idx = path[0];
                 }
             }
@@ -304,12 +325,26 @@ impl CacocoApp {
 
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let time = ctx.input(|i| i.time);
+
+        if let Some(doc) = &mut self.doc {
+            let mut tick_ctx = ui::properties::editor::TickContext {
+                ctx,
+                assets: &mut self.assets,
+                state: &mut self.preview_state,
+                time,
+            };
+            for lump in &doc.lumps {
+                lump.tick(&mut tick_ctx);
+            }
+        }
+
         ctx.set_visuals(egui::Visuals::dark());
         ui::draw_root_ui(ctx, self);
 
         if let Some(doc) = &self.doc {
             if doc.selection != self.last_selection {
-                self.preview_state.editor.strobe_timer = 0.5;
+                self.preview_state.interaction.strobe_timer = 0.5;
                 self.last_selection = doc.selection.clone();
             }
         } else if !self.last_selection.is_empty() {

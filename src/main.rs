@@ -32,6 +32,8 @@ const TITLES: &[&str] = &[
     "*Cacodemon noise*",
     "Proudly made in a programming language!",
     "Sometimes even supports KEX!",
+    "We thought this would be way easier!",
+    "Eventually supporting INTERLEVEL and FINALE!",
 ];
 
 fn main() -> eframe::Result<()> {

@@ -1,0 +1,1224 @@
+{
+	"type": "umapinfo",
+	"version": "1.0.0",
+	"metadata": null,
+	"data": {
+		"maps": [
+			{
+				"mapname": "MAP01",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Entryway"
+					},
+					{
+						"type": "Label",
+						"value": "Level 1"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV00"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP02"
+					},
+					{
+						"type": "Music",
+						"value": "D_RUNNIN"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					},
+					{
+						"type": "Episode",
+						"value": {
+							"patch": "clear",
+							"name": "",
+							"key": ""
+						}
+					},
+					{
+						"type": "Episode",
+						"value": {
+							"patch": "-",
+							"name": "Doom II: Hell on Earth",
+							"key": "1"
+						}
+					}
+				]
+			},
+			{
+				"mapname": "MAP02",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Underhalls"
+					},
+					{
+						"type": "Label",
+						"value": "Level 2"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV01"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP03"
+					},
+					{
+						"type": "Music",
+						"value": "D_STALKS"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP03",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Gantlet"
+					},
+					{
+						"type": "Label",
+						"value": "Level 3"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV02"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP04"
+					},
+					{
+						"type": "Music",
+						"value": "D_COUNTD"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP04",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Focus"
+					},
+					{
+						"type": "Label",
+						"value": "Level 4"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV03"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP05"
+					},
+					{
+						"type": "Music",
+						"value": "D_BETWEE"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP05",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Waste Tunnels"
+					},
+					{
+						"type": "Label",
+						"value": "Level 5"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV04"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP06"
+					},
+					{
+						"type": "Music",
+						"value": "D_DOOM"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP06",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Crusher"
+					},
+					{
+						"type": "Label",
+						"value": "Level 6"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV05"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP07"
+					},
+					{
+						"type": "Music",
+						"value": "D_THE_DA"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					},
+					{
+						"type": "InterBackdrop",
+						"value": "SLIME16"
+					},
+					{
+						"type": "InterMusic",
+						"value": "D_READ_M"
+					},
+					{
+						"type": "InterText",
+						"value": [
+							"YOU HAVE ENTERED DEEPLY INTO THE INFESTED",
+							"STARPORT. BUT SOMETHING IS WRONG. THE",
+							"MONSTERS HAVE BROUGHT THEIR OWN REALITY",
+							"WITH THEM, AND THE STARPORT'S TECHNOLOGY",
+							"IS BEING SUBVERTED BY THEIR PRESENCE.",
+							"AHEAD, YOU SEE AN OUTPOST OF HELL, A",
+							"FORTIFIED ZONE. IF YOU CAN GET PAST IT,",
+							"YOU CAN PENETRATE INTO THE HAUNTED HEART",
+							"OF THE STARBASE AND FIND THE CONTROLLING",
+							"SWITCH WHICH HOLDS EARTH'S POPULATION",
+							"HOSTAGE."
+						]
+					}
+				]
+			},
+			{
+				"mapname": "MAP07",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Dead Simple"
+					},
+					{
+						"type": "Label",
+						"value": "Level 7"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV06"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP08"
+					},
+					{
+						"type": "Music",
+						"value": "D_SHAWN"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP08",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Tricks and Traps"
+					},
+					{
+						"type": "Label",
+						"value": "Level 8"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV07"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP09"
+					},
+					{
+						"type": "Music",
+						"value": "D_DDTBLU"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP09",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Pit"
+					},
+					{
+						"type": "Label",
+						"value": "Level 9"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV08"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP10"
+					},
+					{
+						"type": "Music",
+						"value": "D_IN_CIT"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP10",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Refueling Base"
+					},
+					{
+						"type": "Label",
+						"value": "Level 10"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV09"
+					},
+					{
+						"type": "Author",
+						"value": "Tom Hall & Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP11"
+					},
+					{
+						"type": "Music",
+						"value": "D_DEAD"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					}
+				]
+			},
+			{
+				"mapname": "MAP11",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Circle of Death"
+					},
+					{
+						"type": "Label",
+						"value": "Level 11"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV10"
+					},
+					{
+						"type": "Author",
+						"value": "John Romero"
+					},
+					{
+						"type": "Next",
+						"value": "MAP12"
+					},
+					{
+						"type": "Music",
+						"value": "D_STLKS2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY1"
+					},
+					{
+						"type": "InterBackdrop",
+						"value": "RROCK14"
+					},
+					{
+						"type": "InterMusic",
+						"value": "D_READ_M"
+					},
+					{
+						"type": "InterText",
+						"value": [
+							"YOU HAVE WON! YOUR VICTORY HAS ENABLED",
+							"HUMANKIND TO EVACUATE EARTH AND ESCAPE",
+							"THE NIGHTMARE.  NOW YOU ARE THE ONLY",
+							"HUMAN LEFT ON THE FACE OF THE PLANET.",
+							"CANNIBAL MUTATIONS, CARNIVOROUS ALIENS,",
+							"AND EVIL SPIRITS ARE YOUR ONLY NEIGHBORS.",
+							"YOU SIT BACK AND WAIT FOR DEATH, CONTENT",
+							"THAT YOU HAVE SAVED YOUR SPECIES.",
+							"BUT THEN, EARTH CONTROL BEAMS DOWN A",
+							"MESSAGE FROM SPACE: 'SENSORS HAVE LOCATED",
+							"THE SOURCE OF THE ALIEN INVASION. IF YOU",
+							"GO THERE, YOU MAY BE ABLE TO BLOCK THEIR",
+							"ENTRY.  THE ALIEN BASE IS IN THE HEART OF",
+							"YOUR OWN HOME CITY, NOT FAR FROM THE",
+							"STARPORT.' SLOWLY AND PAINFULLY YOU GET",
+							"UP AND RETURN TO THE FRAY."
+						]
+					}
+				]
+			},
+			{
+				"mapname": "MAP12",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Factory"
+					},
+					{
+						"type": "Label",
+						"value": "Level 12"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV11"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP13"
+					},
+					{
+						"type": "Music",
+						"value": "D_THEDA2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP13",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Downtown"
+					},
+					{
+						"type": "Label",
+						"value": "Level 13"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV12"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP14"
+					},
+					{
+						"type": "Music",
+						"value": "D_DOOM2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP14",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Inmost Dens"
+					},
+					{
+						"type": "Label",
+						"value": "Level 14"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV13"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP15"
+					},
+					{
+						"type": "Music",
+						"value": "D_DDTBL2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP15",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Industrial Zone"
+					},
+					{
+						"type": "Label",
+						"value": "Level 15"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV14"
+					},
+					{
+						"type": "Author",
+						"value": "John Romero"
+					},
+					{
+						"type": "Next",
+						"value": "MAP16"
+					},
+					{
+						"type": "NextSecret",
+						"value": "MAP31"
+					},
+					{
+						"type": "Music",
+						"value": "D_RUNNI2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					},
+					{
+						"type": "InterBackdrop",
+						"value": "RROCK13"
+					},
+					{
+						"type": "InterMusic",
+						"value": "D_READ_M"
+					},
+					{
+						"type": "InterTextSecret",
+						"value": [
+							"CONGRATULATIONS, YOU'VE FOUND THE SECRET",
+							"LEVEL! LOOKS LIKE IT'S BEEN BUILT BY",
+							"HUMANS, RATHER THAN DEMONS. YOU WONDER",
+							"WHO THE INMATES OF THIS CORNER OF HELL",
+							"WILL BE."
+						]
+					}
+				]
+			},
+			{
+				"mapname": "MAP16",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Suburbs"
+					},
+					{
+						"type": "Label",
+						"value": "Level 16"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV15"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP17"
+					},
+					{
+						"type": "Music",
+						"value": "D_DEAD2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP17",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Tenements"
+					},
+					{
+						"type": "Label",
+						"value": "Level 17"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV16"
+					},
+					{
+						"type": "Author",
+						"value": "John Romero"
+					},
+					{
+						"type": "Next",
+						"value": "MAP18"
+					},
+					{
+						"type": "Music",
+						"value": "D_STLKS3"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP18",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Courtyard"
+					},
+					{
+						"type": "Label",
+						"value": "Level 18"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV17"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP19"
+					},
+					{
+						"type": "Music",
+						"value": "D_ROMERO"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP19",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Citadel"
+					},
+					{
+						"type": "Label",
+						"value": "Level 19"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV18"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP20"
+					},
+					{
+						"type": "Music",
+						"value": "D_SHAWN2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					}
+				]
+			},
+			{
+				"mapname": "MAP20",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Gotcha!"
+					},
+					{
+						"type": "Label",
+						"value": "Level 20"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV19"
+					},
+					{
+						"type": "Author",
+						"value": "John Romero"
+					},
+					{
+						"type": "Next",
+						"value": "MAP21"
+					},
+					{
+						"type": "Music",
+						"value": "D_MESSAG"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY2"
+					},
+					{
+						"type": "InterBackdrop",
+						"value": "RROCK07"
+					},
+					{
+						"type": "InterMusic",
+						"value": "D_READ_M"
+					},
+					{
+						"type": "InterText",
+						"value": [
+							"YOU ARE AT THE CORRUPT HEART OF THE CITY,",
+							"SURROUNDED BY THE CORPSES OF YOUR ENEMIES.",
+							"YOU SEE NO WAY TO DESTROY THE CREATURES'",
+							"ENTRYWAY ON THIS SIDE, SO YOU CLENCH YOUR",
+							"TEETH AND PLUNGE THROUGH IT.",
+							"THERE MUST BE A WAY TO CLOSE IT ON THE",
+							"OTHER SIDE. WHAT DO YOU CARE IF YOU'VE",
+							"GOT TO GO THROUGH HELL TO GET TO IT?"
+						]
+					}
+				]
+			},
+			{
+				"mapname": "MAP21",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Nirvana"
+					},
+					{
+						"type": "Label",
+						"value": "Level 21"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV20"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP22"
+					},
+					{
+						"type": "Music",
+						"value": "D_COUNT2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP22",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Catacombs"
+					},
+					{
+						"type": "Label",
+						"value": "Level 22"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV21"
+					},
+					{
+						"type": "Author",
+						"value": "American McGee"
+					},
+					{
+						"type": "Next",
+						"value": "MAP23"
+					},
+					{
+						"type": "Music",
+						"value": "D_DDTBL3"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP23",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Barrels o' Fun"
+					},
+					{
+						"type": "Label",
+						"value": "Level 23"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV22"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP24"
+					},
+					{
+						"type": "Music",
+						"value": "D_AMPIE"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP24",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Chasm"
+					},
+					{
+						"type": "Label",
+						"value": "Level 24"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV23"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP25"
+					},
+					{
+						"type": "Music",
+						"value": "D_THEDA3"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP25",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Bloodfalls"
+					},
+					{
+						"type": "Label",
+						"value": "Level 25"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV24"
+					},
+					{
+						"type": "Author",
+						"value": "Shawn Green"
+					},
+					{
+						"type": "Next",
+						"value": "MAP26"
+					},
+					{
+						"type": "Music",
+						"value": "D_ADRIAN"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP26",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Abandoned Mines"
+					},
+					{
+						"type": "Label",
+						"value": "Level 26"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV25"
+					},
+					{
+						"type": "Author",
+						"value": "John Romero"
+					},
+					{
+						"type": "Next",
+						"value": "MAP27"
+					},
+					{
+						"type": "Music",
+						"value": "D_MESSG2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP27",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Monster Condo"
+					},
+					{
+						"type": "Label",
+						"value": "Level 27"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV26"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP28"
+					},
+					{
+						"type": "Music",
+						"value": "D_ROMER2"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP28",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Spirit World"
+					},
+					{
+						"type": "Label",
+						"value": "Level 28"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV27"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP29"
+					},
+					{
+						"type": "Music",
+						"value": "D_TENSE"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP29",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "The Living End"
+					},
+					{
+						"type": "Label",
+						"value": "Level 29"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV28"
+					},
+					{
+						"type": "Author",
+						"value": "John Romero"
+					},
+					{
+						"type": "Next",
+						"value": "MAP30"
+					},
+					{
+						"type": "Music",
+						"value": "D_SHAWN3"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			},
+			{
+				"mapname": "MAP30",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Icon of Sin"
+					},
+					{
+						"type": "Label",
+						"value": "Level 30"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV29"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "EndCast",
+						"value": true
+					},
+					{
+						"type": "Music",
+						"value": "D_OPENIN"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					},
+					{
+						"type": "InterBackdrop",
+						"value": "RROCK17"
+					},
+					{
+						"type": "InterMusic",
+						"value": "D_READ_M"
+					},
+					{
+						"type": "InterText",
+						"value": [
+							"THE HORRENDOUS VISAGE OF THE BIGGEST",
+							"DEMON YOU'VE EVER SEEN CRUMBLES BEFORE",
+							"YOU, AFTER YOU PUMP YOUR ROCKETS INTO",
+							"HIS EXPOSED BRAIN. THE MONSTER SHRIVELS",
+							"UP AND DIES, ITS THRASHING LIMBS",
+							"DEVASTATING UNTOLD MILES OF HELL'S",
+							"SURFACE.",
+							"YOU'VE DONE IT. THE INVASION IS OVER.",
+							"EARTH IS SAVED. HELL IS A WRECK. YOU",
+							"WONDER WHERE BAD FOLKS WILL GO WHEN THEY",
+							"DIE, NOW. WIPING THE SWEAT FROM YOUR",
+							"FOREHEAD YOU BEGIN THE LONG TREK BACK",
+							"HOME. REBUILDING EARTH OUGHT TO BE A",
+							"LOT MORE FUN THAN RUINING IT WAS."
+						]
+					}
+				]
+			},
+			{
+				"mapname": "MAP31",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Wolfenstein"
+					},
+					{
+						"type": "Label",
+						"value": "Secret Level"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV30"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP16"
+					},
+					{
+						"type": "NextSecret",
+						"value": "MAP32"
+					},
+					{
+						"type": "Music",
+						"value": "D_EVIL"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					},
+					{
+						"type": "InterBackdrop",
+						"value": "RROCK19"
+					},
+					{
+						"type": "InterMusic",
+						"value": "D_READ_M"
+					},
+					{
+						"type": "InterTextSecret",
+						"value": [
+							"CONGRATULATIONS, YOU'VE FOUND THE",
+							"SUPER SECRET LEVEL!  YOU'D BETTER",
+							"BLAZE THROUGH THIS ONE!"
+						]
+					}
+				]
+			},
+			{
+				"mapname": "MAP32",
+				"fields": [
+					{
+						"type": "LevelName",
+						"value": "Grosse"
+					},
+					{
+						"type": "Label",
+						"value": "Secret Level 2"
+					},
+					{
+						"type": "LevelPic",
+						"value": "CWILV31"
+					},
+					{
+						"type": "Author",
+						"value": "Sandy Petersen"
+					},
+					{
+						"type": "Next",
+						"value": "MAP16"
+					},
+					{
+						"type": "Music",
+						"value": "D_ULTIMA"
+					},
+					{
+						"type": "SkyTexture",
+						"value": "SKY3"
+					}
+				]
+			}
+		]
+	}
+}

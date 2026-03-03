@@ -3,21 +3,21 @@ use crate::state::PreviewState;
 /// All possible items and weapons that can trigger a message.
 #[derive(Debug, Clone, Copy)]
 pub enum MessageItem {
-    // Keys
+    // --- Keys ---
     BlueCard,
     YellowCard,
     RedCard,
     BlueSkull,
     YellowSkull,
     RedSkull,
-    // Powerups
+    // --- Powerups ---
     Invisibility,
     Invulnerability,
     Berserk,
     Map,
     Radsuit,
     Liteamp,
-    // Weapons
+    // --- Weapons ---
     Chainsaw,
     Pistol,
     Shotgun,
@@ -26,13 +26,13 @@ pub enum MessageItem {
     RocketLauncher,
     PlasmaGun,
     BFG,
-    // Ammo
+    // --- Ammo ---
     Clip,
     Shells,
     Rocket,
     Cell,
     Backpack,
-    // Vitals
+    // --- Vitals ---
     HealthBonus,
     ArmorBonus,
     GreenArmor,
@@ -57,6 +57,7 @@ pub enum EditorEvent {
     ImportImages(usize),
     ImportFolder(usize),
     AssetsDeleted,
+    AssetsFlipped(usize),
     Pickup(MessageItem),
     Cheat(String),
 }
@@ -78,6 +79,7 @@ pub fn log_event(state: &mut PreviewState, event: EditorEvent) {
         EditorEvent::ImportImages(count) => format!("Imported {} images.", count),
         EditorEvent::ImportFolder(count) => format!("Imported {} images from folder.", count),
         EditorEvent::AssetsDeleted => "Deleted assets from project.".to_string(),
+        EditorEvent::AssetsFlipped(count) => format!("Flipped {} assets horizontally.", count),
         EditorEvent::Cheat(m) => m,
         EditorEvent::Pickup(item) => match item {
             MessageItem::BlueCard => "Picked up a blue keycard.",
@@ -114,5 +116,5 @@ pub fn log_event(state: &mut PreviewState, event: EditorEvent) {
         .to_string(),
     };
 
-    state.push_message(msg);
+    state.interaction.push_message(msg);
 }

@@ -19,8 +19,10 @@ pub struct Template {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FontSource {
-    Internal, // Found in base IWAD (e.g. STCFN)
-    Package,  // Built into Cacoco's library
+    /// Found in base IWAD (e.g. STCFN)
+    Internal,
+    /// Built into Cacoco's library
+    Package,
 }
 
 pub struct FontDefinition {
@@ -349,6 +351,12 @@ pub const TEMPLATES: &[Template] = &[
         description: "A compact, modern Statusbar showcasing the power of SBARDEF with dynamic elements.",
         json_content: include_str!("../assets/templates/nightkicker.json"),
         required_prefixes: NIGHTKICKER_PREFIXES,
+    },
+    Template {
+        name: "Doom II Original",
+        description: "A complete UMAPINFO definition for Doom II.",
+        json_content: include_str!("../assets/templates/doom2umapinfo.json"),
+        required_prefixes: &[],
     },
 ];
 

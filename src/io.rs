@@ -1,5 +1,5 @@
 use crate::assets::AssetStore;
-use crate::models::sbardef::{ExportTarget, SBarDefFile};
+use crate::models::sbardef::ExportTarget;
 use crate::wad;
 use eframe::egui;
 use rfd::FileDialog;
@@ -13,14 +13,15 @@ use zip::{CompressionMethod, ZipWriter};
 
 /// Container for a successfully loaded project and its assets.
 pub struct LoadedProject {
-    pub file: crate::models::ProjectData,
+    pub lumps: Vec<crate::models::ProjectData>,
     pub assets: AssetStore,
+    pub passthrough_lumps: Vec<wad::RawLump>,
 }
 
 /// Opens the system file dialog to pick a SBARDEF project file.
 pub fn open_project_dialog() -> Option<String> {
     if let Some(path) = FileDialog::new()
-        .add_filter("SBARDEF Projects", &["pk3", "zip", "json", "txt"])
+        .add_filter("SBARDEF Projects", &["pk3", "zip", "json", "txt", "wad"])
         .set_title("Open SBARDEF Project")
         .pick_file()
     {
@@ -45,6 +46,14 @@ pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<Loa
 
     if ext == "pk3" || ext == "zip" {
         load_pk3(ctx, &path)
+    } else if ext == "wad" {
+        match wad::load_wad_project(ctx, &path) {
+            Ok(loaded) => Some(loaded),
+            Err(e) => {
+                eprintln!("Failed to load WAD project: {}", e);
+                None
+            }
+        }
     } else {
         load_text_file(&path)
     }
@@ -55,15 +64,13 @@ fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
         Ok(json_content) => match serde_json::from_str::<crate::models::ProjectData>(&json_content)
         {
             Ok(mut parsed_file) => {
-                if let crate::models::ProjectData::StatusBar(ref mut sbar) = parsed_file {
-                    sbar.normalize_paths();
-                    sbar.target = sbar.determine_target();
-                    sbar.normalize_for_target();
-                }
+                parsed_file.set_target(parsed_file.determine_target());
+                parsed_file.normalize_for_target();
 
                 Some(LoadedProject {
-                    file: parsed_file,
+                    lumps: vec![parsed_file],
                     assets: AssetStore::default(),
+                    passthrough_lumps: Vec::new(),
                 })
             }
             Err(e) => {
@@ -81,98 +88,155 @@ fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
 fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
     let file = fs::File::open(path).ok()?;
     let mut archive = zip::ZipArchive::new(file).ok()?;
+    let mut lumps = Vec::new();
+    let mut passthrough_lumps = Vec::new();
+    let mut assets = AssetStore::default();
 
-    let mut sbardef_content = String::new();
-    let mut found_def = false;
+    let valid_lumps = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE", "UMAPINFO"];
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).unwrap();
-        let name = file.name();
-        if name.eq_ignore_ascii_case("SBARDEF")
-            || name.eq_ignore_ascii_case("SBARDEF.txt")
-            || name.eq_ignore_ascii_case("SBARDEF.json")
-        {
-            if let Ok(_) = file.read_to_string(&mut sbardef_content) {
-                found_def = true;
+        let mut f = archive.by_index(i).unwrap();
+        let name = f.name().to_string();
+
+        if name.ends_with('/') {
+            continue;
+        }
+
+        let stem = Path::new(&name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+
+        let is_managed_lump = valid_lumps.iter().any(|&l| l.eq_ignore_ascii_case(stem));
+        let is_graphic = name.to_lowercase().starts_with("graphics/");
+
+        if is_managed_lump {
+            let mut lump_data = Vec::new();
+            if f.read_to_end(&mut lump_data).is_ok() {
+                if let Some(parsed) = crate::models::ProjectData::parse_lump(&name, &lump_data) {
+                    lumps.push(parsed);
+                }
             }
-            break;
+        } else if is_graphic {
+            let mut buffer = Vec::new();
+            if f.read_to_end(&mut buffer).is_ok() {
+                assets.load_image(ctx, &name, &buffer);
+            }
+        } else {
+            let mut buffer = Vec::new();
+            if f.read_to_end(&mut buffer).is_ok() {
+                passthrough_lumps.push(wad::RawLump { name, data: buffer });
+            }
         }
     }
 
-    if !found_def {
-        eprintln!("Error: No SBARDEF file found in PK3.");
+    if lumps.is_empty() {
         return None;
     }
 
-    let parsed_file = match serde_json::from_str::<crate::models::ProjectData>(&sbardef_content) {
-        Ok(mut f) => {
-            if let crate::models::ProjectData::StatusBar(ref mut sbar) = f {
-                sbar.normalize_paths();
-                sbar.target = sbar.determine_target();
-                sbar.normalize_for_target();
-            }
-            f
-        }
-        Err(e) => {
-            eprintln!("PK3 Parse Error: {}", e);
-            return None;
-        }
-    };
-
-    let mut assets = AssetStore::default();
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).unwrap();
-        let name = file.name().to_string();
-
-        if name.to_lowercase().starts_with("graphics/") && !name.ends_with('/') {
-            let mut buffer = Vec::new();
-            if file.read_to_end(&mut buffer).is_ok() {
-                assets.load_image(ctx, &name, &buffer);
-            }
-        }
-    }
-
     Some(LoadedProject {
-        file: parsed_file,
+        lumps,
         assets,
+        passthrough_lumps,
     })
 }
 
 /// Internal helper to compress project data into a PK3 structure.
+/// Preserves passthrough data from the original archive while updating managed lumps.
 fn build_pk3<W: Write + Seek>(
     writer: W,
-    file: &SBarDefFile,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
+    passthrough: &[wad::RawLump],
 ) -> anyhow::Result<()> {
     let mut zip = ZipWriter::new(writer);
     let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
-    if let Ok(json) = serde_json::to_string_pretty(file) {
-        zip.start_file("SBARDEF", options)?;
-        zip.write_all(json.as_bytes())?;
+    let mut managed_paths = std::collections::HashSet::new();
+    for lump in lumps {
+        managed_paths.insert(lump.standard_lump_name().to_string());
     }
 
-    for (id, bytes) in &assets.raw_files {
-        let original_name = assets
-            .names
-            .get(id)
-            .cloned()
-            .unwrap_or_else(|| format!("{}.png", id));
+    let has_skydefs = lumps.iter().any(|l| l.standard_lump_name() == "SKYDEFS");
 
-        let mut final_path = original_name;
-
-        if Path::new(&final_path).extension().is_none() {
-            final_path.push_str(".png");
+    for raw in passthrough {
+        if managed_paths.contains(&raw.name) {
+            continue;
         }
 
-        if !final_path.to_lowercase().starts_with("graphics/") {
-            final_path = format!("graphics/{}", final_path);
+        if has_skydefs && (raw.name == "PNAMES" || raw.name == "TEXTURE1" || raw.name == "UMAPINFO")
+        {
+            continue;
         }
 
-        zip.start_file(final_path, options)?;
-        zip.write_all(bytes)?;
+        zip.start_file(&raw.name, options)?;
+        zip.write_all(&raw.data)?;
+    }
+
+    for lump in lumps {
+        zip.start_file(lump.standard_lump_name(), options)?;
+        zip.write_all(lump.to_sanitized_json(assets).as_bytes())?;
+    }
+
+    if has_skydefs {
+        let has_umap =
+            managed_paths.contains("UMAPINFO") || passthrough.iter().any(|r| r.name == "UMAPINFO");
+
+        if !has_umap {
+            let umapinfo_text = wad::generate_simple_umapinfo(lumps);
+            if !umapinfo_text.is_empty() {
+                zip.start_file("UMAPINFO", options)?;
+                zip.write_all(umapinfo_text.as_bytes())?;
+            }
+        }
+
+        let merged_pnames = wad::build_merged_pnames(assets);
+        let merged_texture1 = wad::build_merged_texture1(&merged_pnames, assets);
+        let pnames_data = wad::serialize_pnames(&merged_pnames);
+
+        zip.start_file("PNAMES", options)?;
+        zip.write_all(&pnames_data)?;
+        zip.start_file("TEXTURE1", options)?;
+        zip.write_all(&merged_texture1)?;
+
+        for (id, bytes) in &assets.raw_files {
+            let name = assets
+                .names
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("{}", id));
+            let mut stem = AssetStore::stem(&name);
+            stem.truncate(8);
+
+            zip.start_file(stem, options)?;
+            zip.write_all(bytes)?;
+        }
+    } else {
+        for (id, bytes) in &assets.raw_files {
+            let original_name = assets
+                .names
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("{}.png", id));
+
+            if original_name.contains('/') || original_name.contains('\\') {
+                zip.start_file(&original_name, options)?;
+                zip.write_all(bytes)?;
+            } else {
+                let stem = AssetStore::stem(&original_name);
+                let ext = Path::new(&original_name)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("png");
+
+                zip.start_file(format!("textures/{}.{}", stem, ext), options)?;
+                zip.write_all(bytes)?;
+                zip.start_file(format!("graphics/{}.{}", stem, ext), options)?;
+                zip.write_all(bytes)?;
+            }
+        }
     }
 
     zip.finish()?;
@@ -204,8 +268,9 @@ pub fn save_json_dialog(json_content: &str, opened_path: Option<String>) -> Opti
 }
 
 pub fn save_pk3_dialog(
-    file: &SBarDefFile,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
+    passthrough: &[wad::RawLump],
     opened_path: Option<String>,
 ) -> Option<String> {
     let mut dialog = FileDialog::new()
@@ -220,7 +285,7 @@ pub fn save_pk3_dialog(
         let mut final_name = p
             .file_name()
             .and_then(|s| s.to_str())
-            .unwrap_or("status_bar.pk3")
+            .unwrap_or("project.pk3")
             .to_string();
         let lower = final_name.to_lowercase();
         if !lower.ends_with(".pk3") && !lower.ends_with(".zip") {
@@ -228,13 +293,13 @@ pub fn save_pk3_dialog(
         }
         dialog = dialog.set_file_name(&final_name);
     } else {
-        dialog = dialog.set_file_name("status_bar.pk3");
+        dialog = dialog.set_file_name("project.pk3");
     }
 
     if let Some(path) = dialog.save_file() {
         match fs::File::create(&path) {
             Ok(fs_file) => {
-                if let Err(e) = build_pk3(fs_file, file, assets) {
+                if let Err(e) = build_pk3(fs_file, lumps, assets, passthrough) {
                     eprintln!("Failed to build PK3: {}", e);
                 } else {
                     return Some(path.to_string_lossy().into_owned());
@@ -247,8 +312,9 @@ pub fn save_pk3_dialog(
 }
 
 pub fn save_wad_dialog(
-    sbardef_content: &str,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
+    passthrough: &[wad::RawLump],
     opened_path: Option<String>,
 ) -> Option<String> {
     let mut dialog = FileDialog::new()
@@ -257,18 +323,15 @@ pub fn save_wad_dialog(
 
     if let Some(p_str) = opened_path {
         let p = Path::new(&p_str);
-        let stem = p
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("status_bar");
+        let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("project");
         dialog = dialog.set_file_name(format!("{}.wad", stem));
     } else {
-        dialog = dialog.set_file_name("status_bar.wad");
+        dialog = dialog.set_file_name("project.wad");
     }
 
     if let Some(path) = dialog.save_file() {
         if let Ok(mut f) = fs::File::create(&path) {
-            if wad::write_wad_to_file(&mut f, sbardef_content.as_bytes(), assets).is_ok() {
+            if wad::write_wad_to_file(&mut f, lumps, assets, passthrough).is_ok() {
                 return Some(path.to_string_lossy().into_owned());
             }
         }
@@ -277,13 +340,14 @@ pub fn save_wad_dialog(
 }
 
 pub fn save_pk3_silent(
-    file: &SBarDefFile,
+    lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
+    passthrough: &[wad::RawLump],
     path_str: &str,
 ) -> anyhow::Result<()> {
     let path = Path::new(path_str);
     let fs_file = fs::File::create(path)?;
-    build_pk3(fs_file, file, assets)?;
+    build_pk3(fs_file, lumps, assets, passthrough)?;
     Ok(())
 }
 
@@ -321,50 +385,30 @@ pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut Asse
 /// If targeting 'Basic', it produces a temporary .WAD for KEX compatibility.
 /// Otherwise, it produces a temporary .PK3.
 pub fn launch_game(
-    sbardef_content: &str,
     assets: &AssetStore,
     source_port: &str,
     iwad: &str,
     target: ExportTarget,
+    lumps: &[crate::models::ProjectData],
+    passthrough: &[wad::RawLump],
 ) {
     let mut temp_path = env::temp_dir();
-    let extension = if target == ExportTarget::Basic {
+
+    let extension = if !passthrough.is_empty() || target == ExportTarget::Basic {
         "wad"
     } else {
         "zip"
     };
+
     temp_path.push(format!("cacotest.{}", extension));
     let temp_path_str = temp_path.to_string_lossy().into_owned();
 
     match fs::File::create(&temp_path) {
         Ok(mut fs_file) => {
-            if target == ExportTarget::Basic {
-                let _ = wad::write_wad_to_file(&mut fs_file, sbardef_content.as_bytes(), assets);
+            if extension == "wad" {
+                let _ = wad::write_wad_to_file(&mut fs_file, lumps, assets, passthrough);
             } else {
-                let mut zip = ZipWriter::new(fs_file);
-                let options =
-                    SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-
-                let _ = zip.start_file("SBARDEF", options);
-                let _ = zip.write_all(sbardef_content.as_bytes());
-
-                for (id, bytes) in &assets.raw_files {
-                    let name = assets
-                        .names
-                        .get(id)
-                        .cloned()
-                        .unwrap_or_else(|| format!("{}.png", id));
-                    let mut final_path = name;
-                    if !final_path.to_lowercase().starts_with("graphics/") {
-                        final_path = format!("graphics/{}", final_path);
-                    }
-                    if Path::new(&final_path).extension().is_none() {
-                        final_path.push_str(".png");
-                    }
-                    let _ = zip.start_file(final_path, options);
-                    let _ = zip.write_all(bytes);
-                }
-                let _ = zip.finish();
+                let _ = build_pk3(fs_file, lumps, assets, passthrough);
             }
         }
         Err(e) => {
@@ -466,6 +510,7 @@ fn visit_dirs_for_images(dir: &Path, paths: &mut Vec<PathBuf>) {
 mod tests {
     use super::*;
     use crate::assets::AssetId;
+    use crate::models::sbardef::SBarDefFile;
     use std::io::Cursor;
 
     #[test]
@@ -476,6 +521,8 @@ mod tests {
             target: ExportTarget::Basic,
             data: Default::default(),
         };
+        let project_data = crate::models::ProjectData::StatusBar(file);
+        let lumps = vec![project_data];
 
         let mut assets = AssetStore::default();
         let dummy_bytes = vec![0u8; 10];
@@ -491,7 +538,7 @@ mod tests {
             .insert(id_path, "graphics/patch.png".to_string());
 
         let mut buffer = Cursor::new(Vec::new());
-        build_pk3(&mut buffer, &file, &assets).expect("Failed to build PK3");
+        build_pk3(&mut buffer, &lumps, &assets, &[]).expect("Failed to build PK3");
 
         let mut zip = zip::ZipArchive::new(buffer).expect("Failed to open built ZIP");
 
@@ -501,6 +548,7 @@ mod tests {
             zip.by_name("graphics/STBAR.png").is_ok(),
             "Loose lump failed to move to graphics/ or gain extension"
         );
+
         assert!(
             zip.by_name("graphics/patch.png").is_ok(),
             "Explicit path failed to preserve correctly"

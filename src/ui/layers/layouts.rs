@@ -1,4 +1,4 @@
-use crate::document::LayerAction;
+use crate::document::actions::{DocumentAction, SBarAction};
 use crate::models::sbardef::SBarDefFile;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::layers::thumbnails::ListRow;
@@ -11,15 +11,18 @@ pub fn draw_layouts_browser(
     file: &mut SBarDefFile,
     selection: &mut HashSet<Vec<usize>>,
     current_bar_idx: &mut usize,
-    actions: &mut Vec<LayerAction>,
+    actions: &mut Vec<DocumentAction>,
     confirmation_modal: &mut Option<crate::app::ConfirmationRequest>,
 ) -> bool {
     let mut changed = false;
 
     if shared::heading_action_button(ui, "Layouts", Some("New Layout"), false).clicked() {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::AddStatusBar);
-        changed = true;
+        ui.data_mut(|d| {
+            d.insert_temp(
+                egui::Id::new("creation_modal_type"),
+                crate::app::CreationModal::LayoutTemplate,
+            )
+        });
     }
 
     let mut move_request = None;
@@ -87,26 +90,8 @@ pub fn draw_layouts_browser(
                 egui::DragAndDrop::set_payload(ui.ctx(), i);
             }
 
-            if let Some(source_idx) = egui::DragAndDrop::payload::<usize>(ui.ctx()) {
-                if ui.rect_contains_pointer(response.rect) && *source_idx != i {
-                    let pos = ui.input(|i| i.pointer.latest_pos().unwrap_or_default());
-                    let is_top = pos.y < response.rect.center().y;
-
-                    let target_idx = if is_top { i } else { i + 1 };
-
-                    if target_idx > 0 && target_idx < bar_count {
-                        let target_y = if is_top {
-                            response.rect.top()
-                        } else {
-                            response.rect.bottom()
-                        };
-                        shared::draw_yellow_line(ui, response.rect, target_y);
-
-                        if ui.input(|i| i.pointer.any_released()) {
-                            move_request = Some((*source_idx, target_idx));
-                        }
-                    }
-                }
+            if let Some(indices) = shared::check_list_reorder(ui, response.rect, i, bar_count) {
+                move_request = Some(indices);
             }
 
             let just_opened = ContextMenu::check(ui, &response);
@@ -143,18 +128,21 @@ pub fn draw_layouts_browser(
     });
 
     if let Some((source, target)) = move_request {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::MoveStatusBar { source, target });
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::MoveStatusBar {
+            source,
+            target,
+        }));
         changed = true;
     }
     if let Some(idx) = duplicate_request {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::DuplicateStatusBar(idx));
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::DuplicateStatusBar(idx)));
         changed = true;
     }
     if let Some(idx) = delete_request {
-        actions.push(LayerAction::UndoSnapshot);
-        actions.push(LayerAction::DeleteStatusBar(idx));
+        actions.push(DocumentAction::UndoSnapshot);
+        actions.push(DocumentAction::SBar(SBarAction::DeleteStatusBar(idx)));
         changed = true;
     }
 

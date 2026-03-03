@@ -13,9 +13,9 @@ static CHEATS: &[Cheat] = &[
     Cheat {
         code: "iddqd",
         action: |s| {
-            s.player.is_god_mode = !s.player.is_god_mode;
-            s.player.health = 100;
-            let msg = if s.player.is_god_mode {
+            s.sim.player.is_god_mode = !s.sim.player.is_god_mode;
+            s.sim.player.health = 100;
+            let msg = if s.sim.player.is_god_mode {
                 "Degreelessness Mode On"
             } else {
                 "Degreelessness Mode Off"
@@ -40,8 +40,8 @@ static CHEATS: &[Cheat] = &[
     Cheat {
         code: "idchoppers",
         action: |s| {
-            s.inventory.has_chainsaw = true;
-            s.selected_weapon_slot = 1;
+            s.sim.inventory.has_chainsaw = true;
+            s.sim.selected_weapon_slot = 1;
             messages::log_event(
                 s,
                 EditorEvent::Cheat("...something small for the children, sir?".to_string()),
@@ -51,57 +51,73 @@ static CHEATS: &[Cheat] = &[
     Cheat {
         code: "idbeholdv",
         action: |s| {
-            let dur = if s.inventory.has_invulnerability {
+            let dur = if s.sim.inventory.has_invulnerability {
                 0.0
             } else {
                 30.0
             };
-            s.player.powerup_durations.insert(0, dur);
+            s.sim.player.powerup_durations.insert(0, dur);
             messages::log_event(s, EditorEvent::Cheat("Invulnerability On/Off".to_string()));
         },
     },
     Cheat {
         code: "idbeholds",
         action: |s| {
-            let dur = if s.inventory.has_berserk { 0.0 } else { 1.0 };
-            s.player.powerup_durations.insert(1, dur);
-            s.player.health = 100;
+            let dur = if s.sim.inventory.has_berserk {
+                0.0
+            } else {
+                1.0
+            };
+            s.sim.player.powerup_durations.insert(1, dur);
+            s.sim.player.health = 100;
             messages::log_event(s, EditorEvent::Cheat("Berserk On/Off".to_string()));
         },
     },
     Cheat {
         code: "idbeholdi",
         action: |s| {
-            let dur = if s.inventory.has_invisibility {
+            let dur = if s.sim.inventory.has_invisibility {
                 0.0
             } else {
                 60.0
             };
-            s.player.powerup_durations.insert(2, dur);
+            s.sim.player.powerup_durations.insert(2, dur);
             messages::log_event(s, EditorEvent::Cheat("Invisibility On/Off".to_string()));
         },
     },
     Cheat {
         code: "idbeholdr",
         action: |s| {
-            let dur = if s.inventory.has_radsuit { 0.0 } else { 60.0 };
-            s.player.powerup_durations.insert(3, dur);
+            let dur = if s.sim.inventory.has_radsuit {
+                0.0
+            } else {
+                60.0
+            };
+            s.sim.player.powerup_durations.insert(3, dur);
             messages::log_event(s, EditorEvent::Cheat("Radiation Suit On/Off".to_string()));
         },
     },
     Cheat {
         code: "idbeholda",
         action: |s| {
-            let dur = if s.inventory.has_automap { 0.0 } else { 1.0 };
-            s.player.powerup_durations.insert(4, dur);
+            let dur = if s.sim.inventory.has_automap {
+                0.0
+            } else {
+                1.0
+            };
+            s.sim.player.powerup_durations.insert(4, dur);
             messages::log_event(s, EditorEvent::Cheat("Computer Map Added".to_string()));
         },
     },
     Cheat {
         code: "idbeholdl",
         action: |s| {
-            let dur = if s.inventory.has_liteamp { 0.0 } else { 120.0 };
-            s.player.powerup_durations.insert(5, dur);
+            let dur = if s.sim.inventory.has_liteamp {
+                0.0
+            } else {
+                120.0
+            };
+            s.sim.player.powerup_durations.insert(5, dur);
             messages::log_event(
                 s,
                 EditorEvent::Cheat("Light Amplification On/Off".to_string()),
@@ -132,45 +148,45 @@ impl CheatEngine {
 
         ctx.input(|i| {
             if i.key_pressed(egui::Key::Num1) {
-                state.selected_weapon_slot = 1;
-                state.inventory.has_fist = true;
-                if state.engine.slot_mapping == crate::state::SlotMapping::Vanilla {
-                    state.inventory.has_chainsaw = true;
+                state.sim.selected_weapon_slot = 1;
+                state.sim.inventory.has_fist = true;
+                if state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla {
+                    state.sim.inventory.has_chainsaw = true;
                 }
             }
             if i.key_pressed(egui::Key::Num2) {
-                state.selected_weapon_slot = 2;
-                state.inventory.has_pistol = true;
+                state.sim.selected_weapon_slot = 2;
+                state.sim.inventory.has_pistol = true;
             }
             if i.key_pressed(egui::Key::Num3) {
-                state.selected_weapon_slot = 3;
-                state.use_super_shotgun = true;
-                state.inventory.has_shotgun = true;
-                state.inventory.has_super_shotgun = true;
+                state.sim.selected_weapon_slot = 3;
+                state.sim.use_super_shotgun = true;
+                state.sim.inventory.has_shotgun = true;
+                state.sim.inventory.has_super_shotgun = true;
             }
             if i.key_pressed(egui::Key::Num4) {
-                state.selected_weapon_slot = 4;
-                state.inventory.has_chaingun = true;
+                state.sim.selected_weapon_slot = 4;
+                state.sim.inventory.has_chaingun = true;
             }
             if i.key_pressed(egui::Key::Num5) {
-                state.selected_weapon_slot = 5;
-                state.inventory.has_rocket_launcher = true;
+                state.sim.selected_weapon_slot = 5;
+                state.sim.inventory.has_rocket_launcher = true;
             }
             if i.key_pressed(egui::Key::Num6) {
-                state.selected_weapon_slot = 6;
-                state.inventory.has_plasma_gun = true;
+                state.sim.selected_weapon_slot = 6;
+                state.sim.inventory.has_plasma_gun = true;
             }
             if i.key_pressed(egui::Key::Num7) {
-                state.selected_weapon_slot = 7;
-                state.inventory.has_bfg = true;
+                state.sim.selected_weapon_slot = 7;
+                state.sim.inventory.has_bfg = true;
             }
             if i.key_pressed(egui::Key::Num8) {
-                state.selected_weapon_slot = 8;
-                state.inventory.has_chainsaw = true;
+                state.sim.selected_weapon_slot = 8;
+                state.sim.inventory.has_chainsaw = true;
             }
             if i.key_pressed(egui::Key::Num9) {
-                state.selected_weapon_slot = 9;
-                state.inventory.has_super_shotgun = true;
+                state.sim.selected_weapon_slot = 9;
+                state.sim.inventory.has_super_shotgun = true;
             }
         });
 
@@ -205,31 +221,31 @@ impl CheatEngine {
 
 /// Helper used by IDFA and IDKFA to refill the player's stock.
 fn give_all(s: &mut PreviewState, give_keys: bool) {
-    s.player.armor = 200;
-    s.player.armor_max = 200;
+    s.sim.player.armor = 200;
+    s.sim.player.armor_max = 200;
 
-    s.inventory.has_fist = true;
-    s.inventory.has_chainsaw = true;
-    s.inventory.has_pistol = true;
-    s.inventory.has_shotgun = true;
-    s.inventory.has_super_shotgun = true;
-    s.inventory.has_chaingun = true;
-    s.inventory.has_rocket_launcher = true;
-    s.inventory.has_plasma_gun = true;
-    s.inventory.has_bfg = true;
+    s.sim.inventory.has_fist = true;
+    s.sim.inventory.has_chainsaw = true;
+    s.sim.inventory.has_pistol = true;
+    s.sim.inventory.has_shotgun = true;
+    s.sim.inventory.has_super_shotgun = true;
+    s.sim.inventory.has_chaingun = true;
+    s.sim.inventory.has_rocket_launcher = true;
+    s.sim.inventory.has_plasma_gun = true;
+    s.sim.inventory.has_bfg = true;
 
-    s.inventory.has_backpack = true;
-    s.inventory.ammo_bullets = 400;
-    s.inventory.ammo_shells = 100;
-    s.inventory.ammo_rockets = 100;
-    s.inventory.ammo_cells = 600;
+    s.sim.inventory.has_backpack = true;
+    s.sim.inventory.ammo_bullets = 400;
+    s.sim.inventory.ammo_shells = 100;
+    s.sim.inventory.ammo_rockets = 100;
+    s.sim.inventory.ammo_cells = 600;
 
     if give_keys {
-        s.inventory.has_blue_card = true;
-        s.inventory.has_yellow_card = true;
-        s.inventory.has_red_card = true;
-        s.inventory.has_blue_skull = true;
-        s.inventory.has_yellow_skull = true;
-        s.inventory.has_red_skull = true;
+        s.sim.inventory.has_blue_card = true;
+        s.sim.inventory.has_yellow_card = true;
+        s.sim.inventory.has_red_card = true;
+        s.sim.inventory.has_blue_skull = true;
+        s.sim.inventory.has_yellow_skull = true;
+        s.sim.inventory.has_red_skull = true;
     }
 }

@@ -244,10 +244,124 @@ pub fn combobox_button(ui: &mut egui::Ui, text: &str, width: f32) -> egui::Respo
     response
 }
 
+/// A version of draw_scaled_image that works with raw IDs and sizes to satisfy the borrow checker.
+pub fn draw_scaled_texture_id(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    tex_id: egui::TextureId,
+    tex_size: egui::Vec2,
+    tint: egui::Color32,
+    max_scale: f32,
+) {
+    if tex_size.x > 0.0 && tex_size.y > 0.0 {
+        let raw_scale = (rect.width() / tex_size.x)
+            .min(rect.height() / tex_size.y)
+            .min(max_scale);
+
+        let scale = if raw_scale >= 1.0 {
+            raw_scale.floor()
+        } else {
+            raw_scale
+        };
+        let final_size = tex_size * scale;
+
+        let left = (rect.left() + (rect.width() - final_size.x) / 2.0).floor();
+        let top = (rect.top() + (rect.height() - final_size.y) / 2.0).floor();
+        let draw_rect = egui::Rect::from_min_size(egui::pos2(left, top), final_size);
+
+        ui.painter().image(
+            tex_id,
+            draw_rect,
+            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            tint,
+        );
+    }
+}
+
+/// Draws a subtle horizontal divider line.
+pub fn draw_separator_line(ui: &mut egui::Ui) {
+    let stroke_color = ui.visuals().widgets.noninteractive.bg_stroke.color;
+    let (div_rect, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 2.0), egui::Sense::hover());
+    ui.painter().line_segment(
+        [
+            egui::pos2(div_rect.min.x, div_rect.center().y),
+            egui::pos2(div_rect.max.x, div_rect.center().y),
+        ],
+        egui::Stroke::new(1.0, stroke_color.gamma_multiply(0.5)),
+    );
+}
+
 pub fn truncate_path(path: &str, max_chars: usize) -> String {
     if path.len() <= max_chars {
         return path.to_string();
     }
     let half = (max_chars - 3) / 2;
     format!("{}...{}", &path[..half], &path[path.len() - half..])
+}
+
+/// Helper for list reordering.
+/// Determines if the mouse is hovering over the top or bottom half of the rect,
+/// draws the insertion line, and returns the target insertion index if dropped.
+pub fn handle_list_drag_zone(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    my_idx: usize,
+    count: usize,
+) -> Option<usize> {
+    if !ui.rect_contains_pointer(rect) {
+        return None;
+    }
+
+    let pos = ui.input(|i| i.pointer.latest_pos())?;
+    let center_y = rect.center().y;
+    let is_top = pos.y < center_y;
+
+    let target_idx = if is_top { my_idx } else { my_idx + 1 };
+
+    let safe_target = target_idx.min(count);
+
+    let line_y = if is_top { rect.top() } else { rect.bottom() };
+    draw_yellow_line(ui, rect, line_y);
+
+    if ui.input(|i| i.pointer.any_released()) {
+        return Some(safe_target);
+    }
+
+    None
+}
+
+/// Handles the full reorder lifecycle: checking payload, hit testing, and index calculation.
+pub fn check_list_reorder(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    i: usize,
+    count: usize,
+) -> Option<(usize, usize)> {
+    if let Some(source_idx) = egui::DragAndDrop::payload::<usize>(ui.ctx()) {
+        if *source_idx != i {
+            if let Some(target_idx) = handle_list_drag_zone(ui, rect, i, count) {
+                return Some((*source_idx, target_idx));
+            }
+        }
+    }
+    None
+}
+
+/// Specialized DragValue for percentages (0.0 - 1.0 internally, 0 - 100 in UI).
+pub fn drag_percentage(ui: &mut egui::Ui, label: &str, value: &mut f32) -> bool {
+    let mut pct = *value * 100.0;
+    ui.label(label);
+    if ui
+        .add(
+            egui::DragValue::new(&mut pct)
+                .range(1.0..=1000.0)
+                .suffix("%"),
+        )
+        .changed()
+    {
+        *value = pct / 100.0;
+        return true;
+    }
+    false
 }

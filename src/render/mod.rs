@@ -9,11 +9,13 @@ pub mod animation;
 pub mod canvas;
 pub mod components;
 pub mod face;
+pub mod fire;
 pub mod graphic;
 pub mod list;
 pub mod palette;
 pub mod patch;
 pub mod projection;
+pub(crate) mod sky;
 pub mod text;
 
 /// Defines whether an element is being drawn in the standard background pass
@@ -87,7 +89,7 @@ pub fn draw_element_wrapper(
         || ctx.selection.iter().any(|s| current_path.starts_with(s));
 
     let is_ancestor_of_selection = ctx.selection.iter().any(|s| s.starts_with(current_path));
-    let is_strobing = ctx.state.editor.strobe_timer > 0.0;
+    let is_strobing = ctx.state.interaction.strobe_timer > 0.0;
 
     match ctx.pass {
         RenderPass::Background => {
@@ -116,13 +118,13 @@ pub fn draw_element_wrapper(
 
     let is_hovered_branch = ctx
         .state
-        .editor
+        .interaction
         .hovered_path
         .as_ref()
         .map_or(false, |h| current_path.starts_with(h));
     let is_grabbed_branch = ctx
         .state
-        .editor
+        .interaction
         .grabbed_path
         .as_ref()
         .map_or(false, |g| current_path.starts_with(g));
@@ -130,11 +132,13 @@ pub fn draw_element_wrapper(
     if is_hovered_branch || is_grabbed_branch {
         let wave = (ctx.time * std::f64::consts::PI * 4.0).cos() as f32;
         alpha *= 0.70 + (wave * 0.30);
+        ctx.painter.ctx().request_repaint();
     } else if is_selected_branch && is_strobing {
         let dur = 0.5;
-        let prog = (dur - ctx.state.editor.strobe_timer) / dur;
+        let prog = (dur - ctx.state.interaction.strobe_timer) / dur;
         let wave = (prog * std::f32::consts::PI * 4.0).cos();
         alpha *= 0.70 + (wave * 0.30);
+        ctx.painter.ctx().request_repaint();
     }
 
     let mut pos = resolve_position(ctx, common, parent_pos);

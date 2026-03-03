@@ -1,16 +1,18 @@
 use crate::assets::{AssetId, AssetStore};
-use crate::document::{LayerAction, determine_insertion_point};
+use crate::document::actions::{DocumentAction, TreeAction};
+use crate::document::determine_insertion_point;
 use crate::models::ProjectData;
 use crate::models::sbardef::*;
 use crate::render::projection::ViewportProjection;
 use crate::render::{self, RenderPass};
 use crate::state::PreviewState;
+use crate::ui::properties::editor::ViewportContext;
 use crate::ui::shared::VIEWPORT_RECT_ID;
 use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
 
-/// Draws the main ID24 viewport, handling background rendering and interaction logic.
+/// Draws the main viewport, handling background rendering and interaction logic.
 pub fn draw_viewport(
     ui: &mut egui::Ui,
     project: &Option<ProjectData>,
@@ -20,13 +22,13 @@ pub fn draw_viewport(
     selection: &HashSet<Vec<usize>>,
     current_bar_idx: usize,
     active_mode: &mut crate::app::ProjectMode,
-) -> Vec<LayerAction> {
+) -> Vec<DocumentAction> {
     let mut actions = Vec::new();
 
     let mut estimate_rect = ui.available_rect_before_wrap();
     estimate_rect.min.y += 32.0;
 
-    let temp_proj = ViewportProjection::from_engine(estimate_rect, &preview_state.engine);
+    let temp_proj = ViewportProjection::from_engine(estimate_rect, &preview_state.sim.engine);
 
     ui.vertical(|ui| {
         ui.add_space(-1.0);
@@ -37,6 +39,7 @@ pub fn draw_viewport(
                 crate::app::ProjectMode::SkyDefs => "SKYDEFS",
                 crate::app::ProjectMode::Interlevel => "INTERLEVEL",
                 crate::app::ProjectMode::Finale => "FINALE",
+                crate::app::ProjectMode::UmapInfo => "UMAPINFO",
             };
 
             let mode_res = ui.add_sized([110.0, 28.0], |ui: &mut egui::Ui| {
@@ -70,8 +73,11 @@ pub fn draw_viewport(
                     let all_modes = [
                         (ProjectMode::SBarDef, "SBARDEF"),
                         (ProjectMode::SkyDefs, "SKYDEFS"),
+                        /* TODO: Not quite ready yet...
                         (ProjectMode::Interlevel, "INTERLEVEL"),
                         (ProjectMode::Finale, "FINALE"),
+                        */
+                        (ProjectMode::UmapInfo, "UMAPINFO"),
                     ];
 
                     for (m, lbl) in all_modes {
@@ -83,6 +89,12 @@ pub fn draw_viewport(
                                 &format!("{}{}", prefix, lbl),
                                 true,
                             ) {
+                                ui.ctx().data_mut(|d| {
+                                    d.remove::<HashSet<Vec<usize>>>(egui::Id::new("selection"))
+                                });
+                                preview_state.interaction.grabbed_path = None;
+                                preview_state.interaction.hovered_path = None;
+
                                 *active_mode = m;
                                 crate::ui::context_menu::ContextMenu::close(ui);
                             }
@@ -106,12 +118,15 @@ pub fn draw_viewport(
 
                     add_lump_row("+ SBARDEF", ProjectMode::SBarDef, CreationModal::SBarDef);
                     add_lump_row("+ SKYDEFS", ProjectMode::SkyDefs, CreationModal::SkyDefs);
+                    /* TODO: Not quite ready yet...
                     add_lump_row(
                         "+ INTERLEVEL",
                         ProjectMode::Interlevel,
                         CreationModal::Interlevel,
                     );
                     add_lump_row("+ FINALE", ProjectMode::Finale, CreationModal::Finale);
+                    */
+                    add_lump_row("+ UMAPINFO", ProjectMode::UmapInfo, CreationModal::UmapInfo);
                 });
             }
 
@@ -121,39 +136,39 @@ pub fn draw_viewport(
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.checkbox(
-                    &mut preview_state.engine.widescreen_mode,
+                    &mut preview_state.sim.engine.widescreen_mode,
                     "Widescreen (16:9)",
                 );
                 ui.checkbox(
-                    &mut preview_state.engine.aspect_correction,
+                    &mut preview_state.sim.engine.aspect_correction,
                     "Aspect Correct (4:3)",
                 );
 
                 ui.separator();
 
                 if ui
-                    .checkbox(&mut preview_state.engine.auto_zoom, "Auto Fit")
+                    .checkbox(&mut preview_state.sim.engine.auto_zoom, "Auto Fit")
                     .changed()
                 {
-                    if preview_state.engine.auto_zoom {
-                        preview_state.engine.pan_offset = egui::Vec2::ZERO;
+                    if preview_state.sim.engine.auto_zoom {
+                        preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
                     }
                 }
 
-                if !preview_state.engine.auto_zoom {
+                if !preview_state.sim.engine.auto_zoom {
                     ui.label(
-                        egui::RichText::new(format!("{}x", preview_state.engine.zoom_level))
+                        egui::RichText::new(format!("{}x", preview_state.sim.engine.zoom_level))
                             .strong(),
                     );
 
                     let btn_size = egui::vec2(20.0, 20.0);
                     if ui.add_sized(btn_size, egui::Button::new("-")).clicked() {
-                        preview_state.engine.zoom_level =
-                            (preview_state.engine.zoom_level - 1).max(1);
+                        preview_state.sim.engine.zoom_level =
+                            (preview_state.sim.engine.zoom_level - 1).max(1);
                     }
                     if ui.add_sized(btn_size, egui::Button::new("+")).clicked() {
-                        preview_state.engine.zoom_level =
-                            (preview_state.engine.zoom_level + 1).min(8);
+                        preview_state.sim.engine.zoom_level =
+                            (preview_state.sim.engine.zoom_level + 1).min(8);
                     }
                 }
             });
@@ -187,11 +202,11 @@ pub fn draw_viewport(
 
     let is_panning = ui.input(|i| i.key_down(egui::Key::Space));
 
-    if !preview_state.engine.auto_zoom && viewport_res.hovered() {
+    if !preview_state.sim.engine.auto_zoom && viewport_res.hovered() {
         ui.input(|i| {
             for event in &i.events {
                 if let egui::Event::MouseWheel { delta, .. } = event {
-                    let old_zoom = preview_state.engine.zoom_level;
+                    let old_zoom = preview_state.sim.engine.zoom_level;
                     let new_zoom = if delta.y > 0.0 {
                         (old_zoom + 1).min(8)
                     } else if delta.y < 0.0 {
@@ -204,21 +219,21 @@ pub fn draw_viewport(
                         if let Some(mouse_pos) = i.pointer.latest_pos() {
                             let old_proj = ViewportProjection::from_engine(
                                 background_rect,
-                                &preview_state.engine,
+                                &preview_state.sim.engine,
                             );
                             let virt_anchor = old_proj.to_virtual(mouse_pos);
 
-                            preview_state.engine.zoom_level = new_zoom;
+                            preview_state.sim.engine.zoom_level = new_zoom;
 
                             let new_proj_temp = ViewportProjection::from_engine(
                                 background_rect,
-                                &preview_state.engine,
+                                &preview_state.sim.engine,
                             );
 
                             let new_screen_pos = new_proj_temp.to_screen(virt_anchor);
-                            preview_state.engine.pan_offset += mouse_pos - new_screen_pos;
+                            preview_state.sim.engine.pan_offset += mouse_pos - new_screen_pos;
                         } else {
-                            preview_state.engine.zoom_level = new_zoom;
+                            preview_state.sim.engine.zoom_level = new_zoom;
                         }
                     }
                 }
@@ -226,20 +241,20 @@ pub fn draw_viewport(
         });
     }
 
-    let proj = ViewportProjection::from_engine(background_rect, &preview_state.engine);
+    let proj = ViewportProjection::from_engine(background_rect, &preview_state.sim.engine);
 
     if is_panning {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
         if viewport_res.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-            preview_state.engine.pan_offset += ui.input(|i| i.pointer.delta());
+            preview_state.sim.engine.pan_offset += ui.input(|i| i.pointer.delta());
         }
     }
 
     let mouse_pos = ui
         .input(|i| i.pointer.latest_pos())
         .unwrap_or(egui::pos2(-1000.0, -1000.0));
-    preview_state.editor.virtual_mouse_pos = proj.to_virtual(mouse_pos);
+    preview_state.interaction.virtual_mouse_pos = proj.to_virtual(mouse_pos);
 
     let selection_mode = ui.input(|i| i.modifiers.alt || i.modifiers.command || i.modifiers.ctrl);
     let container_mode = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
@@ -250,133 +265,35 @@ pub fn draw_viewport(
     let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(background_rect));
     viewport_ui.set_clip_rect(final_clip_rect);
 
-    match project {
-        Some(ProjectData::StatusBar(sbar)) => {
-            let bar_idx = current_bar_idx.min(sbar.data.status_bars.len().saturating_sub(1));
-            let bar = &sbar.data.status_bars[bar_idx];
+    preview_state.interaction.hovered_path = None;
 
-            render_statusbar_workspace(&mut viewport_ui, bar, assets, preview_state, &proj);
-
-            if selection_mode && !is_panning {
-                let mut hit_result = None;
-                let root_y = if bar.fullscreen_render {
-                    0.0
-                } else {
-                    200.0 - bar.height as f32
-                };
-
-                let hit_ctx = render::RenderContext {
-                    painter: viewport_ui.painter(),
-                    assets,
-                    file: sbar,
-                    state: preview_state,
-                    time: ui.input(|i| i.time),
-                    fps: preview_state.editor.display_fps,
-                    mouse_pos: preview_state.editor.virtual_mouse_pos,
-                    selection,
-                    pass: RenderPass::Background,
-                    proj: &proj,
-                    is_dragging: controller.is_dragging,
-                    is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
-                    is_native: false,
-                };
-
-                if viewport_res.hovered() {
-                    for (idx, child) in bar.children.iter().enumerate().rev() {
-                        let mut path = vec![bar_idx, idx];
-                        if let Some(hit) = render::hit_test(
-                            &hit_ctx,
-                            child,
-                            egui::pos2(proj.origin_x, root_y),
-                            &mut path,
-                            true,
-                            container_mode,
-                        ) {
-                            hit_result = Some(hit);
-                            break;
-                        }
-                    }
-                }
-                preview_state.editor.hovered_path = hit_result;
-
-                if primary_pressed && viewport_res.hovered() {
-                    if let Some(path) = preview_state.editor.hovered_path.clone() {
-                        preview_state.editor.grabbed_path = Some(path.clone());
-                        if ui.input(|i| i.modifiers.shift) {
-                            actions.push(LayerAction::ToggleSelection(vec![path]));
-                        } else {
-                            actions.push(LayerAction::Select(vec![path]));
-                        }
-                    }
-                }
-            } else {
-                preview_state.editor.hovered_path = None;
-            }
-
-            let time = ui.input(|i| i.time);
-            let fps = preview_state.editor.display_fps;
-            let root_y = if bar.fullscreen_render {
-                0.0
-            } else {
-                200.0 - bar.height as f32
-            };
-
-            let draw_hud_elements = |painter: &egui::Painter, pass: RenderPass| {
-                let render_ctx = render::RenderContext {
-                    painter,
-                    assets,
-                    file: sbar,
-                    state: preview_state,
-                    time,
-                    fps,
-                    mouse_pos: preview_state.editor.virtual_mouse_pos,
-                    selection,
-                    pass,
-                    proj: &proj,
-                    is_dragging: controller.is_dragging,
-                    is_viewport_clicked: viewport_res.contains_pointer() && primary_down,
-                    is_native: false,
-                };
-
-                for (idx, child) in bar.children.iter().enumerate() {
-                    let mut path = vec![bar_idx, idx];
-                    render::draw_element_wrapper(
-                        &render_ctx,
-                        child,
-                        egui::pos2(proj.origin_x, root_y),
-                        &mut path,
-                        true,
-                    );
-                }
-            };
-
-            draw_hud_elements(viewport_ui.painter(), RenderPass::Background);
-
-            if !selection.is_empty() && preview_state.editor.strobe_timer > 0.0 {
-                draw_hud_elements(viewport_ui.painter(), RenderPass::Foreground);
-            }
-        }
-        Some(ProjectData::Interlevel(int)) => {
-            render_id24_background(&mut viewport_ui, &int.data.backgroundimage, assets, &proj);
-            preview_state.editor.hovered_path = None;
-        }
-        Some(ProjectData::Finale(fin)) => {
-            render_id24_background(&mut viewport_ui, &fin.data.background, assets, &proj);
-            preview_state.editor.hovered_path = None;
-        }
-        _ => {
-            viewport_ui
-                .painter()
-                .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
-        }
+    if let Some(lump) = project {
+        let mut vp_ctx = ViewportContext {
+            assets,
+            state: preview_state,
+            proj: &proj,
+            selection,
+            current_item_idx: current_bar_idx,
+            is_panning,
+            container_mode,
+            selection_mode,
+            primary_pressed,
+            primary_down,
+            viewport_res: &viewport_res,
+        };
+        actions.extend(lump.render_viewport(&mut viewport_ui, &mut vp_ctx));
+    } else {
+        viewport_ui
+            .painter()
+            .rect_filled(proj.screen_rect, 0.0, egui::Color32::BLACK);
     }
 
     if !primary_down {
-        preview_state.editor.grabbed_path = None;
+        preview_state.interaction.grabbed_path = None;
     }
 
     let mut effective_selection = selection.clone();
-    if let Some(grab) = &preview_state.editor.grabbed_path {
+    if let Some(grab) = &preview_state.interaction.grabbed_path {
         effective_selection.clear();
         effective_selection.insert(grab.clone());
     }
@@ -387,6 +304,8 @@ pub fn draw_viewport(
         &effective_selection,
         &viewport_res,
         is_panning,
+        Default::default(),
+        &mut Default::default(),
     ));
 
     if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
@@ -412,8 +331,8 @@ pub fn draw_viewport(
                         file: sbar,
                         state: preview_state,
                         time: ui.input(|i| i.time),
-                        fps: preview_state.editor.display_fps,
-                        mouse_pos: preview_state.editor.virtual_mouse_pos,
+                        fps: preview_state.viewer.display_fps,
+                        mouse_pos: preview_state.interaction.virtual_mouse_pos,
                         selection,
                         pass: RenderPass::Background,
                         proj: &proj,
@@ -438,11 +357,11 @@ pub fn draw_viewport(
                         let (parent_path, mut insert_idx) =
                             determine_insertion_point(sbar, selection, bar_idx);
                         for key in asset_keys.iter() {
-                            actions.push(LayerAction::Add {
+                            actions.push(DocumentAction::Tree(TreeAction::Add {
                                 parent_path: parent_path.clone(),
                                 insert_idx,
                                 element: wrap_graphic(key, final_x, final_y),
-                            });
+                            }));
                             insert_idx += 1;
                         }
                         egui::DragAndDrop::clear_payload(ui.ctx());
@@ -456,7 +375,7 @@ pub fn draw_viewport(
 }
 
 /// Renders a generic ID24 background centered in the virtual 320x200 space.
-fn render_id24_background(
+pub(crate) fn render_id24_background(
     ui: &mut egui::Ui,
     lump: &str,
     assets: &AssetStore,
@@ -472,7 +391,7 @@ fn render_id24_background(
 }
 
 /// Renders the complex workspace for SBARDEF, including world view and status bar flats.
-fn render_statusbar_workspace(
+pub(crate) fn render_statusbar_workspace(
     ui: &mut egui::Ui,
     bar: &StatusBarLayout,
     assets: &AssetStore,
@@ -489,7 +408,7 @@ fn render_statusbar_workspace(
     let y_offset_from_top = y_center - 100.0;
 
     if let Some(tex) = assets.textures.get(&AssetId::new("_BG_MASTER")) {
-        let mut uv_rect = if state.engine.widescreen_mode {
+        let mut uv_rect = if state.sim.engine.widescreen_mode {
             egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0))
         } else {
             let margin = (1.0 - 0.75) / 2.0;
@@ -559,11 +478,11 @@ fn render_player_weapon(
     proj: &ViewportProjection,
     v_shift: f32,
 ) {
-    let (weapon_lump_name, constant_offset) = match state.editor.display_weapon_slot {
+    let (weapon_lump_name, constant_offset) = match state.viewer.display_weapon_slot {
         1 => (
             Some(
-                if state.inventory.has_chainsaw
-                    && state.engine.slot_mapping == crate::state::SlotMapping::Vanilla
+                if state.sim.inventory.has_chainsaw
+                    && state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla
                 {
                     "SAWGC0"
                 } else {
@@ -575,8 +494,8 @@ fn render_player_weapon(
         2 => (Some("PISGA0"), 0.0),
         3 => (
             Some(
-                if state.editor.display_super_shotgun
-                    && state.engine.slot_mapping == crate::state::SlotMapping::Vanilla
+                if state.viewer.display_super_shotgun
+                    && state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla
                 {
                     "SHT2A0"
                 } else {
@@ -604,7 +523,7 @@ fn render_player_weapon(
             );
             let draw_x = proj.screen_rect.center().x - (scaled_size.x / 2.0);
             let total_offset_y =
-                (state.editor.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
+                (state.viewer.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
             let draw_y = (proj.screen_rect.max.y - scaled_size.y) + total_offset_y;
 
             ui.painter().image(

@@ -140,12 +140,10 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(lump) = d.lumps.first() {
-                        if let Some(sbar) = lump.as_sbar() {
-                            if let Some(path) = io::save_pk3_dialog(sbar, assets, d.path.clone()) {
-                                action = MenuAction::SaveDone(path);
-                            }
-                        }
+                    if let Some(path) =
+                        io::save_pk3_dialog(&d.lumps, assets, &d.passthrough_lumps, d.path.clone())
+                    {
+                        action = MenuAction::SaveDone(path);
                     }
                 }
                 ContextMenu::close(ui);
@@ -163,12 +161,10 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Export WAD...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(lump) = d.get_lump(active_mode) {
-                        let sanitized = lump.to_sanitized_json(assets);
-                        if let Some(path) = io::save_wad_dialog(&sanitized, assets, d.path.clone())
-                        {
-                            action = MenuAction::ExportDone(path);
-                        }
+                    if let Some(path) =
+                        io::save_wad_dialog(&d.lumps, assets, &d.passthrough_lumps, d.path.clone())
+                    {
+                        action = MenuAction::ExportDone(path);
                     }
                 }
                 ContextMenu::close(ui);
@@ -204,16 +200,14 @@ pub fn draw_menu_bar(
                     if ContextMenu::button(ui, &format!("Launch in {}", port.name), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
-                            if let Some(lump) = d.get_lump(active_mode) {
-                                let sanitized = lump.to_sanitized_json(assets);
-                                io::launch_game(
-                                    &sanitized,
-                                    assets,
-                                    &port.command,
-                                    iwad,
-                                    lump.target(),
-                                );
-                            }
+                            io::launch_game(
+                                assets,
+                                &port.command,
+                                iwad,
+                                d.lumps[0].target(),
+                                &d.lumps,
+                                &d.passthrough_lumps,
+                            );
                         }
                         ContextMenu::close(ui);
                     }
@@ -362,7 +356,7 @@ pub fn draw_settings_window(
                                                 - label_width
                                                 - browse_button_width
                                                 - ui.spacing().item_spacing.x
-                                                - 16.0; // frame margin
+                                                - 16.0;
                                             ui.add(
                                                 egui::TextEdit::singleline(&mut port.command)
                                                     .hint_text("Executable path or command")
@@ -543,6 +537,8 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
         CreationModal::SkyDefs => "Create SKYDEFS Lump",
         CreationModal::Interlevel => "Create INTERLEVEL Lump",
         CreationModal::Finale => "Create FINALE Lump",
+        CreationModal::UmapInfo => "Create UMAPINFO Lump",
+        CreationModal::LayoutTemplate => "Add New Layout",
         _ => "Create New Project",
     };
 
@@ -571,30 +567,48 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                             if draw_menu_card(
                                 ui,
                                 "Status Bar (SBARDEF)",
-                                "Recursive HUD and UI layouts.",
+                                "The main UI layout in-game. Customize anything and everything.",
                             ) {
                                 app.creation_modal = CreationModal::SBarDef;
                             }
                             if draw_menu_card(
                                 ui,
                                 "Sky Definitions (SKYDEFS)",
-                                "Custom panoramas, Hexen skies, and Fire effects.",
+                                "The skybox. Now with foreground and background, and sometime even on fire.",
                             ) {
                                 app.creation_modal = CreationModal::SkyDefs;
                             }
+                            /* TODO: Not quite ready yet...
                             if draw_menu_card(
                                 ui,
                                 "Interlevel Animations",
-                                "Victory screens, score tallies, and map transitions.",
+                                "Exiting that last map. Here's your statistics. Entering the next one.",
                             ) {
                                 app.creation_modal = CreationModal::Interlevel;
                             }
                             if draw_menu_card(
                                 ui,
                                 "Finale Definitions",
-                                "Art screens, bunny scrollers, and cast calls.",
+                                "Art screens, the bunny scroller thing, and monster cast call.",
                             ) {
                                 app.creation_modal = CreationModal::Finale;
+                            }
+                            */
+                            if draw_menu_card(
+                                ui,
+                                "Map Information (UMAPINFO)",
+                                "Map names, music, skies, and a bunch of other metadata. Kinda in alpha.",
+                            ) {
+                                app.creation_modal = CreationModal::UmapInfo;
+                            }
+                        }
+                        CreationModal::LayoutTemplate => {
+                            if draw_menu_card(ui, "Empty Layout", "Start from a blank layout.") {
+                                app.execute_actions(vec![
+                                    crate::document::actions::DocumentAction::UndoSnapshot,
+                                    crate::document::actions::DocumentAction::SBar(crate::document::actions::SBarAction::AddStatusBar)
+                                ]);
+                                app.creation_modal = CreationModal::None;
                             }
                         }
                         _ => {
@@ -613,6 +627,9 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                                     CreationModal::Finale => {
                                         ProjectData::Finale(finale::FinaleDefFile::new_empty())
                                     }
+                                    CreationModal::UmapInfo => {
+                                        ProjectData::UmapInfo(umapinfo::UmapInfoFile::new_empty())
+                                    }
                                     _ => ProjectData::StatusBar(sbardef::SBarDefFile::new_empty()),
                                 };
 
@@ -623,16 +640,78 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                                 }
                                 app.creation_modal = CreationModal::None;
                             }
+                        }
+                    }
 
-                            if app.creation_modal == CreationModal::SBarDef {
+                    if app.creation_modal != CreationModal::LumpSelector {
+                        let target_type_key = match app.creation_modal {
+                            CreationModal::SBarDef | CreationModal::LayoutTemplate => Some("\"type\": \"statusbar\""),
+                            CreationModal::UmapInfo => Some("\"type\": \"umapinfo\""),
+                            CreationModal::SkyDefs => Some("\"type\": \"skydefs\""),
+                            CreationModal::Interlevel => Some("\"type\": \"interlevel\""),
+                            CreationModal::Finale => Some("\"type\": \"finale\""),
+                            _ => None,
+                        };
+
+                        if let Some(key) = target_type_key {
+                            let relevant_templates: Vec<_> = crate::library::TEMPLATES
+                                .iter()
+                                .filter(|t| t.json_content.contains(key))
+                                .collect();
+
+                            if !relevant_templates.is_empty() {
                                 ui.add_space(4.0);
                                 ui.label(
-                                    egui::RichText::new("Templates").weak().italics().size(11.0),
+                                    egui::RichText::new("Templates")
+                                        .weak()
+                                        .italics()
+                                        .size(11.0),
                                 );
 
-                                for template in crate::library::TEMPLATES {
+                                for template in relevant_templates {
                                     if draw_menu_card(ui, template.name, template.description) {
-                                        app.apply_template(ctx, template);
+                                        if app.creation_modal == CreationModal::LayoutTemplate {
+                                            if let Ok(crate::models::ProjectData::StatusBar(s)) = serde_json::from_str(template.json_content) {
+                                                let mut layouts = s.data.status_bars;
+                                                for l in &mut layouts {
+                                                    l.reassign_all_uids();
+                                                }
+
+                                                app.execute_actions(vec![
+                                                    crate::document::actions::DocumentAction::UndoSnapshot,
+                                                ]);
+
+                                                if let Some(doc) = &mut app.doc {
+                                                    if let Some(crate::models::ProjectData::StatusBar(sbar)) = doc.get_lump_mut(app.active_mode) {
+                                                        for nf in s.data.number_fonts {
+                                                            if !sbar.data.number_fonts.iter().any(|f| f.name == nf.name) {
+                                                                sbar.data.number_fonts.push(nf);
+                                                            }
+                                                        }
+                                                        for hf in s.data.hud_fonts {
+                                                            if !sbar.data.hud_fonts.iter().any(|f| f.name == hf.name) {
+                                                                sbar.data.hud_fonts.push(hf);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                app.execute_actions(vec![
+                                                    crate::document::actions::DocumentAction::SBar(crate::document::actions::SBarAction::PasteStatusBars(layouts)),
+                                                ]);
+
+                                                for prefix in template.required_prefixes {
+                                                    for lib_asset in crate::library::ASSETS {
+                                                        if lib_asset.name.to_lowercase().starts_with(prefix) {
+                                                            let key = AssetStore::stem(lib_asset.name);
+                                                            app.assets.load_image(ctx, &key, lib_asset.bytes);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            app.apply_template(ctx, template);
+                                        }
                                         app.creation_modal = CreationModal::None;
                                     }
                                 }
@@ -645,7 +724,7 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
             ui.separator();
 
             ui.horizontal(|ui| {
-                if app.creation_modal != CreationModal::LumpSelector {
+                if app.creation_modal != CreationModal::LumpSelector && app.creation_modal != CreationModal::LayoutTemplate {
                     if ui.button("  Back  ").clicked() {
                         app.creation_modal = CreationModal::LumpSelector;
                     }

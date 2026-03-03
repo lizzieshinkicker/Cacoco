@@ -2,6 +2,7 @@ pub mod finale;
 pub mod interlevel;
 pub mod sbardef;
 pub mod skydefs;
+pub mod umapinfo;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,16 +17,29 @@ pub enum ProjectData {
     Sky(skydefs::SkyDefsFile),
     #[serde(rename = "interlevel")]
     Interlevel(interlevel::InterlevelDefFile),
+    #[serde(rename = "umapinfo")]
+    UmapInfo(umapinfo::UmapInfoFile),
 }
 
 #[allow(dead_code)]
 impl ProjectData {
+    pub fn standard_lump_name(&self) -> &str {
+        match self {
+            ProjectData::StatusBar(_) => "SBARDEF",
+            ProjectData::Sky(_) => "SKYDEFS",
+            ProjectData::Interlevel(_) => "INTERLEVEL",
+            ProjectData::Finale(_) => "FINALE",
+            ProjectData::UmapInfo(_) => "UMAPINFO",
+        }
+    }
+
     pub fn version(&self) -> &str {
         match self {
             ProjectData::StatusBar(f) => &f.version,
             ProjectData::Finale(f) => &f.version,
             ProjectData::Sky(f) => &f.version,
             ProjectData::Interlevel(f) => &f.version,
+            ProjectData::UmapInfo(f) => &f.version,
         }
     }
 
@@ -103,10 +117,180 @@ impl ProjectData {
         }
     }
 
+    pub fn as_umapinfo(&self) -> Option<&umapinfo::UmapInfoFile> {
+        if let ProjectData::UmapInfo(u) = self {
+            Some(u)
+        } else {
+            None
+        }
+    }
+
     pub fn to_sanitized_json(&self, assets: &crate::assets::AssetStore) -> String {
         match self {
             ProjectData::StatusBar(f) => f.to_sanitized_json(assets),
-            _ => serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string()),
+            ProjectData::Sky(f) => self.wrap_lump("skydefs", &f.version, &f.metadata, &f.data),
+            ProjectData::Interlevel(f) => {
+                self.wrap_lump("interlevel", &f.version, &f.metadata, &f.data)
+            }
+            ProjectData::Finale(f) => self.wrap_lump("finale", &f.version, &f.metadata, &f.data),
+            ProjectData::UmapInfo(f) => f.to_umapinfo_text(),
+        }
+    }
+
+    fn wrap_lump(
+        &self,
+        lump_type: &str,
+        version: &str,
+        metadata: &serde_json::Value,
+        data: &impl serde::Serialize,
+    ) -> String {
+        let mut data_val = serde_json::to_value(data).unwrap_or_default();
+        sanitize_json_value(&mut data_val);
+
+        let mut root = serde_json::Map::new();
+        root.insert("type".to_string(), serde_json::json!(lump_type));
+        root.insert("version".to_string(), serde_json::json!(version));
+
+        if metadata.is_null() {
+            root.insert("metadata".to_string(), serde_json::json!({}));
+        } else {
+            root.insert("metadata".to_string(), metadata.clone());
+        }
+
+        root.insert("data".to_string(), data_val);
+
+        serde_json::to_string_pretty(&root).unwrap_or_default()
+    }
+
+    /// Returns a list of all unique texture names referenced by this project
+    /// that require legacy TEXTURE1/PNAMES registration (mostly for SKYDEFS).
+    pub fn get_legacy_texture_names(&self) -> Vec<String> {
+        let mut names = std::collections::HashSet::new();
+        if let ProjectData::Sky(sky_file) = self {
+            for sky in &sky_file.data.skies {
+                names.insert(sky.name.to_uppercase());
+                if let Some(fore) = &sky.foregroundtex {
+                    names.insert(fore.name.to_uppercase());
+                }
+            }
+        }
+        let mut list: Vec<String> = names.into_iter().collect();
+        list.sort();
+        list
+    }
+
+    pub fn draw_properties(
+        &mut self,
+        ui: &mut eframe::egui::Ui,
+        ctx: &crate::ui::properties::editor::PropertyContext,
+    ) -> bool {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.draw_properties(ui, ctx),
+            ProjectData::Sky(f) => f.draw_properties(ui, ctx),
+            ProjectData::UmapInfo(f) => f.draw_properties(ui, ctx),
+            ProjectData::Interlevel(f) => f.draw_properties(ui, ctx),
+            ProjectData::Finale(f) => f.draw_properties(ui, ctx),
+        }
+    }
+
+    pub fn tick(&self, ctx: &mut crate::ui::properties::editor::TickContext) {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.tick(ctx),
+            ProjectData::Sky(f) => f.tick(ctx),
+            ProjectData::UmapInfo(f) => f.tick(ctx),
+            ProjectData::Interlevel(f) => f.tick(ctx),
+            ProjectData::Finale(f) => f.tick(ctx),
+        }
+    }
+
+    pub fn draw_layer_list(
+        &mut self,
+        ui: &mut eframe::egui::Ui,
+        ctx: &mut crate::ui::properties::editor::LayerContext,
+    ) -> (Vec<crate::document::actions::DocumentAction>, bool) {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::Sky(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::UmapInfo(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::Interlevel(f) => f.draw_layer_list(ui, ctx),
+            ProjectData::Finale(f) => f.draw_layer_list(ui, ctx),
+        }
+    }
+
+    pub fn get_header(
+        &self,
+        selection: &std::collections::HashSet<Vec<usize>>,
+    ) -> (String, String, eframe::egui::Color32) {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.header_info(selection),
+            ProjectData::Sky(f) => f.header_info(selection),
+            ProjectData::UmapInfo(f) => f.header_info(selection),
+            ProjectData::Interlevel(f) => f.header_info(selection),
+            ProjectData::Finale(f) => f.header_info(selection),
+        }
+    }
+
+    pub fn get_preview(
+        &self,
+        ui: &eframe::egui::Ui,
+        ctx: &crate::ui::properties::editor::PropertyContext,
+    ) -> Option<crate::ui::properties::preview::PreviewContent> {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.get_preview_content(ui, ctx),
+            _ => None,
+        }
+    }
+
+    pub fn render_viewport(
+        &self,
+        ui: &mut eframe::egui::Ui,
+        ctx: &mut crate::ui::properties::editor::ViewportContext,
+    ) -> Vec<crate::document::actions::DocumentAction> {
+        use crate::ui::properties::editor::LumpUI;
+        match self {
+            ProjectData::StatusBar(f) => f.render_viewport(ui, ctx),
+            ProjectData::Sky(f) => f.render_viewport(ui, ctx),
+            ProjectData::UmapInfo(f) => f.render_viewport(ui, ctx),
+            ProjectData::Interlevel(f) => f.render_viewport(ui, ctx),
+            ProjectData::Finale(f) => f.render_viewport(ui, ctx),
+        }
+    }
+
+    /// Centralized lump parser for ID24 JSON and UMAPINFO text formats.
+    pub fn parse_lump(name: &str, data: &[u8]) -> Option<Self> {
+        let content = String::from_utf8_lossy(data);
+        if let Ok(mut parsed) = serde_json::from_str::<Self>(&content) {
+            parsed.set_target(parsed.determine_target());
+            parsed.normalize_for_target();
+            Some(parsed)
+        } else if name.eq_ignore_ascii_case("UMAPINFO") {
+            Some(Self::UmapInfo(umapinfo::UmapInfoFile::from_umapinfo_text(
+                &content,
+            )))
+        } else {
+            None
+        }
+    }
+}
+
+fn sanitize_json_value(v: &mut serde_json::Value) {
+    if let Some(obj) = v.as_object_mut() {
+        obj.retain(|_, val| !val.is_null());
+        for value in obj.values_mut() {
+            sanitize_json_value(value);
+        }
+    } else if let Some(arr) = v.as_array_mut() {
+        for value in arr {
+            sanitize_json_value(value);
+        }
+    } else if let Some(n) = v.as_f64() {
+        if n.fract() == 0.0 {
+            *v = serde_json::json!(n as i64);
         }
     }
 }

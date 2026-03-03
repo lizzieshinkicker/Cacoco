@@ -38,6 +38,18 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
         }
     }
 
+    let last_mode = ctx.data(|d| d.get_temp::<ProjectMode>(egui::Id::new("active_mode")));
+    if let Some(lm) = last_mode {
+        if lm != app.active_mode {
+            if let Some(doc) = &mut app.doc {
+                doc.selection.clear();
+                doc.selection_pivot = None;
+            }
+            app.preview_state.interaction.grabbed_path = None;
+            app.preview_state.interaction.hovered_path = None;
+        }
+    }
+
     ctx.data_mut(|d| {
         d.insert_temp(egui::Id::new("active_doc_exists"), app.doc.is_some());
         d.insert_temp(egui::Id::new("active_mode"), app.active_mode);
@@ -75,7 +87,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                             ui.input(|i| i.pointer.any_pressed()) && ui.ui_contains_pointer();
 
                         if mouse_clicked || (has_focus && tab_pressed) {
-                            app.execute_actions(vec![document::LayerAction::UndoSnapshot]);
+                            app.execute_actions(vec![document::DocumentAction::UndoSnapshot]);
                         }
                     }
 
@@ -324,7 +336,7 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
 
 /// Dispatches keyboard shortcuts to application actions.
 fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui::Context) {
-    use crate::document::LayerAction;
+    use crate::document::actions::{DocumentAction, SBarAction, TreeAction};
     use crate::hotkeys::Action;
     use crate::models::ProjectData;
 
@@ -353,32 +365,37 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Save => {
             if let Some(doc) = &mut app.doc {
-                if let Some(sbar) = doc.get_lump(ProjectMode::SBarDef).and_then(|l| l.as_sbar()) {
-                    let needs_dialog = match &doc.path {
-                        Some(p) => !Path::new(p).is_absolute(),
-                        None => true,
-                    };
-                    if needs_dialog {
-                        if let Some(p) =
-                            crate::io::save_pk3_dialog(sbar, &app.assets, doc.path.clone())
-                        {
-                            doc.path = Some(p.clone());
-                            doc.dirty = false;
-                            app.add_to_recent(&p);
-                            messages::log_event(
-                                &mut app.preview_state,
-                                EditorEvent::ProjectSaved(p),
-                            );
-                        }
-                    } else {
-                        let p = doc.path.as_ref().unwrap();
-                        if crate::io::save_pk3_silent(sbar, &app.assets, p).is_ok() {
-                            doc.dirty = false;
-                            messages::log_event(
-                                &mut app.preview_state,
-                                EditorEvent::ProjectSaved(p.clone()),
-                            );
-                        }
+                let needs_dialog = match &doc.path {
+                    Some(p) => !Path::new(p).is_absolute(),
+                    None => true,
+                };
+                if needs_dialog {
+                    if let Some(p) = crate::io::save_pk3_dialog(
+                        &doc.lumps,
+                        &app.assets,
+                        &doc.passthrough_lumps,
+                        doc.path.clone(),
+                    ) {
+                        doc.path = Some(p.clone());
+                        doc.dirty = false;
+                        app.add_to_recent(&p);
+                        messages::log_event(&mut app.preview_state, EditorEvent::ProjectSaved(p));
+                    }
+                } else {
+                    let p = doc.path.as_ref().unwrap();
+                    if crate::io::save_pk3_silent(
+                        &doc.lumps,
+                        &app.assets,
+                        &doc.passthrough_lumps,
+                        p,
+                    )
+                    .is_ok()
+                    {
+                        doc.dirty = false;
+                        messages::log_event(
+                            &mut app.preview_state,
+                            EditorEvent::ProjectSaved(p.clone()),
+                        );
                     }
                 }
             }
@@ -437,8 +454,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         let pasted = doc.history.prepare_bar_clipboard_for_paste();
                         doc.execute_actions(
                             vec![
-                                LayerAction::UndoSnapshot,
-                                LayerAction::PasteStatusBars(pasted),
+                                DocumentAction::UndoSnapshot,
+                                DocumentAction::SBar(SBarAction::PasteStatusBars(pasted)),
                             ],
                             app.active_mode,
                         );
@@ -456,12 +473,12 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         );
                         doc.execute_actions(
                             vec![
-                                LayerAction::UndoSnapshot,
-                                LayerAction::Paste {
+                                DocumentAction::UndoSnapshot,
+                                DocumentAction::Tree(TreeAction::Paste {
                                     parent_path: p,
                                     insert_idx: i,
                                     elements: pasted,
-                                },
+                                }),
                             ],
                             app.active_mode,
                         );
@@ -481,9 +498,11 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     let mut actions = Vec::new();
                     for path in paths {
                         if path.len() == 1 {
-                            actions.push(LayerAction::DuplicateStatusBar(path[0]));
+                            actions.push(DocumentAction::SBar(SBarAction::DuplicateStatusBar(
+                                path[0],
+                            )));
                         } else {
-                            actions.push(LayerAction::DuplicateSelection(vec![path]));
+                            actions.push(DocumentAction::Tree(TreeAction::Duplicate(vec![path])));
                         }
                     }
                     doc.execute_actions(actions, app.active_mode);
@@ -505,7 +524,9 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                                 return;
                             } else if sbar.data.status_bars.len() > 1 {
                                 doc.execute_actions(
-                                    vec![LayerAction::DeleteStatusBar(bar_idx)],
+                                    vec![DocumentAction::SBar(SBarAction::DeleteStatusBar(
+                                        bar_idx,
+                                    ))],
                                     app.active_mode,
                                 );
                                 messages::log_event(&mut app.preview_state, EditorEvent::Delete);
@@ -528,8 +549,8 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                         } else {
                             doc.execute_actions(
                                 vec![
-                                    LayerAction::UndoSnapshot,
-                                    LayerAction::DeleteSelection(paths),
+                                    DocumentAction::UndoSnapshot,
+                                    DocumentAction::Tree(TreeAction::Delete(paths)),
                                 ],
                                 app.active_mode,
                             );
@@ -577,7 +598,10 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
                     }
                 }
 
-                doc.execute_actions(vec![document::LayerAction::UndoSnapshot], app.active_mode);
+                doc.execute_actions(
+                    vec![document::DocumentAction::UndoSnapshot],
+                    app.active_mode,
+                );
                 if let Some(l) = doc.get_lump_mut(app.active_mode) {
                     l.set_target(t);
                     l.normalize_for_target();
@@ -607,6 +631,8 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
 mod tests {
     use super::*;
     use crate::app::{CacocoApp, ConfirmationRequest, PendingAction, ProjectMode};
+    use crate::document::DocumentAction;
+    use crate::document::actions::SBarAction;
     use crate::hotkeys::Action;
     use crate::models::ProjectData;
     use crate::models::sbardef::{
@@ -629,6 +655,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(sbar),
+            Vec::new(),
             None,
         ));
         app.active_mode = ProjectMode::SBarDef;
@@ -650,6 +677,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(SBarDefFile::new_empty()),
+            Vec::new(),
             None,
         ));
         app.doc.as_mut().unwrap().dirty = true;
@@ -679,6 +707,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(sbar),
+            Vec::new(),
             None,
         ));
         app.active_mode = ProjectMode::SBarDef;
@@ -695,8 +724,8 @@ mod tests {
         };
 
         app.execute_actions(vec![
-            document::LayerAction::UndoSnapshot,
-            document::LayerAction::DeleteStatusBar(idx_to_delete),
+            DocumentAction::UndoSnapshot,
+            DocumentAction::SBar(SBarAction::DeleteStatusBar(idx_to_delete)),
         ]);
 
         let final_count = app.doc.as_ref().unwrap().lumps[0]
@@ -731,6 +760,7 @@ mod tests {
 
         app.doc = Some(document::ProjectDocument::new(
             ProjectData::StatusBar(sbar),
+            Vec::new(),
             None,
         ));
         app.active_mode = ProjectMode::SBarDef;
@@ -752,8 +782,11 @@ mod tests {
         let ctx = egui::Context::default();
         let mut app = CacocoApp::default();
 
-        let mut doc =
-            document::ProjectDocument::new(ProjectData::StatusBar(SBarDefFile::new_empty()), None);
+        let mut doc = document::ProjectDocument::new(
+            ProjectData::StatusBar(SBarDefFile::new_empty()),
+            Vec::new(),
+            None,
+        );
         doc.lumps.push(ProjectData::Sky(
             crate::models::skydefs::SkyDefsFile::new_empty(),
         ));
