@@ -342,6 +342,7 @@ pub enum Element {
     Carousel(CarouselDef),
     List(ListDef),
     String(StringDef),
+    Minimap(MinimapDef),
 }
 
 /// A polymorphic wrapper that holds an Element along with editor-specific metadata.
@@ -607,13 +608,25 @@ pub struct CarouselDef {
     pub common: CommonAttrs,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct MinimapDef {
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    pub width: i32,
+    pub height: i32,
+    #[serde(default)]
+    pub background: i32,
+    #[serde(default)]
+    pub scale: f32,
+}
+
 impl ElementWrapper {
     /// Returns true if the SBARDEF spec allows this element to have children.
     /// In Cacoco, we allow "Child Mode" (Ctrl/Cmd) to target any container-type element.
     pub fn is_spec_container(&self) -> bool {
         matches!(
             self.data,
-            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_)
+            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_) | Element::Minimap(_)
         )
     }
 
@@ -654,6 +667,7 @@ impl ElementWrapper {
             }
             Element::Component(c) => format!("Component: {:?}", c.type_),
             Element::Carousel(_) => "Carousel".to_string(),
+            Element::Minimap(_) => "Minimap".to_string(),
         }
     }
 
@@ -672,6 +686,7 @@ impl ElementWrapper {
             Element::String(e) => &e.common.children,
             Element::Component(e) => &e.common.children,
             Element::Carousel(e) => &e.common.children,
+            Element::Minimap(e) => &e.common.children,
         }
     }
 
@@ -690,6 +705,7 @@ impl ElementWrapper {
             Element::Component(e) => &mut e.common,
             Element::Carousel(e) => &mut e.common,
             Element::Native(e) => &mut e.common,
+            Element::Minimap(e) => &mut e.common,
         }
     }
 
@@ -708,6 +724,7 @@ impl ElementWrapper {
             Element::Component(e) => &e.common,
             Element::Carousel(e) => &e.common,
             Element::Native(e) => &e.common,
+            Element::Minimap(e) => &e.common,
         }
     }
 
