@@ -83,7 +83,7 @@ impl PropertiesUI for ElementWrapper {
             Element::Component(e) => e.get_preview_content(ui, fonts, state),
             Element::Carousel(e) => e.get_preview_content(ui, fonts, state),
             Element::Native(e) => e.get_preview_content(ui, fonts, state),
-            Element::Minimap(e) => None,
+            Element::Minimap(_) => None,
         }
     }
 
