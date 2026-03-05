@@ -9,6 +9,9 @@ fn default_type() -> String {
 fn default_version() -> String {
     "1.2.0".to_string()
 }
+fn default_scale() -> f32 {
+    1.0
+}
 
 fn is_zero(num: &i32) -> bool {
     *num == 0
@@ -117,6 +120,26 @@ pub enum NumberType {
     MaxItems = 15,
     MaxSecrets = 16,
     PowerupDuration = 17,
+}
+
+/// Mapping for the Minimap. Only a small amount though. Mini mapping. For the Minimap. Hello...?
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
+pub enum MinimapBackground {
+    #[default]
+    Off = 0,
+    Dark = 1,
+    Black = 2,
+}
+
+impl MinimapBackground {
+    pub fn from_i32(val: i32) -> Self {
+        match val {
+            1 => MinimapBackground::Dark,
+            2 => MinimapBackground::Black,
+            _ => MinimapBackground::Off,
+        }
+    }
 }
 
 /// The feature set compatibility for the status bar.
@@ -342,6 +365,7 @@ pub enum Element {
     Carousel(CarouselDef),
     List(ListDef),
     String(StringDef),
+    Minimap(MinimapDef),
 }
 
 /// A polymorphic wrapper that holds an Element along with editor-specific metadata.
@@ -607,20 +631,51 @@ pub struct CarouselDef {
     pub common: CommonAttrs,
 }
 
+/// Renders a minimap of the automap.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MinimapDef {
+    #[serde(flatten)]
+    pub common: CommonAttrs,
+    pub width: i32,
+    pub height: i32,
+    #[serde(default)]
+    pub background: MinimapBackground,
+    #[serde(default = "default_scale")]
+    pub scale: f32,
+}
+
+impl Default for MinimapDef {
+    fn default() -> Self {
+        Self {
+            common: CommonAttrs::default(),
+            width: 72,
+            height: 60,
+            background: MinimapBackground::Off,
+            scale: 1.0,
+        }
+    }
+}
+
 impl ElementWrapper {
     /// Returns true if the SBARDEF spec allows this element to have children.
     /// In Cacoco, we allow "Child Mode" (Ctrl/Cmd) to target any container-type element.
     pub fn is_spec_container(&self) -> bool {
         matches!(
             self.data,
-            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_)
+            Element::Canvas(_)
+                | Element::Native(_)
+                | Element::List(_)
+                | Element::Carousel(_)
+                | Element::Minimap(_)
         )
     }
 
     /// Returns true if this is a logical organizational folder (Canvas, List, etc.).
     /// Natural containers allow nesting by default.
     pub fn is_natural_container(&self) -> bool {
-        self._cacoco_text.is_none() && self.is_spec_container()
+        self._cacoco_text.is_none()
+            && self.is_spec_container()
+            && !matches!(self.data, Element::Minimap(_))
     }
 
     /// Returns a human-friendly name for use in the layer tree.
@@ -654,6 +709,7 @@ impl ElementWrapper {
             }
             Element::Component(c) => format!("Component: {:?}", c.type_),
             Element::Carousel(_) => "Carousel".to_string(),
+            Element::Minimap(_) => "Minimap".to_string(),
         }
     }
 
@@ -672,6 +728,7 @@ impl ElementWrapper {
             Element::String(e) => &e.common.children,
             Element::Component(e) => &e.common.children,
             Element::Carousel(e) => &e.common.children,
+            Element::Minimap(e) => &e.common.children,
         }
     }
 
@@ -690,6 +747,7 @@ impl ElementWrapper {
             Element::Component(e) => &mut e.common,
             Element::Carousel(e) => &mut e.common,
             Element::Native(e) => &mut e.common,
+            Element::Minimap(e) => &mut e.common,
         }
     }
 
@@ -708,6 +766,7 @@ impl ElementWrapper {
             Element::Component(e) => &e.common,
             Element::Carousel(e) => &e.common,
             Element::Native(e) => &e.common,
+            Element::Minimap(e) => &e.common,
         }
     }
 

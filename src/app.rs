@@ -164,6 +164,18 @@ impl CacocoApp {
             .load_reference_image(ctx, "HICACOCO", include_bytes!("../assets/HICACOCO.png"));
         self.assets.load_system_assets(ctx);
 
+        self.assets.load_smooth_image(
+            ctx,
+            "_MINIMAP_PLACEHOLDER",
+            include_bytes!("../assets/automap.png"),
+        );
+
+        self.assets.load_smooth_image(
+            ctx,
+            "_MINIMAP_THUMB",
+            include_bytes!("../assets/tinyautomap.png"),
+        );
+
         for asset in crate::library::ASSETS {
             let key = AssetStore::stem(asset.name);
             self.assets.load_reference_image(ctx, &key, asset.bytes);

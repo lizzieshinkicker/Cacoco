@@ -12,6 +12,7 @@ pub mod face;
 pub mod fire;
 pub mod graphic;
 pub mod list;
+mod minimap;
 pub mod palette;
 pub mod patch;
 pub mod projection;
@@ -191,6 +192,7 @@ pub fn draw_element_wrapper(
             Element::String(s) => text::draw_string(&local_ctx, s, pos, alpha),
             Element::Component(c) => components::draw_component(&local_ctx, c, pos, alpha),
             Element::Carousel(_) => {}
+            Element::Minimap(m) => minimap::draw_minimap(&local_ctx, m, pos, alpha),
         }
     } else if let Element::List(l) = &element.data {
         list::draw_list(&local_ctx, l, pos, alpha, current_path, visible_in_game);
@@ -303,6 +305,7 @@ fn get_element_footprint(ctx: &RenderContext, element: &ElementWrapper) -> egui:
             })
             .unwrap_or(egui::vec2(16.0, 16.0))
         }
+        Element::Minimap(m) => egui::vec2(m.width as f32, m.height as f32),
         _ => egui::Vec2::ZERO,
     };
 
