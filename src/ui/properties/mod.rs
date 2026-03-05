@@ -20,6 +20,7 @@ mod graphics;
 mod interlevel;
 mod list;
 mod lookups;
+mod minimap;
 pub mod palette_picker;
 pub(crate) mod preview;
 mod sbardef;
@@ -27,7 +28,6 @@ mod skydefs;
 mod text;
 pub mod text_helper;
 mod umapinfo;
-mod minimap;
 
 use editor::PropertiesUI;
 use font_cache::FontCache;

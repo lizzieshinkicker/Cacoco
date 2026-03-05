@@ -328,6 +328,7 @@ pub fn get_preview_texture<'a>(
             Some(AssetId::new(&sprite))
         }
         Element::FaceBackground(_) => Some(AssetId::new("STFB0")),
+        Element::Minimap(_) => Some(AssetId::new("_MINIMAP_THUMB")),
         Element::Number(n) => file
             .data
             .number_fonts

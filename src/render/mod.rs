@@ -12,6 +12,7 @@ pub mod face;
 pub mod fire;
 pub mod graphic;
 pub mod list;
+mod minimap;
 pub mod palette;
 pub mod patch;
 pub mod projection;
@@ -191,34 +192,7 @@ pub fn draw_element_wrapper(
             Element::String(s) => text::draw_string(&local_ctx, s, pos, alpha),
             Element::Component(c) => components::draw_component(&local_ctx, c, pos, alpha),
             Element::Carousel(_) => {}
-            Element::Minimap(m) => {
-                let rect = egui::Rect::from_min_size(pos, egui::vec2(m.width as f32, m.height as f32));
-                let screen_rect = ctx.to_screen_rect(rect);
-
-                match ctx.pass {
-                    RenderPass::Background => {
-                        let id = crate::assets::AssetId::new("_MINIMAP_PLACEHOLDER");
-                        if let Some(tex) = ctx.assets.textures.get(&id) {
-                            ctx.painter.image(
-                                tex.id(),
-                                screen_rect,
-                                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                                egui::Color32::WHITE.linear_multiply(alpha),
-                            );
-                        } else {
-                            ctx.painter.rect_filled(screen_rect, 0.0, egui::Color32::from_gray(40).linear_multiply(alpha));
-                        }
-                    }
-                    RenderPass::Foreground => {
-                        ctx.painter.rect_stroke(
-                            screen_rect,
-                            0.0,
-                            egui::Stroke::new(1.0, egui::Color32::YELLOW),
-                            egui::StrokeKind::Middle,
-                        );
-                    }
-                }
-            }
+            Element::Minimap(m) => minimap::draw_minimap(&local_ctx, m, pos, alpha),
         }
     } else if let Element::List(l) = &element.data {
         list::draw_list(&local_ctx, l, pos, alpha, current_path, visible_in_game);

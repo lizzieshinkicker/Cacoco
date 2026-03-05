@@ -108,6 +108,9 @@ pub const FEATURE_LEVELS: &[LookupItem] = &[
     item!(6, "ID24"),
 ];
 
+pub const MINIMAP_BACKGROUNDS: &[LookupItem] =
+    &[item!(0, "Off"), item!(1, "Dark"), item!(2, "Solid Black")];
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GroupStyle {
     Standard,

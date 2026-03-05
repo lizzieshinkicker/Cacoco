@@ -9,6 +9,9 @@ fn default_type() -> String {
 fn default_version() -> String {
     "1.2.0".to_string()
 }
+fn default_scale() -> f32 {
+    1.0
+}
 
 fn is_zero(num: &i32) -> bool {
     *num == 0
@@ -117,6 +120,26 @@ pub enum NumberType {
     MaxItems = 15,
     MaxSecrets = 16,
     PowerupDuration = 17,
+}
+
+/// Mapping for the Minimap. Only a small amount though. Mini mapping. For the Minimap. Hello...?
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
+pub enum MinimapBackground {
+    #[default]
+    Off = 0,
+    Dark = 1,
+    Black = 2,
+}
+
+impl MinimapBackground {
+    pub fn from_i32(val: i32) -> Self {
+        match val {
+            1 => MinimapBackground::Dark,
+            2 => MinimapBackground::Black,
+            _ => MinimapBackground::Off,
+        }
+    }
 }
 
 /// The feature set compatibility for the status bar.
@@ -608,16 +631,29 @@ pub struct CarouselDef {
     pub common: CommonAttrs,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+/// Renders a minimap of the automap.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MinimapDef {
     #[serde(flatten)]
     pub common: CommonAttrs,
     pub width: i32,
     pub height: i32,
     #[serde(default)]
-    pub background: i32,
-    #[serde(default)]
+    pub background: MinimapBackground,
+    #[serde(default = "default_scale")]
     pub scale: f32,
+}
+
+impl Default for MinimapDef {
+    fn default() -> Self {
+        Self {
+            common: CommonAttrs::default(),
+            width: 72,
+            height: 60,
+            background: MinimapBackground::Off,
+            scale: 1.0,
+        }
+    }
 }
 
 impl ElementWrapper {
@@ -626,14 +662,20 @@ impl ElementWrapper {
     pub fn is_spec_container(&self) -> bool {
         matches!(
             self.data,
-            Element::Canvas(_) | Element::Native(_) | Element::List(_) | Element::Carousel(_) | Element::Minimap(_)
+            Element::Canvas(_)
+                | Element::Native(_)
+                | Element::List(_)
+                | Element::Carousel(_)
+                | Element::Minimap(_)
         )
     }
 
     /// Returns true if this is a logical organizational folder (Canvas, List, etc.).
     /// Natural containers allow nesting by default.
     pub fn is_natural_container(&self) -> bool {
-        self._cacoco_text.is_none() && self.is_spec_container()
+        self._cacoco_text.is_none()
+            && self.is_spec_container()
+            && !matches!(self.data, Element::Minimap(_))
     }
 
     /// Returns a human-friendly name for use in the layer tree.
