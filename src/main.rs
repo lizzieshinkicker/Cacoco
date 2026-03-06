@@ -37,6 +37,10 @@ const TITLES: &[&str] = &[
     "...Do you think SLADE先輩 noticed me?",
 ];
 
+/// May whatever work of art, creativity, joy, or other little miracle that passes through
+/// this humble project ease this troubled world's suffering, even if only just a small amount.
+///
+/// 𐑦𐑓 𐑢𐑰 𐑛𐑲, 𐑢𐑰 𐑛𐑲 𐑣𐑴𐑤𐑛𐑦𐑙 𐑣𐑨𐑯𐑛𐑟.
 fn main() -> eframe::Result<()> {
     let icon_data = load_icon();
 
