@@ -28,6 +28,9 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     if let Some(action) = app.hotkeys.check(ctx) {
         handle_action(app, action, ctx);
     }
+
+    handle_arrow_key_movement(ctx, app);
+
     app.cheat_engine.process_input(ctx, &mut app.preview_state);
     app.preview_state.update(ctx.input(|i| i.stable_dt));
 
@@ -624,6 +627,107 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
             messages::log_event(&mut app.preview_state, EditorEvent::ProjectExported(path));
         }
         _ => {}
+    }
+}
+
+/// Handles arrow key movement for selected elements in the viewport.
+/// Moves selected layers by 1 pixel (or 10 pixels with Shift held).
+/// First press moves immediately and waits, then after a delay
+/// moves quickly.
+fn handle_arrow_key_movement(ctx: &egui::Context, app: &mut CacocoApp) {
+    use crate::document::actions::{DocumentAction, TreeAction};
+    use egui::Key;
+
+    let doc = match &mut app.doc {
+        Some(d) => d,
+        None => return,
+    };
+
+    if doc.selection.is_empty() {
+        return;
+    }
+
+    if ctx.wants_keyboard_input() {
+        return;
+    }
+
+    let (is_panning, shift_held, arrow_left, arrow_right, arrow_up, arrow_down, current_time) = ctx
+        .input(|i| {
+            (
+                i.key_down(Key::Space),
+                i.modifiers.shift,
+                i.key_down(Key::ArrowLeft),
+                i.key_down(Key::ArrowRight),
+                i.key_down(Key::ArrowUp),
+                i.key_down(Key::ArrowDown),
+                i.time,
+            )
+        });
+
+    if is_panning {
+        return;
+    }
+
+    let step = if shift_held { 10 } else { 1 };
+
+    let mut dx = 0i32;
+    let mut dy = 0i32;
+
+    if arrow_left {
+        dx -= step;
+    }
+    if arrow_right {
+        dx += step;
+    }
+    if arrow_up {
+        dy -= step;
+    }
+    if arrow_down {
+        dy += step;
+    }
+
+    if dx != 0 || dy != 0 {
+        let paths: Vec<Vec<usize>> = doc.selection.iter().cloned().collect();
+
+        let move_start_time: Option<f64> =
+            ctx.data(|d| d.get_temp(egui::Id::new("arrow_move_start")));
+        let recent_move_time: Option<f64> =
+            ctx.data(|d| d.get_temp(egui::Id::new("arrow_move_time")));
+
+        let delay_passed = move_start_time.map_or(false, |t| current_time - t >= 0.5);
+        let recently_undone = recent_move_time.map_or(false, |t| current_time - t < 0.1);
+
+        if move_start_time.is_none() {
+            ctx.data_mut(|d| d.insert_temp(egui::Id::new("arrow_move_start"), current_time));
+        }
+
+        let should_move = move_start_time.is_none() || delay_passed;
+
+        if should_move {
+            if !recently_undone {
+                ctx.data_mut(|d| d.insert_temp(egui::Id::new("arrow_move_time"), current_time));
+            }
+
+            let actions = if recently_undone || move_start_time.is_some() {
+                vec![DocumentAction::Tree(TreeAction::Translate {
+                    paths,
+                    dx,
+                    dy,
+                })]
+            } else {
+                vec![
+                    DocumentAction::UndoSnapshot,
+                    DocumentAction::Tree(TreeAction::Translate { paths, dx, dy }),
+                ]
+            };
+
+            app.execute_actions(actions);
+        }
+    } else {
+        ctx.data_mut(|d| {
+            d.remove::<f64>(egui::Id::new("arrow_move_start"));
+            d.remove::<f64>(egui::Id::new("arrow_move_time"));
+        });
     }
 }
 

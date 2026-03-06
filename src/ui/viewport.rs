@@ -141,7 +141,7 @@ pub fn draw_viewport(
                 );
                 ui.checkbox(
                     &mut preview_state.sim.engine.aspect_correction,
-                    "Aspect Correct (4:3)",
+                    "Aspect Correct",
                 );
 
                 ui.separator();
