@@ -112,6 +112,10 @@ jobs:
           target/aarch64-apple-darwin/release/cacoco \
           target/x86_64-apple-darwin/release/cacoco \
           -output dist/cacoco-${{ env.RELEASE_VERSION }}-mac
+        chmod +x dist/cacoco-${{ env.RELEASE_VERSION }}-mac
+        cd dist
+        zip cacoco-${{ env.RELEASE_VERSION }}-mac.zip cacoco-${{ env.RELEASE_VERSION }}-mac
+        rm cacoco-${{ env.RELEASE_VERSION }}-mac
     - name: Upload artifact
       uses: actions/upload-artifact@v6
       with:
