@@ -34,6 +34,7 @@ const TITLES: &[&str] = &[
     "Sometimes even supports KEX!",
     "We thought this would be way easier!",
     "Eventually supporting INTERLEVEL and FINALE!",
+    "...Do you think SLADE先輩 noticed me?",
 ];
 
 fn main() -> eframe::Result<()> {
@@ -41,6 +42,8 @@ fn main() -> eframe::Result<()> {
 
     let mut rng = rand::rng();
     let title_flavor = TITLES.choose(&mut rng).unwrap_or(&"Cacoco").to_string();
+
+    let open_file_path = std::env::args().nth(1).filter(|arg| !arg.starts_with('-'));
 
     let native_options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -58,7 +61,7 @@ fn main() -> eframe::Result<()> {
         Box::new(move |cc| {
             cc.egui_ctx
                 .data_mut(|d| d.insert_temp(egui::Id::new("random_title"), title_flavor));
-            Ok(Box::new(CacocoApp::new(cc)))
+            Ok(Box::new(CacocoApp::new(cc, open_file_path.clone())))
         }),
     )
 }

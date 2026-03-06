@@ -131,7 +131,7 @@ impl Default for CacocoApp {
 
 impl CacocoApp {
     /// Creates a new instance of the application and loads initial assets.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, open_file_path: Option<String>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
 
         let mut app = Self::default();
@@ -148,6 +148,15 @@ impl CacocoApp {
 
         if let Some(path) = &app.config.base_wad_path {
             app.iwad_verified = io::load_wad_from_path(&cc.egui_ctx, path, &mut app.assets);
+        }
+
+        if let Some(file_path) = open_file_path {
+            if let Some(loaded) = io::load_project_from_path(&cc.egui_ctx, &file_path) {
+                app.load_project(&cc.egui_ctx, loaded, &file_path);
+                println!("Loaded project from command line: {}", file_path);
+            } else {
+                eprintln!("Failed to load project from command line: {}", file_path);
+            }
         }
 
         app

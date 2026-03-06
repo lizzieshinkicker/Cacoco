@@ -18,11 +18,12 @@ pub struct LoadedProject {
     pub passthrough_lumps: Vec<wad::RawLump>,
 }
 
-/// Opens the system file dialog to pick a SBARDEF project file.
+/// Opens the system file dialog to pick a project file.
 pub fn open_project_dialog() -> Option<String> {
     if let Some(path) = FileDialog::new()
-        .add_filter("SBARDEF Projects", &["pk3", "zip", "json", "txt", "wad"])
-        .set_title("Open SBARDEF Project")
+        .add_filter("Project Files", &["pk3", "zip", "json", "txt", "wad"])
+        .add_filter("All files (*.*)", &["*"])
+        .set_title("Open Project")
         .pick_file()
     {
         return Some(path.to_string_lossy().into_owned());
@@ -54,35 +55,81 @@ pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<Loa
                 None
             }
         }
+    } else if ext == "json" || ext == "txt" || ext.is_empty() {
+        load_text_file_with_name(&path).or_else(|| load_extensionless_as_wad(ctx, &path))
     } else {
-        load_text_file(&path)
+        load_text_file_with_name(&path).or_else(|| load_extensionless_as_wad(ctx, &path))
     }
 }
 
-fn load_text_file(path: &PathBuf) -> Option<LoadedProject> {
-    match fs::read_to_string(path) {
-        Ok(json_content) => match serde_json::from_str::<crate::models::ProjectData>(&json_content)
-        {
-            Ok(mut parsed_file) => {
-                parsed_file.set_target(parsed_file.determine_target());
-                parsed_file.normalize_for_target();
+/// Loads a text/JSON file, using the filename (without extension) to determine the lump type.
+/// This enables proper parsing of `UMAPINFO`, `SBARDEF`, `SKYDEFS`, etc. when passed alone
+/// without extensions as standalone files. If you name a `SBARDEF` file in your project
+/// "`UMAPINFO`" I'll personally come to your house and make a mess of your pots and pans.
+fn load_text_file_with_name(path: &PathBuf) -> Option<LoadedProject> {
+    let lump_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
-                Some(LoadedProject {
-                    lumps: vec![parsed_file],
+    match fs::read_to_string(path) {
+        Ok(content) => {
+            if let Some(parsed) =
+                crate::models::ProjectData::parse_lump(lump_name, content.as_bytes())
+            {
+                return Some(LoadedProject {
+                    lumps: vec![parsed],
                     assets: AssetStore::default(),
                     passthrough_lumps: Vec::new(),
-                })
+                });
             }
-            Err(e) => {
-                eprintln!("Failed to parse JSON: {}", e);
-                None
+
+            match serde_json::from_str::<crate::models::ProjectData>(&content) {
+                Ok(mut parsed_file) => {
+                    parsed_file.set_target(parsed_file.determine_target());
+                    parsed_file.normalize_for_target();
+
+                    Some(LoadedProject {
+                        lumps: vec![parsed_file],
+                        assets: AssetStore::default(),
+                        passthrough_lumps: Vec::new(),
+                    })
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Failed to parse file {} as {}: {}",
+                        path.display(),
+                        lump_name,
+                        e
+                    );
+                    None
+                }
             }
-        },
+        }
         Err(e) => {
             eprintln!("Failed to read file: {}", e);
             None
         }
     }
+}
+
+/// Attempts to load a file without extension as a WAD or PK3/ZIP file
+/// by checking magic bytes (header sniffing)
+fn load_extensionless_as_wad(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
+    if let Ok(mut file) = fs::File::open(path) {
+        let mut header = [0u8; 4];
+        if file.read_exact(&mut header).is_ok() {
+            if &header == b"IWAD" || &header == b"PWAD" {
+                eprintln!("Detected WAD file (no extension), attempting to load...");
+                match wad::load_wad_project(ctx, path) {
+                    Ok(loaded) => return Some(loaded),
+                    Err(e) => eprintln!("Failed to load as WAD: {}", e),
+                }
+            }
+            if &header[0..2] == b"PK" {
+                eprintln!("Detected ZIP/PK3 file (no extension), attempting to load...");
+                return load_pk3(ctx, path);
+            }
+        }
+    }
+    None
 }
 
 fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
