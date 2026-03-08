@@ -66,4 +66,6 @@ pub enum SkyAction {
 pub enum UmapAction {
     AddMap,
     DeleteMap(usize),
+    UpdateNodePos(String, f32, f32),
+    ResetLayout,
 }

@@ -55,7 +55,7 @@ impl ViewportController {
                 state.viewer.weapon_offset_y -= delta.y * sensitivity;
 
                 self.is_dragging = true;
-            } else if !selection.is_empty() {
+            } else if active_mode == crate::app::ProjectMode::SBarDef && !selection.is_empty() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::None);
                 self.is_dragging = true;
 

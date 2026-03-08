@@ -132,46 +132,64 @@ pub fn draw_viewport(
 
             ui.add_space(8.0);
 
-            ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.checkbox(
-                    &mut preview_state.sim.engine.widescreen_mode,
-                    "Widescreen (16:9)",
-                );
-                ui.checkbox(
-                    &mut preview_state.sim.engine.aspect_correction,
-                    "Aspect Correct",
-                );
-
-                ui.separator();
-
-                if ui
-                    .checkbox(&mut preview_state.sim.engine.auto_zoom, "Auto Fit")
-                    .changed()
-                {
-                    if preview_state.sim.engine.auto_zoom {
-                        preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
+            if *active_mode == crate::app::ProjectMode::UmapInfo {
+                ui.heading("Flowchart");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button("Reset Layout")
+                        .on_hover_text("Automatically arrange nodes their default state.")
+                        .clicked()
+                    {
+                        actions.push(DocumentAction::UndoSnapshot);
+                        actions.push(DocumentAction::Umap(
+                            crate::document::actions::UmapAction::ResetLayout,
+                        ));
                     }
-                }
-
-                if !preview_state.sim.engine.auto_zoom {
-                    ui.label(
-                        egui::RichText::new(format!("{}x", preview_state.sim.engine.zoom_level))
-                            .strong(),
+                });
+            } else {
+                ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.checkbox(
+                        &mut preview_state.sim.engine.widescreen_mode,
+                        "Widescreen (16:9)",
+                    );
+                    ui.checkbox(
+                        &mut preview_state.sim.engine.aspect_correction,
+                        "Aspect Correct",
                     );
 
-                    let btn_size = egui::vec2(20.0, 20.0);
-                    if ui.add_sized(btn_size, egui::Button::new("-")).clicked() {
-                        preview_state.sim.engine.zoom_level =
-                            (preview_state.sim.engine.zoom_level - 1).max(1);
+                    ui.separator();
+
+                    if ui
+                        .checkbox(&mut preview_state.sim.engine.auto_zoom, "Auto Fit")
+                        .changed()
+                    {
+                        if preview_state.sim.engine.auto_zoom {
+                            preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
+                        }
                     }
-                    if ui.add_sized(btn_size, egui::Button::new("+")).clicked() {
-                        preview_state.sim.engine.zoom_level =
-                            (preview_state.sim.engine.zoom_level + 1).min(8);
+
+                    if !preview_state.sim.engine.auto_zoom {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{}x",
+                                preview_state.sim.engine.zoom_level
+                            ))
+                            .strong(),
+                        );
+
+                        let btn_size = egui::vec2(20.0, 20.0);
+                        if ui.add_sized(btn_size, egui::Button::new("-")).clicked() {
+                            preview_state.sim.engine.zoom_level =
+                                (preview_state.sim.engine.zoom_level - 1).max(1);
+                        }
+                        if ui.add_sized(btn_size, egui::Button::new("+")).clicked() {
+                            preview_state.sim.engine.zoom_level =
+                                (preview_state.sim.engine.zoom_level + 1).min(8);
+                        }
                     }
-                }
-            });
+                });
+            }
         });
         ui.add_space(4.0);
     });
@@ -196,7 +214,7 @@ pub fn draw_viewport(
 
     let viewport_res = ui.interact(
         background_rect,
-        ui.make_persistent_id("viewport_interact"),
+        egui::Id::new("cacoco_viewport_interact_global"),
         egui::Sense::click_and_drag(),
     );
 
@@ -261,8 +279,18 @@ pub fn draw_viewport(
     let primary_pressed = ui.input(|i| i.pointer.primary_pressed());
     let primary_down = ui.input(|i| i.pointer.primary_down());
 
-    let final_clip_rect = proj.screen_rect.intersect(background_rect);
-    let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(background_rect));
+    let is_umap = *active_mode == crate::app::ProjectMode::UmapInfo;
+    let final_clip_rect = if is_umap {
+        background_rect
+    } else {
+        proj.screen_rect.intersect(background_rect)
+    };
+
+    let mut viewport_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .id_salt("cacoco_viewport_child_ui_stable")
+            .max_rect(background_rect),
+    );
     viewport_ui.set_clip_rect(final_clip_rect);
 
     preview_state.interaction.hovered_path = None;

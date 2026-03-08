@@ -9,12 +9,12 @@
 
 
 ## It's id24 maker!!
-Cacoco is an visual editor, primarily SBARDEF lumps, and hopefully soon other ID24 features.
+Cacoco is a visual editor, primarily SBARDEF lumps, and hopefully soon other ID24 features.
 
 ![statchanges](https://github.com/user-attachments/assets/f31b9132-8bc5-421d-8215-3335e9192521)
 
 
-###### (At this point, I think you could even call it an IDE for SBARDEF... is that too much? I totally forgot to hold down the `ctrl` key in that gif for Direct Selection...)
+###### (At this point, I think you could even call it an IDE for SBARDEF... is that too much? I totally forgot to hold down the `ctrl` key in that GIF for Direct Selection...)
 
 <br>
 

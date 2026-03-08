@@ -138,6 +138,84 @@ impl UmapInfoFile {
         }
     }
 
+    /// Retrieves the Cacoco-only visual position for a map node.
+    pub fn get_node_pos(&self, mapname: &str, default_index: usize) -> (f32, f32) {
+        if let Some(pos) = self
+            .metadata
+            .get("node_positions")
+            .and_then(|p| p.get(mapname))
+            .and_then(|arr| arr.as_array())
+        {
+            if pos.len() == 2 {
+                if let (Some(x), Some(y)) = (pos[0].as_f64(), pos[1].as_f64()) {
+                    return (x as f32, y as f32);
+                }
+            }
+        }
+
+        let name_to_idx: std::collections::HashMap<String, usize> = self
+            .data
+            .maps
+            .iter()
+            .enumerate()
+            .map(|(i, m)| (m.mapname.to_lowercase(), i))
+            .collect();
+
+        let mut depths = vec![0; self.data.maps.len()];
+        let mut rows = vec![100; self.data.maps.len()];
+        rows[0] = 0;
+
+        for _ in 0..10 {
+            for i in 0..self.data.maps.len() {
+                for field in &self.data.maps[i].fields {
+                    match field {
+                        UmapField::Next(target) => {
+                            if let Some(&t_idx) = name_to_idx.get(&target.to_lowercase()) {
+                                depths[t_idx] = depths[t_idx].max(depths[i] + 1);
+                                rows[t_idx] = rows[t_idx].min(rows[i]);
+                            }
+                        }
+                        UmapField::NextSecret(target) => {
+                            if let Some(&t_idx) = name_to_idx.get(&target.to_lowercase()) {
+                                depths[t_idx] = depths[t_idx].max(depths[i]);
+                                rows[t_idx] = rows[t_idx].min(rows[i] + 1);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let col = depths[default_index];
+        let row = if rows[default_index] == 100 {
+            (default_index % 5) as i32
+        } else {
+            rows[default_index]
+        };
+
+        (60.0 + (col as f32 * 180.0), 60.0 + (row as f32 * 100.0))
+    }
+
+    /// Updates the Cacoco-only visual position for a map node.
+    pub fn set_node_pos(&mut self, mapname: &str, x: f32, y: f32) {
+        if !self.metadata.is_object() {
+            self.metadata = serde_json::json!({});
+        }
+        let obj = self.metadata.as_object_mut().unwrap();
+
+        if !obj.contains_key("node_positions") {
+            obj.insert("node_positions".to_string(), serde_json::json!({}));
+        }
+
+        if let Some(positions) = obj
+            .get_mut("node_positions")
+            .and_then(|v| v.as_object_mut())
+        {
+            positions.insert(mapname.to_string(), serde_json::json!([x, y]));
+        }
+    }
+
     /// Serializes the modular data model into the standard UMAPINFO plaintext format.
     pub fn to_umapinfo_text(&self) -> String {
         let mut out = String::new();

@@ -25,5 +25,13 @@ pub fn execute_umapinfo_action(
                 selection.clear();
             }
         }
+        UmapAction::UpdateNodePos(name, x, y) => {
+            file.set_node_pos(&name, x, y);
+        }
+        UmapAction::ResetLayout => {
+            if let Some(obj) = file.metadata.as_object_mut() {
+                obj.remove("node_positions");
+            }
+        }
     }
 }
