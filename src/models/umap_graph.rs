@@ -144,6 +144,26 @@ impl UmapGraph {
             map_coords.insert(first.mapname.to_uppercase(), (0.0, 0.0));
         }
 
+        let episode_maps: std::collections::HashSet<String> = file
+            .data
+            .maps
+            .iter()
+            .filter_map(|m| {
+                let has_episode = m.fields.iter().any(|f| {
+                    if let UmapField::Episode { patch, .. } = f {
+                        patch.to_lowercase() != "clear"
+                    } else {
+                        false
+                    }
+                });
+                if has_episode {
+                    Some(m.mapname.to_uppercase())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         for _ in 0..15 {
             for map in &file.data.maps {
                 let name = map.mapname.to_uppercase();
@@ -154,11 +174,19 @@ impl UmapGraph {
                                 let t_name = target.to_uppercase();
                                 let extra_rows =
                                     spine_counts.get(&name).cloned().unwrap_or(0) as f32;
+
+                                let spine_blocker = extra_rows;
+
+                                let target_has_episode =
+                                    episode_maps.contains(&t_name) as i32 as f32;
+                                let episode_spacing = target_has_episode * 1.0;
+
+                                let total_offset = 1.0 + spine_blocker + episode_spacing;
                                 let entry = map_coords
                                     .entry(t_name)
-                                    .or_insert((curr_t, curr_r + 1.0 + extra_rows));
+                                    .or_insert((curr_t, curr_r + total_offset));
                                 entry.0 = entry.0.min(curr_t);
-                                entry.1 = entry.1.max(curr_r + 1.0 + extra_rows);
+                                entry.1 = entry.1.max(curr_r + total_offset);
                             }
                             UmapField::NextSecret(target) => {
                                 let t_name = target.to_uppercase();

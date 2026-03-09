@@ -281,7 +281,12 @@ fn draw_viewport_header(
             if is_umap {
                 ui.heading("Flowchart");
             } else {
-                ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
+                let viewport_label = if preview_state.sim.engine.auto_zoom {
+                    format!("Viewport ({}x Scale)", temp_proj.final_scale_x)
+                } else {
+                    "Viewport".to_string()
+                };
+                ui.heading(viewport_label);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
