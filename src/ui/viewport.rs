@@ -64,6 +64,10 @@ pub fn draw_viewport(
 
     handle_viewport_navigation(ui, &viewport_res, preview_state, is_umap, background_rect);
 
+    if !is_umap && preview_state.sim.engine.auto_zoom {
+        preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
+    }
+
     let proj = if is_umap {
         let umap_zoom: f32 = ui
             .ctx()
