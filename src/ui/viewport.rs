@@ -24,178 +24,20 @@ pub fn draw_viewport(
     active_mode: &mut crate::app::ProjectMode,
 ) -> Vec<DocumentAction> {
     let mut actions = Vec::new();
-
     let mut estimate_rect = ui.available_rect_before_wrap();
     estimate_rect.min.y += 32.0;
-
     let temp_proj = ViewportProjection::from_engine(estimate_rect, &preview_state.sim.engine);
 
-    ui.vertical(|ui| {
-        ui.add_space(-1.0);
-        ui.horizontal(|ui| {
-            let mode_id = ui.make_persistent_id("viewport_mode_dropdown");
-            let mode_label = match active_mode {
-                crate::app::ProjectMode::SBarDef => "SBARDEF",
-                crate::app::ProjectMode::SkyDefs => "SKYDEFS",
-                crate::app::ProjectMode::Interlevel => "INTERLEVEL",
-                crate::app::ProjectMode::Finale => "FINALE",
-                crate::app::ProjectMode::UmapInfo => "UMAPINFO",
-            };
+    actions.extend(draw_viewport_header(
+        ui,
+        active_mode,
+        preview_state,
+        &temp_proj,
+    ));
 
-            let mode_res = ui.add_sized([110.0, 28.0], |ui: &mut egui::Ui| {
-                crate::ui::shared::section_header_button(
-                    ui,
-                    mode_label,
-                    None,
-                    crate::ui::context_menu::ContextMenu::get(ui, mode_id).is_some(),
-                )
-            });
-
-            if mode_res.clicked() {
-                crate::ui::context_menu::ContextMenu::open(
-                    ui,
-                    mode_id,
-                    mode_res.rect.left_bottom(),
-                );
-            }
-
-            if let Some(menu) = crate::ui::context_menu::ContextMenu::get(ui, mode_id) {
-                crate::ui::context_menu::ContextMenu::show(ui, menu, mode_res.clicked(), |ui| {
-                    use crate::app::{CreationModal, ProjectMode};
-
-                    let modes_in_project: HashSet<ProjectMode> = ui.ctx().data(|d| {
-                        d.get_temp(egui::Id::new("modes_in_project"))
-                            .unwrap_or_default()
-                    });
-
-                    ui.label(egui::RichText::new("Lumps in Project").weak().size(10.0));
-
-                    let all_modes = [
-                        (ProjectMode::SBarDef, "SBARDEF"),
-                        (ProjectMode::SkyDefs, "SKYDEFS"),
-                        /* TODO: Not quite ready yet...
-                        (ProjectMode::Interlevel, "INTERLEVEL"),
-                        (ProjectMode::Finale, "FINALE"),
-                        */
-                        (ProjectMode::UmapInfo, "UMAPINFO"),
-                    ];
-
-                    for (m, lbl) in all_modes {
-                        if modes_in_project.contains(&m) {
-                            let is_active = *active_mode == m;
-                            let prefix = if is_active { "✔ " } else { "  " };
-                            if crate::ui::context_menu::ContextMenu::button(
-                                ui,
-                                &format!("{}{}", prefix, lbl),
-                                true,
-                            ) {
-                                ui.ctx().data_mut(|d| {
-                                    d.remove::<HashSet<Vec<usize>>>(egui::Id::new("selection"))
-                                });
-                                preview_state.interaction.grabbed_path = None;
-                                preview_state.interaction.hovered_path = None;
-
-                                *active_mode = m;
-                                crate::ui::context_menu::ContextMenu::close(ui);
-                            }
-                        }
-                    }
-
-                    ui.separator();
-                    ui.label(egui::RichText::new("Add to Project").weak().size(10.0));
-
-                    let mut add_lump_row = |lbl: &str, m: ProjectMode, target: CreationModal| {
-                        let already_exists = modes_in_project.contains(&m);
-                        if !already_exists {
-                            if crate::ui::context_menu::ContextMenu::button(ui, lbl, true) {
-                                ui.data_mut(|d| {
-                                    d.insert_temp(egui::Id::new("creation_modal_type"), target)
-                                });
-                                crate::ui::context_menu::ContextMenu::close(ui);
-                            }
-                        }
-                    };
-
-                    add_lump_row("+ SBARDEF", ProjectMode::SBarDef, CreationModal::SBarDef);
-                    add_lump_row("+ SKYDEFS", ProjectMode::SkyDefs, CreationModal::SkyDefs);
-                    /* TODO: Not quite ready yet...
-                    add_lump_row(
-                        "+ INTERLEVEL",
-                        ProjectMode::Interlevel,
-                        CreationModal::Interlevel,
-                    );
-                    add_lump_row("+ FINALE", ProjectMode::Finale, CreationModal::Finale);
-                    */
-                    add_lump_row("+ UMAPINFO", ProjectMode::UmapInfo, CreationModal::UmapInfo);
-                });
-            }
-
-            ui.add_space(8.0);
-
-            if *active_mode == crate::app::ProjectMode::UmapInfo {
-                ui.heading("Flowchart");
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .button("Reset Layout")
-                        .on_hover_text("Automatically arrange nodes their default state.")
-                        .clicked()
-                    {
-                        actions.push(DocumentAction::UndoSnapshot);
-                        actions.push(DocumentAction::Umap(
-                            crate::document::actions::UmapAction::ResetLayout,
-                        ));
-                    }
-                });
-            } else {
-                ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.checkbox(
-                        &mut preview_state.sim.engine.widescreen_mode,
-                        "Widescreen (16:9)",
-                    );
-                    ui.checkbox(
-                        &mut preview_state.sim.engine.aspect_correction,
-                        "Aspect Correct",
-                    );
-
-                    ui.separator();
-
-                    if ui
-                        .checkbox(&mut preview_state.sim.engine.auto_zoom, "Auto Fit")
-                        .changed()
-                    {
-                        if preview_state.sim.engine.auto_zoom {
-                            preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
-                        }
-                    }
-
-                    if !preview_state.sim.engine.auto_zoom {
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "{}x",
-                                preview_state.sim.engine.zoom_level
-                            ))
-                            .strong(),
-                        );
-
-                        let btn_size = egui::vec2(20.0, 20.0);
-                        if ui.add_sized(btn_size, egui::Button::new("-")).clicked() {
-                            preview_state.sim.engine.zoom_level =
-                                (preview_state.sim.engine.zoom_level - 1).max(1);
-                        }
-                        if ui.add_sized(btn_size, egui::Button::new("+")).clicked() {
-                            preview_state.sim.engine.zoom_level =
-                                (preview_state.sim.engine.zoom_level + 1).min(8);
-                        }
-                    }
-                });
-            }
-        });
-        ui.add_space(4.0);
-    });
+    let is_umap = *active_mode == crate::app::ProjectMode::UmapInfo;
 
     let background_rect = ui.available_rect_before_wrap();
-
     ui.data_mut(|d| {
         d.insert_temp(egui::Id::new(VIEWPORT_RECT_ID), background_rect);
     });
@@ -220,46 +62,24 @@ pub fn draw_viewport(
 
     let is_panning = ui.input(|i| i.key_down(egui::Key::Space));
 
-    if !preview_state.sim.engine.auto_zoom && viewport_res.hovered() {
-        ui.input(|i| {
-            for event in &i.events {
-                if let egui::Event::MouseWheel { delta, .. } = event {
-                    let old_zoom = preview_state.sim.engine.zoom_level;
-                    let new_zoom = if delta.y > 0.0 {
-                        (old_zoom + 1).min(8)
-                    } else if delta.y < 0.0 {
-                        (old_zoom - 1).max(1)
-                    } else {
-                        old_zoom
-                    };
+    handle_viewport_navigation(ui, &viewport_res, preview_state, is_umap, background_rect);
 
-                    if new_zoom != old_zoom {
-                        if let Some(mouse_pos) = i.pointer.latest_pos() {
-                            let old_proj = ViewportProjection::from_engine(
-                                background_rect,
-                                &preview_state.sim.engine,
-                            );
-                            let virt_anchor = old_proj.to_virtual(mouse_pos);
-
-                            preview_state.sim.engine.zoom_level = new_zoom;
-
-                            let new_proj_temp = ViewportProjection::from_engine(
-                                background_rect,
-                                &preview_state.sim.engine,
-                            );
-
-                            let new_screen_pos = new_proj_temp.to_screen(virt_anchor);
-                            preview_state.sim.engine.pan_offset += mouse_pos - new_screen_pos;
-                        } else {
-                            preview_state.sim.engine.zoom_level = new_zoom;
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    let proj = ViewportProjection::from_engine(background_rect, &preview_state.sim.engine);
+    let proj = if is_umap {
+        let umap_zoom: f32 = ui
+            .ctx()
+            .data(|d| d.get_temp(egui::Id::new("umap_zoom")).unwrap_or(1.0));
+        ViewportProjection {
+            screen_rect: egui::Rect::from_min_size(
+                background_rect.min + preview_state.sim.engine.pan_offset,
+                background_rect.size(),
+            ),
+            final_scale_x: umap_zoom,
+            final_scale_y: umap_zoom,
+            origin_x: 0.0,
+        }
+    } else {
+        ViewportProjection::from_engine(background_rect, &preview_state.sim.engine)
+    };
 
     if is_panning {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
@@ -279,7 +99,6 @@ pub fn draw_viewport(
     let primary_pressed = ui.input(|i| i.pointer.primary_pressed());
     let primary_down = ui.input(|i| i.pointer.primary_down());
 
-    let is_umap = *active_mode == crate::app::ProjectMode::UmapInfo;
     let final_clip_rect = if is_umap {
         background_rect
     } else {
@@ -332,9 +151,325 @@ pub fn draw_viewport(
         &effective_selection,
         &viewport_res,
         is_panning,
-        Default::default(),
-        &mut Default::default(),
+        *active_mode,
+        preview_state,
     ));
+
+    actions.extend(handle_asset_drop(
+        ui,
+        &viewport_res,
+        project,
+        assets,
+        preview_state,
+        &proj,
+        selection,
+        current_bar_idx,
+        controller,
+    ));
+
+    actions
+}
+
+fn draw_viewport_header(
+    ui: &mut egui::Ui,
+    active_mode: &mut crate::app::ProjectMode,
+    preview_state: &mut PreviewState,
+    temp_proj: &ViewportProjection,
+) -> Vec<DocumentAction> {
+    let mut actions = Vec::new();
+    let is_umap = *active_mode == crate::app::ProjectMode::UmapInfo;
+
+    ui.vertical(|ui| {
+        ui.add_space(-1.0);
+        ui.horizontal(|ui| {
+            let mode_id = ui.make_persistent_id("viewport_mode_dropdown");
+            let mode_label = match active_mode {
+                crate::app::ProjectMode::SBarDef => "SBARDEF",
+                crate::app::ProjectMode::SkyDefs => "SKYDEFS",
+                crate::app::ProjectMode::Interlevel => "INTERLEVEL",
+                crate::app::ProjectMode::Finale => "FINALE",
+                crate::app::ProjectMode::UmapInfo => "UMAPINFO",
+            };
+
+            let mode_res = ui.add_sized([110.0, 28.0], |ui: &mut egui::Ui| {
+                crate::ui::shared::section_header_button(
+                    ui,
+                    mode_label,
+                    None,
+                    crate::ui::context_menu::ContextMenu::get(ui, mode_id).is_some(),
+                )
+            });
+
+            if mode_res.clicked() {
+                crate::ui::context_menu::ContextMenu::open(
+                    ui,
+                    mode_id,
+                    mode_res.rect.left_bottom(),
+                );
+            }
+
+            if let Some(menu) = crate::ui::context_menu::ContextMenu::get(ui, mode_id) {
+                crate::ui::context_menu::ContextMenu::show(ui, menu, mode_res.clicked(), |ui| {
+                    use crate::app::{CreationModal, ProjectMode};
+
+                    let modes_in_project: HashSet<ProjectMode> = ui.ctx().data(|d| {
+                        d.get_temp(egui::Id::new("modes_in_project"))
+                            .unwrap_or_default()
+                    });
+
+                    ui.label(egui::RichText::new("Lumps in Project").weak().size(10.0));
+
+                    let all_modes = [
+                        (ProjectMode::SBarDef, "SBARDEF"),
+                        (ProjectMode::SkyDefs, "SKYDEFS"),
+                        (ProjectMode::UmapInfo, "UMAPINFO"),
+                    ];
+
+                    for (m, lbl) in all_modes {
+                        if modes_in_project.contains(&m) {
+                            let is_active = *active_mode == m;
+                            let prefix = if is_active { "✔ " } else { "  " };
+
+                            if crate::ui::context_menu::ContextMenu::button(
+                                ui,
+                                &format!("{}{}", prefix, lbl),
+                                true,
+                            ) {
+                                if !is_active {
+                                    ui.ctx().data_mut(|d| {
+                                        d.remove::<HashSet<Vec<usize>>>(egui::Id::new("selection"));
+                                        d.insert_temp(egui::Id::new("umap_zoom"), 1.0f32);
+                                    });
+
+                                    preview_state.interaction.grabbed_path = None;
+                                    preview_state.interaction.hovered_path = None;
+
+                                    preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
+                                    preview_state.sim.engine.auto_zoom = true;
+                                    preview_state.sim.engine.zoom_level = 1;
+
+                                    *active_mode = m;
+                                }
+                                crate::ui::context_menu::ContextMenu::close(ui);
+                            }
+                        }
+                    }
+
+                    ui.separator();
+                    ui.label(egui::RichText::new("Add to Project").weak().size(10.0));
+
+                    let mut add_lump_row = |lbl: &str, m: ProjectMode, target: CreationModal| {
+                        let already_exists = modes_in_project.contains(&m);
+                        if !already_exists {
+                            if crate::ui::context_menu::ContextMenu::button(ui, lbl, true) {
+                                ui.data_mut(|d| {
+                                    d.insert_temp(egui::Id::new("creation_modal_type"), target)
+                                });
+                                crate::ui::context_menu::ContextMenu::close(ui);
+                            }
+                        }
+                    };
+
+                    add_lump_row("+ SBARDEF", ProjectMode::SBarDef, CreationModal::SBarDef);
+                    add_lump_row("+ SKYDEFS", ProjectMode::SkyDefs, CreationModal::SkyDefs);
+                    add_lump_row("+ UMAPINFO", ProjectMode::UmapInfo, CreationModal::UmapInfo);
+                });
+            }
+
+            ui.add_space(8.0);
+
+            if is_umap {
+                ui.heading("Flowchart");
+            } else {
+                ui.heading(format!("Viewport ({}x Scale)", temp_proj.final_scale_x));
+            }
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if is_umap {
+                    if ui
+                        .button("Reset Layout")
+                        .on_hover_text("Automatically arrange nodes to their default state.")
+                        .clicked()
+                    {
+                        actions.push(DocumentAction::UndoSnapshot);
+                        actions.push(DocumentAction::Umap(
+                            crate::document::actions::UmapAction::ResetLayout,
+                        ));
+                    }
+                } else {
+                    ui.checkbox(
+                        &mut preview_state.sim.engine.widescreen_mode,
+                        "Widescreen (16:9)",
+                    );
+                    ui.checkbox(
+                        &mut preview_state.sim.engine.aspect_correction,
+                        "Aspect Correct",
+                    );
+                    ui.separator();
+
+                    if ui
+                        .checkbox(&mut preview_state.sim.engine.auto_zoom, "Auto Fit")
+                        .changed()
+                    {
+                        if preview_state.sim.engine.auto_zoom {
+                            preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
+                        }
+                    }
+
+                    if !preview_state.sim.engine.auto_zoom {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{}x",
+                                preview_state.sim.engine.zoom_level
+                            ))
+                            .strong(),
+                        );
+                        let btn_size = egui::vec2(20.0, 20.0);
+                        if ui.add_sized(btn_size, egui::Button::new("-")).clicked() {
+                            preview_state.sim.engine.zoom_level =
+                                (preview_state.sim.engine.zoom_level - 1).max(1);
+                        }
+                        if ui.add_sized(btn_size, egui::Button::new("+")).clicked() {
+                            preview_state.sim.engine.zoom_level =
+                                (preview_state.sim.engine.zoom_level + 1).min(8);
+                        }
+                    }
+                }
+            });
+        });
+        ui.add_space(4.0);
+    });
+
+    actions
+}
+
+fn handle_viewport_navigation(
+    ui: &mut egui::Ui,
+    viewport_res: &egui::Response,
+    preview_state: &mut PreviewState,
+    is_umap: bool,
+    background_rect: egui::Rect,
+) {
+    if viewport_res.hovered() {
+        let mut scroll_delta = egui::Vec2::ZERO;
+        let mut pointer_pos = None;
+
+        ui.input(|i| {
+            for event in &i.events {
+                if let egui::Event::MouseWheel { delta, .. } = event {
+                    scroll_delta = *delta;
+                }
+            }
+            pointer_pos = i.pointer.latest_pos();
+        });
+
+        if scroll_delta.y != 0.0 {
+            if is_umap {
+                let umap_zoom: f32 = ui
+                    .ctx()
+                    .data(|d| d.get_temp(egui::Id::new("umap_zoom")).unwrap_or(1.0));
+                let zoom_delta = (scroll_delta.y * 0.1).exp();
+                let new_zoom = (umap_zoom * zoom_delta).clamp(0.05, 10.0);
+
+                if let Some(pos) = pointer_pos {
+                    let mouse_rel = pos - background_rect.min - preview_state.sim.engine.pan_offset;
+                    preview_state.sim.engine.pan_offset -= mouse_rel * (new_zoom / umap_zoom - 1.0);
+                }
+
+                ui.ctx()
+                    .data_mut(|d| d.insert_temp(egui::Id::new("umap_zoom"), new_zoom));
+            } else {
+                let current_visible_zoom =
+                    ViewportProjection::from_engine(background_rect, &preview_state.sim.engine)
+                        .final_scale_x
+                        .floor() as i32;
+
+                let old_zoom = if preview_state.sim.engine.auto_zoom {
+                    current_visible_zoom.max(1)
+                } else {
+                    preview_state.sim.engine.zoom_level
+                };
+
+                let new_zoom = if scroll_delta.y > 0.0 {
+                    (old_zoom + 1).min(8)
+                } else {
+                    (old_zoom - 1).max(1)
+                };
+
+                if new_zoom != old_zoom {
+                    if let Some(pos) = pointer_pos {
+                        let old_proj = ViewportProjection::from_engine(
+                            background_rect,
+                            &preview_state.sim.engine,
+                        );
+                        let virt_anchor = old_proj.to_virtual(pos);
+
+                        preview_state.sim.engine.auto_zoom = false;
+                        preview_state.sim.engine.zoom_level = new_zoom;
+
+                        let new_proj_temp = ViewportProjection::from_engine(
+                            background_rect,
+                            &preview_state.sim.engine,
+                        );
+                        let new_screen_pos = new_proj_temp.to_screen(virt_anchor);
+                        preview_state.sim.engine.pan_offset += pos - new_screen_pos;
+                    } else {
+                        preview_state.sim.engine.auto_zoom = false;
+                        preview_state.sim.engine.zoom_level = new_zoom;
+                    }
+                }
+            }
+        }
+    }
+
+    if is_umap {
+        let middle_anchor_id = egui::Id::new("umap_middle_pan_anchor");
+        if viewport_res.drag_started_by(egui::PointerButton::Middle) {
+            if let Some(pos) = ui.input(|i| i.pointer.hover_pos()) {
+                ui.ctx().data_mut(|d| d.insert_temp(middle_anchor_id, pos));
+            }
+        }
+
+        if ui.input(|i| i.pointer.button_down(egui::PointerButton::Middle)) {
+            if let Some(anchor) = ui
+                .ctx()
+                .data(|d| d.get_temp::<egui::Pos2>(middle_anchor_id))
+            {
+                if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
+                    let delta = pos - anchor;
+                    let dt = ui.input(|i| i.stable_dt);
+
+                    preview_state.sim.engine.pan_offset -= delta * dt * 10.0;
+                    ui.ctx().request_repaint();
+
+                    ui.painter().line_segment(
+                        [anchor, pos],
+                        egui::Stroke::new(2.0, egui::Color32::from_white_alpha(50)),
+                    );
+                    ui.painter()
+                        .circle_filled(anchor, 4.0, egui::Color32::from_white_alpha(100));
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::AllScroll);
+                }
+            }
+        } else {
+            ui.ctx()
+                .data_mut(|d| d.remove::<egui::Pos2>(middle_anchor_id));
+        }
+    }
+}
+
+fn handle_asset_drop(
+    ui: &mut egui::Ui,
+    viewport_res: &egui::Response,
+    project: &Option<ProjectData>,
+    assets: &AssetStore,
+    preview_state: &mut PreviewState,
+    proj: &ViewportProjection,
+    selection: &HashSet<Vec<usize>>,
+    current_bar_idx: usize,
+    controller: &ViewportController,
+) -> Vec<DocumentAction> {
+    let mut actions = Vec::new();
 
     if let Some(asset_keys) = egui::DragAndDrop::payload::<Vec<String>>(ui.ctx()) {
         if viewport_res.contains_pointer() {
@@ -354,7 +489,7 @@ pub fn draw_viewport(
                     let final_y = (virtual_pos.y - root_y).round() as i32;
 
                     let render_ctx = render::RenderContext {
-                        painter: viewport_ui.painter(),
+                        painter: ui.painter(),
                         assets,
                         file: sbar,
                         state: preview_state,
@@ -363,7 +498,7 @@ pub fn draw_viewport(
                         mouse_pos: preview_state.interaction.virtual_mouse_pos,
                         selection,
                         pass: RenderPass::Background,
-                        proj: &proj,
+                        proj,
                         is_dragging: controller.is_dragging,
                         is_viewport_clicked: true,
                         is_native: false,
@@ -398,7 +533,6 @@ pub fn draw_viewport(
             }
         }
     }
-
     actions
 }
 
@@ -412,7 +546,6 @@ pub(crate) fn render_id24_background(
     let id = AssetId::new(lump);
     if let Some(tex) = assets.textures.get(&id) {
         let uv_rect = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-
         ui.painter()
             .image(tex.id(), proj.screen_rect, uv_rect, egui::Color32::WHITE);
     }
