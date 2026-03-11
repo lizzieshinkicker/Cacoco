@@ -1,6 +1,7 @@
 use crate::document::actions::{DocumentAction, UmapAction};
 use crate::models::umap_graph::{EdgeType, NodeType, UmapGraph, UmapNode};
 use crate::models::umapinfo::UmapInfoFile;
+use crate::ui::context_menu::ContextMenu;
 use crate::ui::properties::editor::ViewportContext;
 use eframe::egui;
 use std::collections::HashMap;
@@ -467,6 +468,52 @@ fn handle_interaction(
                     }
                 }
             }
+        }
+    }
+
+    let bg_menu_id = egui::Id::new("umap_bg_context_menu");
+    let menu_valid_id = egui::Id::new("umap_bg_menu_valid");
+    
+    let viewport_rect = ctx.viewport_res.rect;
+    let bg_response = ui.interact(viewport_rect, bg_menu_id, egui::Sense::click());
+    
+    let just_opened = ContextMenu::check(ui, &bg_response);
+    
+    if just_opened {
+        if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
+            let mut is_blank = true;
+            for node in graph.nodes.iter() {
+                if let Some(rect) = node_rects.get(&node.id) {
+                    if rect.contains(pos) {
+                        is_blank = false;
+                        break;
+                    }
+                }
+            }
+            ui.data_mut(|d| d.insert_temp(menu_valid_id, is_blank));
+        }
+    }
+    
+    let menu_valid: bool = ui.data(|d| d.get_temp(menu_valid_id).unwrap_or(false));
+    
+    if let Some(menu) = ContextMenu::get(ui, bg_menu_id) {
+        if menu_valid {
+            let click_pos = ui.input(|i| i.pointer.interact_pos()).unwrap_or_default();
+            let virtual_pos = ctx.proj.to_virtual(click_pos);
+            
+            ContextMenu::show(ui, menu, just_opened, |ui| {
+                if ContextMenu::button(ui, "New Map", true) {
+                    actions.push(DocumentAction::UndoSnapshot);
+                    actions.push(DocumentAction::Umap(UmapAction::AddMap { 
+                        x: virtual_pos.x, 
+                        y: virtual_pos.y 
+                    }));
+                    ContextMenu::close(ui);
+                }
+            });
+        }
+        if !ContextMenu::get(ui, bg_menu_id).is_some() {
+            ui.data_mut(|d| d.remove::<bool>(menu_valid_id));
         }
     }
 

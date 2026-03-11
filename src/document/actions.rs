@@ -64,7 +64,7 @@ pub enum SkyAction {
 
 #[derive(Debug, Clone)]
 pub enum UmapAction {
-    AddMap,
+    AddMap { x: f32, y: f32 },
     DeleteMap(usize),
     UpdateNodePos(String, f32, f32),
     ResetLayout,

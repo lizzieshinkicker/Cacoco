@@ -464,7 +464,7 @@ impl LumpUI for UmapInfoFile {
         let mut actions = Vec::new();
         if shared::heading_action_button(ui, "Maps", Some("Add Map"), false).clicked() {
             actions.push(DocumentAction::UndoSnapshot);
-            actions.push(DocumentAction::Umap(UmapAction::AddMap));
+            actions.push(DocumentAction::Umap(UmapAction::AddMap { x: 0.0, y: 0.0 }));
         }
 
         egui::ScrollArea::vertical()

@@ -9,7 +9,7 @@ pub fn execute_umapinfo_action(
     selection: &mut HashSet<Vec<usize>>,
 ) {
     match action {
-        UmapAction::AddMap => {
+        UmapAction::AddMap { x, y } => {
             let next_num = file.data.maps.len() + 1;
             file.data.maps.push(MapEntry {
                 mapname: format!("MAP{:02}", next_num),
@@ -18,6 +18,10 @@ pub fn execute_umapinfo_action(
             let new_idx = file.data.maps.len() - 1;
             selection.clear();
             selection.insert(vec![new_idx]);
+            
+            if x != 0.0 || y != 0.0 {
+                file.set_node_pos(&format!("MAP{:02}", next_num), x, y);
+            }
         }
         UmapAction::DeleteMap(idx) => {
             if idx < file.data.maps.len() {
