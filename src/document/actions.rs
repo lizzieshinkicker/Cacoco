@@ -64,8 +64,25 @@ pub enum SkyAction {
 
 #[derive(Debug, Clone)]
 pub enum UmapAction {
-    AddMap { x: f32, y: f32 },
+    AddMap {
+        x: f32,
+        y: f32,
+    },
     DeleteMap(usize),
     UpdateNodePos(String, f32, f32),
     ResetLayout,
+    /// Set the normal exit (next) for a map node
+    SetNormalExit {
+        map_name: String,
+        target: String,
+    },
+    /// Set the secret exit (nextsecret) for a map node
+    SetSecretExit {
+        map_name: String,
+        target: String,
+    },
+    /// Clear the normal exit (next) for a map node
+    ClearNormalExit(String),
+    /// Clear the secret exit (nextsecret) for a map node
+    ClearSecretExit(String),
 }
