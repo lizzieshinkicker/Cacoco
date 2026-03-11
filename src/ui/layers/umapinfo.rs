@@ -6,6 +6,9 @@ use crate::ui::context_menu::ContextMenu;
 use eframe::egui;
 use std::collections::HashSet;
 
+/// Key for storing the center-on-node request in egui context.
+const CENTER_ON_NODE_KEY: &str = "umap_center_on_node";
+
 /// Renders the scrollable list of maps defined in the project.
 pub fn draw_umapinfo_layers_list(
     ui: &mut egui::Ui,
@@ -45,6 +48,9 @@ pub fn draw_umapinfo_layers_list(
             selection.clear();
             selection.insert(vec![i]);
             *current_idx = i;
+            ui.ctx().data_mut(|d| {
+                d.insert_temp(egui::Id::new(CENTER_ON_NODE_KEY), i);
+            });
         }
 
         let just_opened = ContextMenu::check(ui, &response);

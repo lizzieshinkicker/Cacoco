@@ -48,7 +48,7 @@ pub fn draw_viewport(
     if project.is_none() {
         ui.scope_builder(egui::UiBuilder::new().max_rect(background_rect), |ui| {
             ui.centered_and_justified(|ui| {
-                ui.label("Lump not present in project.");
+                ui.label("No project loaded...");
             });
         });
         return actions;

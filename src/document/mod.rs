@@ -4,6 +4,9 @@ mod sky;
 mod tree;
 mod umapinfo;
 
+pub(crate) use crate::document::actions::{DocumentAction, TreeAction};
+pub use tree::determine_insertion_point;
+
 use crate::app::ProjectMode;
 use crate::history::HistoryManager;
 use crate::models::ProjectData;
@@ -83,6 +86,13 @@ impl ProjectDocument {
                         DocumentAction::Tree(tree_act) => {
                             if let Some(ProjectData::StatusBar(sbar)) = active_lump {
                                 tree::execute_tree_action(sbar, tree_act, selection_ref);
+                            } else if let Some(ProjectData::UmapInfo(_)) = active_lump {
+                                if let TreeAction::Select(paths) = tree_act {
+                                    selection_ref.clear();
+                                    for path in paths {
+                                        selection_ref.insert(path);
+                                    }
+                                }
                             }
                         }
                         DocumentAction::Sky(sky_act) => {
@@ -118,7 +128,3 @@ impl ProjectDocument {
         self.dirty = true;
     }
 }
-
-pub(crate) use crate::document::actions::DocumentAction;
-/// Re-export helper for external UI components.
-pub use tree::determine_insertion_point;

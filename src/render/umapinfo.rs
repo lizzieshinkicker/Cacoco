@@ -1,9 +1,100 @@
 use crate::document::actions::{DocumentAction, UmapAction};
-use crate::models::umap_graph::{EdgeType, NodeType, UmapGraph};
+use crate::models::umap_graph::{EdgeType, NodeType, UmapGraph, UmapNode};
 use crate::models::umapinfo::UmapInfoFile;
 use crate::ui::properties::editor::ViewportContext;
 use eframe::egui;
 use std::collections::HashMap;
+
+/// Key for storing the center-on-node request in egui context.
+const CENTER_ON_NODE_KEY: &str = "umap_center_on_node";
+
+/// Lightens a color by a given amount (0.0 to 1.0).
+fn lighten_color(color: egui::Color32, amount: f32) -> egui::Color32 {
+    let [r, g, b, _a] = color.to_array();
+    let add = (amount * 255.0) as u8;
+    egui::Color32::from_rgb(
+        r.saturating_add(add).min(255),
+        g.saturating_add(add).min(255),
+        b.saturating_add(add).min(255),
+    )
+}
+
+/// Key for storing the target pan offset for smooth scrolling.
+const CENTER_TARGET_KEY: &str = "umap_center_target";
+
+/// Node dimensions in virtual coordinates (from calculate_node_rects).
+const NODE_WIDTH: f32 = 120.0;
+const NODE_HEIGHT: f32 = 40.0;
+
+/// Handles the request to center the viewport on a specific map node.
+/// This is triggered when a map is selected from the List of Maps.
+fn handle_center_request(
+    ui: &mut egui::Ui,
+    file: &UmapInfoFile,
+    graph: &UmapGraph,
+    ctx: &mut ViewportContext,
+) {
+    let center_idx: Option<usize> = ui
+        .ctx()
+        .data(|d| d.get_temp(egui::Id::new(CENTER_ON_NODE_KEY)));
+
+    if let Some(idx) = center_idx {
+        if let Some(map) = file.data.maps.get(idx) {
+            let map_id = map.mapname.to_uppercase();
+
+            for node in &graph.nodes {
+                if node.id == map_id {
+                    let viewport_rect = ctx.viewport_res.rect;
+                    let center = viewport_rect.center();
+
+                    let zoom = ctx.proj.final_scale_x;
+
+                    let node_screen_w = NODE_WIDTH * zoom;
+                    let node_screen_h = NODE_HEIGHT * zoom;
+
+                    let node_screen_x = node.x * zoom;
+                    let node_screen_y = node.y * zoom;
+
+                    let new_pan_offset = egui::vec2(
+                        center.x - viewport_rect.min.x - node_screen_x - node_screen_w * 0.5,
+                        center.y - viewport_rect.min.y - node_screen_y - node_screen_h * 0.5,
+                    );
+
+                    ui.ctx().data_mut(|d| {
+                        d.insert_temp(egui::Id::new(CENTER_TARGET_KEY), new_pan_offset);
+                    });
+
+                    ui.ctx().data_mut(|d| {
+                        d.remove::<usize>(egui::Id::new(CENTER_ON_NODE_KEY));
+                    });
+
+                    break;
+                }
+            }
+        }
+    }
+
+    let target: Option<egui::Vec2> = ui
+        .ctx()
+        .data(|d| d.get_temp(egui::Id::new(CENTER_TARGET_KEY)));
+
+    if let Some(target_offset) = target {
+        let current_offset = ctx.state.sim.engine.pan_offset;
+        let diff = target_offset - current_offset;
+        let dist = diff.length();
+
+        if dist > 0.5 {
+            let t = (10.0 * ui.input(|i| i.stable_dt)).min(1.0);
+            ctx.state.sim.engine.pan_offset = current_offset + diff * t;
+            ui.ctx().request_repaint();
+        } else {
+            ctx.state.sim.engine.pan_offset = target_offset;
+            ui.ctx().data_mut(|d| {
+                d.remove::<egui::Vec2>(egui::Id::new(CENTER_TARGET_KEY));
+            });
+        }
+    }
+}
 
 /// The primary orchestrator for the UMAPINFO flowchart viewport.
 pub fn draw_umapinfo_viewport(
@@ -13,14 +104,47 @@ pub fn draw_umapinfo_viewport(
 ) -> Vec<DocumentAction> {
     let graph = UmapGraph::build(file);
 
+    handle_center_request(ui, file, &graph, ctx);
+
     draw_grid(ui.painter(), ctx);
 
     let node_rects = calculate_node_rects(&graph, ctx);
 
+    let hovered_node = detect_hovered_node(&graph, &node_rects, ctx);
+
+    if hovered_node.is_some() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
     draw_edges(ui.painter(), &graph, &node_rects, ctx);
-    draw_nodes(ui.painter(), file, &graph, &node_rects, ctx);
+    draw_nodes(
+        ui.painter(),
+        file,
+        &graph,
+        &node_rects,
+        ctx,
+        hovered_node.as_deref(),
+    );
 
     handle_interaction(ui, file, &graph, &node_rects, ctx)
+}
+
+/// Detects which node, if any, is currently hovered by the mouse.
+fn detect_hovered_node<'a>(
+    graph: &'a UmapGraph,
+    node_rects: &HashMap<String, egui::Rect>,
+    ctx: &ViewportContext,
+) -> Option<&'a str> {
+    if let Some(pos) = ctx.viewport_res.hover_pos() {
+        for node in graph.nodes.iter() {
+            if let Some(rect) = node_rects.get(&node.id) {
+                if rect.contains(pos) {
+                    return Some(node.id.as_str());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Renders the infinite background dot grid. Culls to a rational amount of dots.
@@ -122,9 +246,13 @@ fn draw_nodes(
     graph: &UmapGraph,
     node_rects: &HashMap<String, egui::Rect>,
     ctx: &ViewportContext,
+    hovered_node: Option<&str>,
 ) {
+    let hover_lighten = 0.25;
+
     for node in &graph.nodes {
         let rect = node_rects.get(&node.id).unwrap();
+        let is_hovered = hovered_node == Some(node.id.as_str());
 
         let (bg_color, stroke_color, title, subtitle) = match &node.node_type {
             NodeType::Map { levelname } => {
@@ -135,11 +263,16 @@ fn draw_nodes(
                         false
                     }
                 });
+                let base_color = if is_selected {
+                    egui::Color32::from_rgb(60, 80, 120)
+                } else {
+                    egui::Color32::from_rgb(45, 45, 45)
+                };
                 (
-                    if is_selected {
-                        egui::Color32::from_rgb(60, 80, 120)
+                    if is_hovered {
+                        lighten_color(base_color, hover_lighten)
                     } else {
-                        egui::Color32::from_rgb(45, 45, 45)
+                        base_color
                     },
                     if is_selected {
                         egui::Color32::WHITE
@@ -150,32 +283,53 @@ fn draw_nodes(
                     Some(levelname.clone()),
                 )
             }
-            NodeType::Episode { name, patch } => (
-                egui::Color32::from_rgb(30, 60, 30),
-                egui::Color32::from_rgb(80, 150, 80),
-                if patch.is_empty() {
-                    "Episode".to_string()
-                } else {
-                    patch.clone()
-                },
-                Some(name.clone()),
-            ),
-            NodeType::InterText { is_secret } => (
-                egui::Color32::from_rgb(60, 40, 80),
-                egui::Color32::from_rgb(150, 100, 200),
-                "Intermission Text".to_string(),
-                if *is_secret {
-                    Some("(Secret)".to_string())
-                } else {
-                    None
-                },
-            ),
-            NodeType::Terminal { end_type } => (
-                egui::Color32::from_rgb(80, 30, 30),
-                egui::Color32::from_rgb(200, 80, 80),
-                "Terminal".to_string(),
-                Some(end_type.clone()),
-            ),
+            NodeType::Episode { name, patch } => {
+                let base_color = egui::Color32::from_rgb(30, 60, 30);
+                (
+                    if is_hovered {
+                        lighten_color(base_color, hover_lighten)
+                    } else {
+                        base_color
+                    },
+                    egui::Color32::from_rgb(80, 150, 80),
+                    if patch.is_empty() {
+                        "Episode".to_string()
+                    } else {
+                        patch.clone()
+                    },
+                    Some(name.clone()),
+                )
+            }
+            NodeType::InterText { is_secret } => {
+                let base_color = egui::Color32::from_rgb(60, 40, 80);
+                (
+                    if is_hovered {
+                        lighten_color(base_color, hover_lighten)
+                    } else {
+                        base_color
+                    },
+                    egui::Color32::from_rgb(150, 100, 200),
+                    "Intermission Text".to_string(),
+                    if *is_secret {
+                        Some("(Secret)".to_string())
+                    } else {
+                        None
+                    },
+                )
+            }
+            NodeType::Terminal { end_type } => {
+                let base_color = egui::Color32::from_rgb(80, 30, 30);
+                (
+                    if is_hovered {
+                        lighten_color(base_color, hover_lighten)
+                    } else {
+                        base_color
+                    },
+                    egui::Color32::from_rgb(200, 80, 80),
+                    "Terminal".to_string(),
+                    Some(end_type.clone()),
+                )
+            }
         };
 
         let rounding = 4.0 * ctx.proj.final_scale_x;
@@ -214,6 +368,39 @@ fn draw_nodes(
     }
 }
 
+/// Extracts the map ID from a node ID if it's a non-MAP node type.
+/// Returns Some(map_id) for Episode, InterText, and Terminal nodes.
+fn extract_map_id_from_node(node: &UmapNode) -> Option<String> {
+    if let NodeType::Map { .. } = &node.node_type {
+        return Some(node.id.clone());
+    }
+
+    let id = &node.id;
+    if let Some(pos) = id.find("::") {
+        Some(id[..pos].to_uppercase())
+    } else {
+        None
+    }
+}
+
+/// Finds the index of the MAP entry in the file that corresponds to the given node.
+/// For MAP nodes, returns the index of that map.
+/// For other node types (Episode, InterText, Terminal), returns the index of the parent MAP.
+fn find_map_index_for_node(file: &UmapInfoFile, node: &UmapNode) -> Option<usize> {
+    let map_id = extract_map_id_from_node(node)?;
+    file.data
+        .maps
+        .iter()
+        .position(|m| m.mapname.to_uppercase() == map_id)
+}
+
+/// Helper to create a selection action for a map index.
+fn select_map_action(idx: usize) -> DocumentAction {
+    DocumentAction::Tree(crate::document::actions::TreeAction::Select(vec![vec![
+        idx,
+    ]]))
+}
+
 /// Processes all mouse inputs, drag-and-drop, selection, and viewport panning.
 fn handle_interaction(
     ui: &mut egui::Ui,
@@ -250,17 +437,8 @@ fn handle_interaction(
                         node_start = Some(egui::pos2(node.x, node.y));
                         hit_node = true;
 
-                        if matches!(node.node_type, NodeType::Map { .. }) {
-                            if let Some(idx) = file
-                                .data
-                                .maps
-                                .iter()
-                                .position(|m| m.mapname.to_uppercase() == node.id)
-                            {
-                                actions.push(DocumentAction::Tree(
-                                    crate::document::actions::TreeAction::Select(vec![vec![idx]]),
-                                ));
-                            }
+                        if let Some(idx) = find_map_index_for_node(file, node) {
+                            actions.push(select_map_action(idx));
                         }
 
                         actions.push(DocumentAction::UndoSnapshot);
@@ -271,6 +449,23 @@ fn handle_interaction(
 
             if !hit_node {
                 is_bg_panning = true;
+            }
+        }
+    }
+
+    let primary_pressed_now = ui.input(|i| i.pointer.primary_down());
+    let was_dragging = ctx.viewport_res.dragged_by(egui::PointerButton::Primary);
+    if primary_pressed_now && !was_dragging && !ctx.is_panning && dragged_node.is_none() {
+        if let Some(pos) = ctx.viewport_res.hover_pos() {
+            for node in graph.nodes.iter().rev() {
+                if let Some(rect) = node_rects.get(&node.id) {
+                    if rect.contains(pos) {
+                        if let Some(idx) = find_map_index_for_node(file, node) {
+                            actions.push(select_map_action(idx));
+                        }
+                        break;
+                    }
+                }
             }
         }
     }
