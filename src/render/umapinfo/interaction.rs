@@ -1,6 +1,6 @@
 use crate::document::actions::{DocumentAction, TreeAction};
 use crate::models::umap_graph::{NodeType, UmapNode};
-use crate::models::umapinfo::{UmapField, UmapInfoFile};
+use crate::models::umapinfo::UmapInfoFile;
 use crate::ui::properties::editor::ViewportContext;
 
 use super::connectors::{
@@ -44,36 +44,6 @@ pub fn is_position_on_blank(
         }
     }
     true
-}
-
-/// Extracts the exit target name from a map for the given connector type.
-pub fn get_exit_target_name(
-    file: &UmapInfoFile,
-    map_id: &str,
-    conn_type: ConnectorType,
-) -> Option<String> {
-    let map = file
-        .data
-        .maps
-        .iter()
-        .find(|m| m.mapname.to_uppercase() == map_id.to_uppercase())?;
-
-    match conn_type {
-        ConnectorType::NormalExit => map.fields.iter().find_map(|f| {
-            if let UmapField::Next(t) = f {
-                Some(t.clone())
-            } else {
-                None
-            }
-        }),
-        ConnectorType::SecretExit => map.fields.iter().find_map(|f| {
-            if let UmapField::NextSecret(t) = f {
-                Some(t.clone())
-            } else {
-                None
-            }
-        }),
-    }
 }
 
 /// Extracts the map ID from a node ID if it's a non-MAP node type.
@@ -235,9 +205,10 @@ pub fn handle_interaction(
         }
     }
 
-    if ctx
-        .viewport_res
-        .drag_started_by(eframe::egui::PointerButton::Primary)
+    if active_connector_drag.is_none()
+        && ctx
+            .viewport_res
+            .drag_started_by(eframe::egui::PointerButton::Primary)
         && !ctx.is_panning
     {
         let click_pos = interact_pos.or(ctx.viewport_res.hover_pos());
@@ -268,7 +239,12 @@ pub fn handle_interaction(
     let was_dragging = ctx
         .viewport_res
         .dragged_by(eframe::egui::PointerButton::Primary);
-    if primary_pressed_now && !was_dragging && !ctx.is_panning && dragged_node.is_none() {
+    if active_connector_drag.is_none()
+        && primary_pressed_now
+        && !was_dragging
+        && !ctx.is_panning
+        && dragged_node.is_none()
+    {
         let click_pos = interact_pos.or(ctx.viewport_res.hover_pos());
         if let Some(pos) = click_pos {
             let hit_connector =
@@ -295,7 +271,9 @@ pub fn handle_interaction(
     if just_opened {
         if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
             let is_blank = is_position_on_blank(pos, graph, node_rects);
-            ui.data_mut(|d| d.insert_temp(menu_valid_id, is_blank));
+            let hit_connector =
+                detect_connector_hit(pos, graph, node_rects, ctx.proj.final_scale_x).is_some();
+            ui.data_mut(|d| d.insert_temp(menu_valid_id, is_blank && !hit_connector));
         }
     }
 
@@ -371,8 +349,6 @@ pub fn handle_interaction(
     let active_connector_drag: Option<(String, ConnectorType, eframe::egui::Pos2)> =
         ui.ctx().data(|d| d.get_temp(connector_drag_data_id));
 
-    let connector_context_id = eframe::egui::Id::new("umap_connector_context");
-
     let click_pos = ui
         .input(|i| i.pointer.interact_pos())
         .or(ctx.viewport_res.hover_pos());
@@ -398,80 +374,41 @@ pub fn handle_interaction(
         }
     }
 
-    if ctx
-        .viewport_res
-        .drag_started_by(eframe::egui::PointerButton::Secondary)
-        && !ctx.is_panning
-    {
-        if let Some(pos) = ctx.viewport_res.hover_pos() {
+    let secondary_clicked = ui.input(|i| {
+        i.pointer
+            .button_clicked(eframe::egui::PointerButton::Secondary)
+    });
+    if secondary_clicked && !ctx.is_panning {
+        if let Some(pos) = click_pos {
             if let Some(hit) = detect_connector_hit(pos, graph, node_rects, ctx.proj.final_scale_x)
             {
-                let map_id = hit.node_id;
+                let map_id = if let Some(idx) = hit.node_id.find("::") {
+                    hit.node_id[..idx].to_uppercase()
+                } else {
+                    hit.node_id.clone()
+                };
+
                 let has_exit = match hit.connector_type {
                     ConnectorType::NormalExit => map_has_normal_exit(file, &map_id),
                     ConnectorType::SecretExit => map_has_secret_exit(file, &map_id),
                 };
 
                 if has_exit {
-                    let target_name =
-                        get_exit_target_name(file, &map_id, hit.connector_type).unwrap_or_default();
-                    ui.data_mut(|d| {
-                        d.insert_temp(
-                            connector_context_id,
-                            (map_id, hit.connector_type, target_name),
-                        )
-                    });
-                }
-            }
-        }
-    }
-
-    let connector_context_data: Option<(String, ConnectorType, String)> =
-        ui.ctx().data(|d| d.get_temp(connector_context_id));
-    if let Some((map_name, conn_type, target_name)) = connector_context_data {
-        let _menu_response = ui.interact(
-            eframe::egui::Rect::from_min_size(
-                eframe::egui::pos2(0.0, 0.0),
-                eframe::egui::vec2(1.0, 1.0),
-            ),
-            connector_context_id,
-            eframe::egui::Sense::click(),
-        );
-
-        if let Some(menu) = crate::ui::context_menu::ContextMenu::get(ui, connector_context_id) {
-            crate::ui::context_menu::ContextMenu::show(ui, menu, false, |ui| {
-                let clear_label = match conn_type {
-                    ConnectorType::NormalExit => format!("Clear Normal Exit (to {})", target_name),
-                    ConnectorType::SecretExit => format!("Clear Secret Exit (to {})", target_name),
-                };
-                if crate::ui::context_menu::ContextMenu::button(ui, &clear_label, true) {
                     actions.push(DocumentAction::UndoSnapshot);
-                    match conn_type {
+                    match hit.connector_type {
                         ConnectorType::NormalExit => {
                             actions.push(DocumentAction::Umap(
-                                crate::document::actions::UmapAction::ClearNormalExit(
-                                    map_name.clone(),
-                                ),
+                                crate::document::actions::UmapAction::ClearNormalExit(map_id),
                             ));
                         }
                         ConnectorType::SecretExit => {
                             actions.push(DocumentAction::Umap(
-                                crate::document::actions::UmapAction::ClearSecretExit(
-                                    map_name.clone(),
-                                ),
+                                crate::document::actions::UmapAction::ClearSecretExit(map_id),
                             ));
                         }
                     }
-                    crate::ui::context_menu::ContextMenu::close(ui);
                 }
-            });
-        }
-
-        if !ui.input(|i| i.pointer.primary_down())
-            && !crate::ui::context_menu::ContextMenu::get(ui, connector_context_id).is_some()
-        {
-            ui.ctx()
-                .data_mut(|d| d.remove::<(String, ConnectorType, String)>(connector_context_id));
+            }
         }
     }
 
@@ -490,7 +427,11 @@ pub fn handle_interaction(
             ui.ctx().request_repaint();
         }
 
-        if ctx.viewport_res.drag_stopped() {
+        let primary_released = ui.input(|i| {
+            i.pointer
+                .button_released(eframe::egui::PointerButton::Primary)
+        });
+        if primary_released {
             if let Some(pos) = ctx.viewport_res.hover_pos() {
                 for target_node in graph.nodes.iter() {
                     if let Some(rect) = node_rects.get(&target_node.id) {
@@ -545,7 +486,11 @@ pub fn handle_interaction(
         }
     }
 
-    if ctx.viewport_res.drag_stopped() {
+    let primary_released = ui.input(|i| {
+        i.pointer
+            .button_released(eframe::egui::PointerButton::Primary)
+    });
+    if ctx.viewport_res.drag_stopped() || primary_released {
         dragged_node = None;
         start_ptr = None;
         node_start = None;

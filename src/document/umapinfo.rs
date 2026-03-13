@@ -92,6 +92,11 @@ pub fn execute_umapinfo_action(
             if let Some(obj) = file.metadata.as_object_mut() {
                 obj.remove("node_positions");
             }
+            let new_positions =
+                crate::models::umap_graph::UmapGraph::generate_topological_layout(file);
+            for (map_id, (x, y)) in new_positions {
+                file.set_node_pos(&map_id, x, y);
+            }
         }
         UmapAction::SetNormalExit { map_name, target } => {
             if let Some(idx) = find_map_index(file, &map_name) {

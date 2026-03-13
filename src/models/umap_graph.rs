@@ -95,9 +95,27 @@ impl ParsedMapData {
 impl UmapGraph {
     /// Parses a standard UMAPINFO file and projects it into a visual node graph.
     pub fn build(file: &UmapInfoFile) -> Self {
-        let spine_counts = Self::count_spine_blockers(file);
-        let map_coords = Self::calculate_topological_grid(file, &spine_counts);
+        let mut map_coords = HashMap::new();
+        for (idx, map) in file.data.maps.iter().enumerate() {
+            let offset = (idx % 2) as f32 * 40.0;
+            map_coords.insert(map.mapname.to_uppercase(), (offset, idx as f32 * 100.0));
+        }
+
         Self::construct_graph(file, &map_coords)
+    }
+
+    /// Explicitly generates coordinates based on a good guess at the nicest looking
+    /// layout for the flow through the WAD.
+    pub fn generate_topological_layout(file: &UmapInfoFile) -> HashMap<String, (f32, f32)> {
+        let spine_counts = Self::count_spine_blockers(file);
+        let grid = Self::calculate_topological_grid(file, &spine_counts);
+        let mut positions = HashMap::new();
+        for map in &file.data.maps {
+            let map_id = map.mapname.to_uppercase();
+            let (t, r) = grid.get(&map_id).copied().unwrap_or((0.0, 0.0));
+            positions.insert(map_id, (60.0 + (t * 160.0), 60.0 + (r * 80.0)));
+        }
+        positions
     }
 
     /// Counts how many extra vertical slots each map requires for text/terminals
@@ -224,7 +242,7 @@ impl UmapGraph {
         map_coords
     }
 
-    /// Instantiates the actual nodes and edges using calculated positions.
+    /// Instantiates the actual nodes and edges of the UMAPINFO graph.
     fn construct_graph(file: &UmapInfoFile, map_coords: &HashMap<String, (f32, f32)>) -> Self {
         let mut graph = UmapGraph::default();
 

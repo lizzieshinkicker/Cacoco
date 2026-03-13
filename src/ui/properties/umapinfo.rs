@@ -494,6 +494,9 @@ impl LumpUI for UmapInfoFile {
     }
 
     fn render_viewport(&self, ui: &mut egui::Ui, ctx: &mut ViewportContext) -> Vec<DocumentAction> {
+        if self.metadata.get("node_positions").is_none() && !self.data.maps.is_empty() {
+            return vec![DocumentAction::Umap(UmapAction::ResetLayout)];
+        }
         crate::render::umapinfo::draw_umapinfo_viewport(ui, self, ctx)
     }
 }

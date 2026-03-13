@@ -296,7 +296,7 @@ fn draw_viewport_header(
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if is_umap {
                     if ui
-                        .button("Reset Layout")
+                        .button("Auto-Arrange Layout")
                         .on_hover_text("Automatically arrange nodes to their default state.")
                         .clicked()
                     {

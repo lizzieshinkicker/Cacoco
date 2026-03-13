@@ -74,7 +74,7 @@ pub fn is_point_in_connector(
     connector_pos: eframe::egui::Pos2,
     scale: f32,
 ) -> bool {
-    let radius = CONNECTOR_RADIUS_BASE * scale;
+    let radius = (CONNECTOR_RADIUS_BASE + 6.0) * scale;
     let dx = point.x - connector_pos.x;
     let dy = point.y - connector_pos.y;
     (dx * dx + dy * dy) <= (radius * radius)

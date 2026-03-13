@@ -24,8 +24,12 @@ pub fn draw_umapinfo_viewport(
 
     let node_rects = calculate_node_rects(&graph, ctx);
 
-    let hovered_node = detect_hovered_node(&graph, &node_rects, ctx);
     let hovered_connector = detect_hovered_connector(&graph, &node_rects, ctx);
+    let hovered_node = if hovered_connector.is_some() {
+        None
+    } else {
+        detect_hovered_node(&graph, &node_rects, ctx)
+    };
 
     if hovered_node.is_some() || hovered_connector.is_some() {
         ui.ctx()

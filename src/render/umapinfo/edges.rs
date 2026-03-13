@@ -136,9 +136,14 @@ pub fn calculate_all_edge_paths(graph: &UmapGraph) -> Vec<EdgePath> {
             cost_so_far.insert(pre_start, 0);
 
             let mut found = false;
+            let mut steps = 0;
             while let Some(AStarState { cost: _, x, y, dir }) = heap.pop() {
+                steps += 1;
                 if (x, y) == pre_end {
                     found = true;
+                    break;
+                }
+                if steps > 1000 {
                     break;
                 }
 
