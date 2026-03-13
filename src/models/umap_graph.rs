@@ -2,8 +2,9 @@ use crate::models::umapinfo::{MapEntry, UmapField, UmapInfoFile};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum EdgeType {
+    #[default]
     Normal,
     Secret,
 }
@@ -140,9 +141,8 @@ impl UmapGraph {
         spine_counts: &HashMap<String, usize>,
     ) -> HashMap<String, (f32, f32)> {
         let mut map_coords: HashMap<String, (f32, f32)> = HashMap::new();
-        if let Some(first) = file.data.maps.first() {
-            map_coords.insert(first.mapname.to_uppercase(), (0.0, 0.0));
-        }
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
 
         let episode_maps: std::collections::HashSet<String> = file
             .data
@@ -164,38 +164,58 @@ impl UmapGraph {
             })
             .collect();
 
-        for _ in 0..15 {
-            for map in &file.data.maps {
-                let name = map.mapname.to_uppercase();
-                if let Some(&(curr_t, curr_r)) = map_coords.get(&name) {
-                    for field in &map.fields {
-                        match field {
-                            UmapField::Next(target) => {
-                                let t_name = target.to_uppercase();
-                                let extra_rows =
-                                    spine_counts.get(&name).cloned().unwrap_or(0) as f32;
+        for map in &file.data.maps {
+            let name = map.mapname.to_uppercase();
+            if !visited.contains(&name) {
+                let start_t = 0.0;
+                let max_r = map_coords
+                    .values()
+                    .map(|(_, r)| *r)
+                    .fold(0.0_f32, |a, b| a.max(b));
+                let actual_start_r = if map_coords.is_empty() {
+                    0.0
+                } else {
+                    max_r + 2.0
+                };
 
-                                let spine_blocker = extra_rows;
+                queue.push_back((name, start_t, actual_start_r));
 
-                                let target_has_episode =
-                                    episode_maps.contains(&t_name) as i32 as f32;
-                                let episode_spacing = target_has_episode * 1.0;
+                while let Some((curr_name, curr_t, curr_r)) = queue.pop_front() {
+                    if visited.contains(&curr_name) {
+                        continue;
+                    }
+                    visited.insert(curr_name.clone());
+                    map_coords.insert(curr_name.clone(), (curr_t, curr_r));
 
-                                let total_offset = 1.0 + spine_blocker + episode_spacing;
-                                let entry = map_coords
-                                    .entry(t_name)
-                                    .or_insert((curr_t, curr_r + total_offset));
-                                entry.0 = entry.0.min(curr_t);
-                                entry.1 = entry.1.max(curr_r + total_offset);
+                    if let Some(map_entry) = file
+                        .data
+                        .maps
+                        .iter()
+                        .find(|m| m.mapname.to_uppercase() == curr_name)
+                    {
+                        for field in &map_entry.fields {
+                            match field {
+                                UmapField::Next(target) => {
+                                    let t_name = target.to_uppercase();
+                                    if !visited.contains(&t_name) {
+                                        let spine_blocker =
+                                            spine_counts.get(&curr_name).cloned().unwrap_or(0)
+                                                as f32;
+                                        let target_has_episode =
+                                            episode_maps.contains(&t_name) as i32 as f32;
+                                        let episode_spacing = target_has_episode * 1.0;
+                                        let total_offset = 1.0 + spine_blocker + episode_spacing;
+                                        queue.push_back((t_name, curr_t, curr_r + total_offset));
+                                    }
+                                }
+                                UmapField::NextSecret(target) => {
+                                    let t_name = target.to_uppercase();
+                                    if !visited.contains(&t_name) {
+                                        queue.push_back((t_name, curr_t + 2.0, curr_r));
+                                    }
+                                }
+                                _ => {}
                             }
-                            UmapField::NextSecret(target) => {
-                                let t_name = target.to_uppercase();
-                                let entry =
-                                    map_coords.entry(t_name).or_insert((curr_t + 2.0, curr_r));
-                                entry.0 = entry.0.max(curr_t + 2.0);
-                                entry.1 = entry.1.max(curr_r);
-                            }
-                            _ => {}
                         }
                     }
                 }
@@ -216,9 +236,11 @@ impl UmapGraph {
             let x_base = 60.0 + (t * 160.0);
             let y_base = 60.0 + (r * 80.0);
 
+            let (map_vx, map_vy) = Self::get_pos(&file.metadata, &map_id, x_base, y_base);
+
             for (ep_idx, (patch, name)) in data.episode_fields.into_iter().enumerate() {
                 let ep_id = format!("{}::EPISODE::{}", map_id, ep_idx);
-                let (vx, vy) = Self::get_pos(&file.metadata, &ep_id, x_base, y_base - 80.0);
+                let (vx, vy) = Self::get_pos(&file.metadata, &ep_id, map_vx, map_vy - 80.0);
                 graph.nodes.push(UmapNode {
                     id: ep_id.clone(),
                     node_type: NodeType::Episode { name, patch },
@@ -232,7 +254,6 @@ impl UmapGraph {
                 });
             }
 
-            let (map_vx, map_vy) = Self::get_pos(&file.metadata, &map_id, x_base, y_base);
             graph.nodes.push(UmapNode {
                 id: map_id.clone(),
                 node_type: NodeType::Map {
@@ -242,12 +263,12 @@ impl UmapGraph {
                 y: map_vy,
             });
 
-            let mut current_v_stack_y = y_base + 80.0;
+            let mut current_v_stack_y = map_vy + 80.0;
             let mut last_node_id = map_id.clone();
 
             if data.has_text_normal {
                 let text_id = format!("{}::TEXT_NORMAL", map_id);
-                let (vx, vy) = Self::get_pos(&file.metadata, &text_id, x_base, current_v_stack_y);
+                let (vx, vy) = Self::get_pos(&file.metadata, &text_id, map_vx, current_v_stack_y);
                 graph.nodes.push(UmapNode {
                     id: text_id.clone(),
                     node_type: NodeType::InterText { is_secret: false },
@@ -265,7 +286,7 @@ impl UmapGraph {
 
             if let Some(term) = data.terminal_type {
                 let term_id = format!("{}::TERMINAL", map_id);
-                let (vx, vy) = Self::get_pos(&file.metadata, &term_id, x_base, current_v_stack_y);
+                let (vx, vy) = Self::get_pos(&file.metadata, &term_id, map_vx, current_v_stack_y);
                 graph.nodes.push(UmapNode {
                     id: term_id.clone(),
                     node_type: NodeType::Terminal { end_type: term },
@@ -288,7 +309,7 @@ impl UmapGraph {
             if let Some(sec_dest) = data.next_secret {
                 if data.has_text_secret {
                     let text_id = format!("{}::TEXT_SECRET", map_id);
-                    let (vx, vy) = Self::get_pos(&file.metadata, &text_id, x_base + 160.0, y_base);
+                    let (vx, vy) = Self::get_pos(&file.metadata, &text_id, map_vx + 160.0, map_vy);
                     graph.nodes.push(UmapNode {
                         id: text_id.clone(),
                         node_type: NodeType::InterText { is_secret: true },
