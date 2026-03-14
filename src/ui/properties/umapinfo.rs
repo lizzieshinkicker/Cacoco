@@ -495,7 +495,13 @@ impl LumpUI for UmapInfoFile {
 
     fn render_viewport(&self, ui: &mut egui::Ui, ctx: &mut ViewportContext) -> Vec<DocumentAction> {
         if self.metadata.get("node_positions").is_none() && !self.data.maps.is_empty() {
-            return vec![DocumentAction::Umap(UmapAction::ResetLayout)];
+            let bake_id = ui.make_persistent_id("umap_initial_bake_done");
+            let already_baked: bool = ui.ctx().data(|d| d.get_temp(bake_id).unwrap_or(false));
+
+            if !already_baked {
+                ui.ctx().data_mut(|d| d.insert_temp(bake_id, true));
+                return vec![DocumentAction::Umap(UmapAction::ResetLayout)];
+            }
         }
         crate::render::umapinfo::draw_umapinfo_viewport(ui, self, ctx)
     }

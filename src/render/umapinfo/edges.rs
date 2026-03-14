@@ -88,16 +88,25 @@ pub fn calculate_all_edge_paths(graph: &UmapGraph) -> Vec<EdgePath> {
         ordered_indices.sort_by_key(|&idx| {
             let prev_penalty = edge_priorities.get(&idx).copied().unwrap_or(0);
             let e = &graph.edges[idx];
-            let src = graph.nodes.iter().find(|n| n.id == e.source).unwrap();
-            let dst = graph.nodes.iter().find(|n| n.id == e.target).unwrap();
-            let dist = ((src.x - dst.x).abs() + (src.y - dst.y).abs()) as i32;
-            (-prev_penalty, dist)
+            let src = graph.nodes.iter().find(|n| n.id == e.source);
+            let dst = graph.nodes.iter().find(|n| n.id == e.target);
+
+            if let (Some(s), Some(d)) = (src, dst) {
+                let dist = ((s.x - d.x).abs() + (s.y - d.y).abs()) as i32;
+                (-prev_penalty, dist)
+            } else {
+                (i32::MAX, 0)
+            }
         });
 
         for &edge_idx in &ordered_indices {
             let edge = &graph.edges[edge_idx];
-            let src_node = graph.nodes.iter().find(|n| n.id == edge.source).unwrap();
-            let dst_node = graph.nodes.iter().find(|n| n.id == edge.target).unwrap();
+            let src_node = graph.nodes.iter().find(|n| n.id == edge.source);
+            let dst_node = graph.nodes.iter().find(|n| n.id == edge.target);
+
+            let (Some(src_node), Some(dst_node)) = (src_node, dst_node) else {
+                continue;
+            };
 
             let is_secret = edge.edge_type == EdgeType::Secret;
             let sgx = (src_node.x / 20.0).round() as i32;

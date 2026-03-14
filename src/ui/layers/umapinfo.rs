@@ -65,6 +65,7 @@ pub fn draw_umapinfo_layers_list(
                 if ContextMenu::button(ui, "Delete Map Entry", true) {
                     actions.push(DocumentAction::UndoSnapshot);
                     actions.push(DocumentAction::Umap(UmapAction::DeleteMap(i)));
+                    *current_idx = 0;
                     ContextMenu::close(ui);
                 }
             });

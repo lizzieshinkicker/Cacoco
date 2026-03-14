@@ -30,22 +30,6 @@ pub fn detect_node_hit(
     None
 }
 
-/// Checks if a position is on the empty field (not on any node).
-pub fn is_position_on_blank(
-    point: eframe::egui::Pos2,
-    graph: &crate::models::umap_graph::UmapGraph,
-    node_rects: &std::collections::HashMap<String, eframe::egui::Rect>,
-) -> bool {
-    for node in graph.nodes.iter() {
-        if let Some(rect) = node_rects.get(&node.id) {
-            if rect.contains(point) {
-                return false;
-            }
-        }
-    }
-    true
-}
-
 /// Extracts the map ID from a node ID if it's a non-MAP node type.
 /// Returns Some(map_id) for Episode, InterText, and Terminal nodes.
 pub fn extract_map_id_from_node(node: &UmapNode) -> Option<String> {
@@ -262,6 +246,7 @@ pub fn handle_interaction(
 
     let bg_menu_id = eframe::egui::Id::new("umap_bg_context_menu");
     let menu_valid_id = eframe::egui::Id::new("umap_bg_menu_valid");
+    let node_menu_idx_id = eframe::egui::Id::new("umap_node_menu_idx");
 
     let viewport_rect = ctx.viewport_res.rect;
     let bg_response = ui.interact(viewport_rect, bg_menu_id, eframe::egui::Sense::click());
@@ -270,16 +255,32 @@ pub fn handle_interaction(
 
     if just_opened {
         if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
-            let is_blank = is_position_on_blank(pos, graph, node_rects);
             let hit_connector =
                 detect_connector_hit(pos, graph, node_rects, ctx.proj.final_scale_x).is_some();
-            ui.data_mut(|d| d.insert_temp(menu_valid_id, is_blank && !hit_connector));
+
+            if hit_connector {
+                ui.data_mut(|d| d.insert_temp(menu_valid_id, false));
+            } else if let Some(node_hit) = detect_node_hit(pos, graph, node_rects) {
+                if let Some(idx) = find_map_index_for_node(file, &node_hit.node) {
+                    actions.push(select_map_action(idx));
+                    ui.data_mut(|d| {
+                        d.insert_temp(menu_valid_id, true);
+                        d.insert_temp(node_menu_idx_id, idx);
+                    });
+                }
+            } else {
+                ui.data_mut(|d| {
+                    d.insert_temp(menu_valid_id, true);
+                    d.remove::<usize>(node_menu_idx_id);
+                });
+            }
         }
     }
 
     let menu_valid: bool = ui
         .ctx()
         .data(|d| d.get_temp(menu_valid_id).unwrap_or(false));
+    let node_to_delete: Option<usize> = ui.ctx().data(|d| d.get_temp(node_menu_idx_id));
 
     if let Some(menu) = crate::ui::context_menu::ContextMenu::get(ui, bg_menu_id) {
         if menu_valid {
@@ -287,20 +288,33 @@ pub fn handle_interaction(
             let virtual_pos = ctx.proj.to_virtual(click_pos);
 
             crate::ui::context_menu::ContextMenu::show(ui, menu, just_opened, |ui| {
-                if crate::ui::context_menu::ContextMenu::button(ui, "New Map", true) {
-                    actions.push(DocumentAction::UndoSnapshot);
-                    actions.push(DocumentAction::Umap(
-                        crate::document::actions::UmapAction::AddMap {
-                            x: virtual_pos.x,
-                            y: virtual_pos.y,
-                        },
-                    ));
-                    crate::ui::context_menu::ContextMenu::close(ui);
+                if let Some(idx) = node_to_delete {
+                    if crate::ui::context_menu::ContextMenu::button(ui, "Delete Map Entry", true) {
+                        actions.push(DocumentAction::UndoSnapshot);
+                        actions.push(DocumentAction::Umap(
+                            crate::document::actions::UmapAction::DeleteMap(idx),
+                        ));
+                        crate::ui::context_menu::ContextMenu::close(ui);
+                    }
+                } else {
+                    if crate::ui::context_menu::ContextMenu::button(ui, "New Map", true) {
+                        actions.push(DocumentAction::UndoSnapshot);
+                        actions.push(DocumentAction::Umap(
+                            crate::document::actions::UmapAction::AddMap {
+                                x: virtual_pos.x,
+                                y: virtual_pos.y,
+                            },
+                        ));
+                        crate::ui::context_menu::ContextMenu::close(ui);
+                    }
                 }
             });
         }
         if !crate::ui::context_menu::ContextMenu::get(ui, bg_menu_id).is_some() {
-            ui.data_mut(|d| d.remove::<bool>(menu_valid_id));
+            ui.data_mut(|d| {
+                d.remove::<bool>(menu_valid_id);
+                d.remove::<usize>(node_menu_idx_id);
+            });
         }
     }
 

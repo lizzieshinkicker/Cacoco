@@ -66,17 +66,28 @@ pub fn execute_umapinfo_action(
 ) {
     match action {
         UmapAction::AddMap { x, y } => {
-            let next_num = file.data.maps.len() + 1;
+            let mut next_num = 1;
+            while file
+                .data
+                .maps
+                .iter()
+                .any(|m| m.mapname.to_uppercase() == format!("MAP{:02}", next_num))
+            {
+                next_num += 1;
+            }
+
+            let new_map_name = format!("MAP{:02}", next_num);
             file.data.maps.push(MapEntry {
-                mapname: format!("MAP{:02}", next_num),
+                mapname: new_map_name.clone(),
                 fields: vec![UmapField::LevelName("New Level".to_string())],
             });
+
             let new_idx = file.data.maps.len() - 1;
             selection.clear();
             selection.insert(vec![new_idx]);
 
             if x != 0.0 || y != 0.0 {
-                file.set_node_pos(&format!("MAP{:02}", next_num), x, y);
+                file.set_node_pos(&new_map_name, x, y);
             }
         }
         UmapAction::DeleteMap(idx) => {
@@ -89,9 +100,13 @@ pub fn execute_umapinfo_action(
             file.set_node_pos(&name, x, y);
         }
         UmapAction::ResetLayout => {
-            if let Some(obj) = file.metadata.as_object_mut() {
-                obj.remove("node_positions");
+            if !file.metadata.is_object() {
+                file.metadata = serde_json::json!({});
             }
+            if let Some(obj) = file.metadata.as_object_mut() {
+                obj.insert("node_positions".to_string(), serde_json::json!({}));
+            }
+
             let new_positions =
                 crate::models::umap_graph::UmapGraph::generate_topological_layout(file);
             for (map_id, (x, y)) in new_positions {
