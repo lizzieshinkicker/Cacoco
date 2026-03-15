@@ -2,6 +2,7 @@ pub mod finale;
 pub mod interlevel;
 pub mod sbardef;
 pub mod skydefs;
+pub mod umap_graph;
 pub mod umapinfo;
 
 use serde::{Deserialize, Serialize};

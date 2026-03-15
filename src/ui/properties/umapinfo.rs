@@ -1,6 +1,7 @@
-use super::editor::{LayerContext, LumpUI, PropertyContext};
+use super::editor::{LayerContext, LumpUI, PropertyContext, ViewportContext};
 use crate::assets::AssetStore;
 use crate::document::DocumentAction;
+use crate::document::actions::UmapAction;
 use crate::models::umapinfo::{MapEntry, UmapField, UmapInfoFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
@@ -463,9 +464,7 @@ impl LumpUI for UmapInfoFile {
         let mut actions = Vec::new();
         if shared::heading_action_button(ui, "Maps", Some("Add Map"), false).clicked() {
             actions.push(DocumentAction::UndoSnapshot);
-            actions.push(DocumentAction::Umap(
-                crate::document::actions::UmapAction::AddMap,
-            ));
+            actions.push(DocumentAction::Umap(UmapAction::AddMap { x: 0.0, y: 0.0 }));
         }
 
         egui::ScrollArea::vertical()
@@ -485,20 +484,25 @@ impl LumpUI for UmapInfoFile {
         (actions, false)
     }
 
-    fn header_info(&self, selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32) {
-        if let Some(path) = selection.iter().next() {
-            if let Some(map) = self.data.maps.get(path[0]) {
-                return (
-                    format!("Map: {}", map.mapname),
-                    "Configure UMAPINFO fields for this level.".into(),
-                    egui::Color32::from_rgb(60, 40, 40),
-                );
+    fn header_info(&self, _selection: &HashSet<Vec<usize>>) -> (String, String, egui::Color32) {
+        (
+            "UMAPINFO".to_string(),
+            "Defines the structure, names of maps, and flow of progression through the WAD."
+                .to_string(),
+            egui::Color32::from_rgb(60, 40, 40),
+        )
+    }
+
+    fn render_viewport(&self, ui: &mut egui::Ui, ctx: &mut ViewportContext) -> Vec<DocumentAction> {
+        if self.metadata.get("node_positions").is_none() && !self.data.maps.is_empty() {
+            let bake_id = ui.make_persistent_id("umap_initial_bake_done");
+            let already_baked: bool = ui.ctx().data(|d| d.get_temp(bake_id).unwrap_or(false));
+
+            if !already_baked {
+                ui.ctx().data_mut(|d| d.insert_temp(bake_id, true));
+                return vec![DocumentAction::Umap(UmapAction::ResetLayout)];
             }
         }
-        (
-            "UMAPINFO".into(),
-            "Select a map entry to edit.".into(),
-            egui::Color32::TRANSPARENT,
-        )
+        crate::render::umapinfo::draw_umapinfo_viewport(ui, self, ctx)
     }
 }

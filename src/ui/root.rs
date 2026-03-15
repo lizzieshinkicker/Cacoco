@@ -50,6 +50,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             }
             app.preview_state.interaction.grabbed_path = None;
             app.preview_state.interaction.hovered_path = None;
+
+            app.preview_state.sim.engine.pan_offset = egui::Vec2::ZERO;
+            app.preview_state.sim.engine.auto_zoom = true;
+            app.preview_state.sim.engine.zoom_level = 1;
         }
     }
 

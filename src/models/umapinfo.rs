@@ -138,6 +138,25 @@ impl UmapInfoFile {
         }
     }
 
+    /// Updates the Cacoco-only visual position for a map node.
+    pub fn set_node_pos(&mut self, mapname: &str, x: f32, y: f32) {
+        if !self.metadata.is_object() {
+            self.metadata = serde_json::json!({});
+        }
+        let obj = self.metadata.as_object_mut().unwrap();
+
+        if !obj.contains_key("node_positions") {
+            obj.insert("node_positions".to_string(), serde_json::json!({}));
+        }
+
+        if let Some(positions) = obj
+            .get_mut("node_positions")
+            .and_then(|v| v.as_object_mut())
+        {
+            positions.insert(mapname.to_string(), serde_json::json!([x, y]));
+        }
+    }
+
     /// Serializes the modular data model into the standard UMAPINFO plaintext format.
     pub fn to_umapinfo_text(&self) -> String {
         let mut out = String::new();

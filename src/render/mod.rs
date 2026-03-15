@@ -18,6 +18,7 @@ pub mod patch;
 pub mod projection;
 pub(crate) mod sky;
 pub mod text;
+pub mod umapinfo;
 
 /// Defines whether an element is being drawn in the standard background pass
 /// or the specialized foreground pass (used for selection highlighting).
