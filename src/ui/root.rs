@@ -76,6 +76,7 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
                 &mut app.config,
                 &mut app.assets,
                 &mut app.settings_open,
+                &mut app.resources_open,
             );
             handle_menu_action(app, menu_action, ctx);
 
@@ -199,6 +200,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
             &mut app.config,
             &mut app.assets,
         );
+    }
+
+    if app.resources_open {
+        ui::draw_resource_manager(ctx, app);
     }
 
     if let Some(doc) = &mut app.doc {

@@ -438,6 +438,7 @@ pub fn launch_game(
     target: ExportTarget,
     lumps: &[crate::models::ProjectData],
     passthrough: &[wad::RawLump],
+    resource_paths: &[String],
 ) {
     let mut temp_path = env::temp_dir();
 
@@ -478,17 +479,78 @@ pub fn launch_game(
         args = words;
     }
 
-    let _ = Command::new(&program)
-        .args(args)
-        .arg("-iwad")
-        .arg(iwad)
-        .arg("-file")
-        .arg(&temp_path_str)
-        .arg("-skill")
-        .arg("4")
-        .arg("-warp")
-        .arg("1")
-        .spawn();
+    let mut cmd = Command::new(&program);
+    cmd.args(args);
+    cmd.arg("-iwad").arg(iwad);
+
+    if !resource_paths.is_empty() {
+        cmd.arg("-file");
+        for res in resource_paths {
+            cmd.arg(res);
+        }
+        cmd.arg(&temp_path_str);
+    } else {
+        cmd.arg("-file").arg(&temp_path_str);
+    }
+
+    cmd.arg("-skill").arg("4").arg("-warp").arg("1");
+
+    let _ = cmd.spawn();
+}
+
+/// Loads an external resource file (WAD or PK3) directly into the AssetStore for viewing.
+/// This will NOT pollute the `raw_files` buffer, ensuring it stays out of the final export.
+pub fn load_resource_file(ctx: &egui::Context, path_str: &str, assets: &mut AssetStore) -> bool {
+    let path = Path::new(path_str);
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if ext == "wad" {
+        load_wad_from_path(ctx, path_str, assets)
+    } else if ext == "pk3" || ext == "zip" {
+        load_resource_pk3(ctx, path, assets)
+    } else {
+        false
+    }
+}
+
+/// Internal helper to load graphics from a PK3/ZIP without polluting project files.
+fn load_resource_pk3(ctx: &egui::Context, path: &Path, assets: &mut AssetStore) -> bool {
+    let file = match fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+
+    for i in 0..archive.len() {
+        let mut f = match archive.by_index(i) {
+            Ok(file) => file,
+            Err(_) => continue,
+        };
+        let name = f.name().to_string();
+        if name.ends_with('/') {
+            continue;
+        }
+
+        let ext = Path::new(&name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if ext == "png" || ext == "jpg" || ext == "jpeg" {
+            let mut buffer = Vec::new();
+            if f.read_to_end(&mut buffer).is_ok() {
+                assets.load_reference_image(ctx, &name, &buffer);
+            }
+        }
+    }
+    true
 }
 
 pub fn import_images_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> usize {
