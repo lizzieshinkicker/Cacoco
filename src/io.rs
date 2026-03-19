@@ -405,7 +405,7 @@ pub fn load_iwad_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> Option<
         .pick_file()
     {
         if let Ok(mut file) = fs::File::open(&path) {
-            if wad::load_wad_into_store(ctx, &mut file, assets).is_ok() {
+            if wad::load_wad_into_store(ctx, &mut file, assets, true).is_ok() {
                 return path.to_str().map(|s| s.to_string());
             }
         }
@@ -413,18 +413,16 @@ pub fn load_iwad_dialog(ctx: &egui::Context, assets: &mut AssetStore) -> Option<
     None
 }
 
-pub fn load_wad_from_path(ctx: &egui::Context, path_str: &str, assets: &mut AssetStore) -> bool {
-    let path = Path::new(path_str);
-    if let Ok(mut file) = fs::File::open(path) {
-        if let Err(e) = wad::load_wad_into_store(ctx, &mut file, assets) {
-            eprintln!("Failed to auto-load WAD at {:?}: {}", path, e);
-            false
-        } else {
-            true
-        }
-    } else {
-        false
+pub fn load_wad_from_path(
+    ctx: &egui::Context,
+    path_str: &str,
+    assets: &mut AssetStore,
+    strict: bool,
+) -> bool {
+    if let Ok(mut file) = fs::File::open(path_str) {
+        return wad::load_wad_into_store(ctx, &mut file, assets, strict).is_ok();
     }
+    false
 }
 
 /// Launches the game with the current project data.
@@ -509,7 +507,7 @@ pub fn load_resource_file(ctx: &egui::Context, path_str: &str, assets: &mut Asse
         .to_lowercase();
 
     if ext == "wad" {
-        load_wad_from_path(ctx, path_str, assets)
+        load_wad_from_path(ctx, path_str, assets, false)
     } else if ext == "pk3" || ext == "zip" {
         load_resource_pk3(ctx, path, assets)
     } else {

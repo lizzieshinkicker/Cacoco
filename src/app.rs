@@ -172,7 +172,7 @@ impl CacocoApp {
         let mut new_assets = AssetStore::default();
 
         if let Some(path) = &self.config.base_wad_path {
-            io::load_wad_from_path(ctx, path, &mut new_assets);
+            io::load_wad_from_path(ctx, path, &mut new_assets, true);
         }
 
         for res_path in &self.config.resource_paths {
@@ -255,7 +255,7 @@ impl CacocoApp {
 
         let mut new_assets = AssetStore::default();
         if let Some(path) = &self.config.base_wad_path {
-            io::load_wad_from_path(ctx, path, &mut new_assets);
+            io::load_wad_from_path(ctx, path, &mut new_assets, true);
         }
         for res_path in &self.config.resource_paths {
             io::load_resource_file(ctx, res_path, &mut new_assets);

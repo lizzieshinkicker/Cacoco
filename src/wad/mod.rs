@@ -33,7 +33,7 @@ pub fn load_wad_project(
     let mut file = fs::File::open(path)?;
     let mut assets = AssetStore::default();
 
-    load_wad_into_store(ctx, &mut file, &mut assets)?;
+    load_wad_into_store(ctx, &mut file, &mut assets, false)?;
 
     file.seek(std::io::SeekFrom::Start(0))?;
     let mut header = [0u8; 12];
@@ -95,9 +95,10 @@ pub fn load_wad_project(
 /// If the WAD is an IWAD, this function also captures PNAMES and TEXTUREx
 /// tables to be used as a template for later exports.
 pub fn load_wad_into_store(
-    _ctx: &eframe::egui::Context,
+    ctx: &eframe::egui::Context,
     file: &mut fs::File,
     assets: &mut AssetStore,
+    strict: bool,
 ) -> anyhow::Result<()> {
     let mut header = [0u8; 12];
     file.read_exact(&mut header).ok();
@@ -173,7 +174,9 @@ pub fn load_wad_into_store(
             continue;
         }
 
-        if is_graphic_lump(&name) {
+        let should_try_load = !strict || is_graphic_lump(&name);
+
+        if should_try_load {
             let mut lump_data = vec![0u8; size];
             file.seek(std::io::SeekFrom::Start(file_pos))?;
             file.read_exact(&mut lump_data)?;
@@ -181,13 +184,15 @@ pub fn load_wad_into_store(
             if let Some((width, height, left, top, pixels)) =
                 patch::decode_doom_patch(&lump_data, &assets.palette)
             {
-                assets.load_rgba_with_offset(_ctx, &name, width, height, left, top, &pixels);
+                assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
             } else if size == 4096 {
                 if let Some((w, h, pixels)) = patch::decode_doom_flat(&lump_data, &assets.palette) {
-                    assets.load_rgba(_ctx, &name, w, h, &pixels);
+                    assets.load_rgba(ctx, &name, w, h, &pixels);
                 }
             } else {
-                assets.load_reference_image(_ctx, &name, &lump_data);
+                if !strict || lump_data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+                    assets.load_reference_image(ctx, &name, &lump_data);
+                }
             }
         }
     }
