@@ -397,6 +397,13 @@ impl CacocoApp {
 
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if let Some(doc) = &self.doc {
+            if let Some(iwad_path) = &self.config.base_wad_path {
+                self.assets
+                    .scan_and_load_missing_iwad_assets(ctx, &doc.lumps, iwad_path);
+            }
+        }
+
         let time = ctx.input(|i| i.time);
 
         if let Some(doc) = &mut self.doc {
