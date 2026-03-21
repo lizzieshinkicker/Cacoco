@@ -50,6 +50,10 @@ pub struct AssetStore {
     pub base_texture2: Vec<u8>,
     /// Original IWAD palette data.
     pub palette: crate::render::palette::DoomPalette,
+    /// Cache of asset names that were deep-searched in the IWAD but not found.
+    pub failed_searches: std::collections::HashSet<String>,
+    /// Hash of the project data during the last deep scan to prevent 60FPS overhead.
+    pub last_scan_hash: u64,
 }
 
 impl Default for AssetStore {
@@ -63,6 +67,8 @@ impl Default for AssetStore {
             base_texture1: Vec::new(),
             base_texture2: Vec::new(),
             palette: crate::render::palette::DoomPalette::default(),
+            failed_searches: std::collections::HashSet::new(),
+            last_scan_hash: 0,
         }
     }
 }
@@ -212,6 +218,59 @@ impl AssetStore {
             "_BADGE_RADSUIT",
             include_bytes!("../assets/badges/Radsuit.png"),
         );
+    }
+
+    /// Scans the project data for any string that looks like a Doom patch name.
+    /// If it's missing from the store, it searches the IWAD and caches it.
+    /// Uses a hash check to ensure it only runs when the project data is modified.
+    pub fn scan_and_load_missing_iwad_assets(
+        &mut self,
+        ctx: &egui::Context,
+        lumps: &[crate::models::ProjectData],
+        iwad_path: &str,
+    ) {
+        let json_str = match serde_json::to_string(lumps) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        json_str.hash(&mut hasher);
+        let current_hash = hasher.finish();
+
+        if current_hash == self.last_scan_hash {
+            return;
+        }
+        self.last_scan_hash = current_hash;
+
+        let mut missing_candidates = Vec::new();
+        let words: Vec<&str> = json_str
+            .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .collect();
+
+        for word in words {
+            if word.len() > 2 && word.len() <= 8 && word.chars().any(|c| c.is_ascii_alphabetic()) {
+                let word_upper = word.to_uppercase();
+                if !self.failed_searches.contains(&word_upper) {
+                    let id = AssetId::new(&word_upper);
+                    if !self.textures.contains_key(&id) {
+                        missing_candidates.push(word_upper);
+                    }
+                }
+            }
+        }
+
+        if !missing_candidates.is_empty() {
+            missing_candidates.sort();
+            missing_candidates.dedup();
+
+            let found = crate::wad::deep_search_iwad(ctx, iwad_path, &missing_candidates, self);
+            for req in missing_candidates {
+                if !found.contains(&req) {
+                    self.failed_searches.insert(req);
+                }
+            }
+        }
     }
 
     /// Resolves a single character into a pre-hashed AssetId.

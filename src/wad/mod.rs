@@ -33,7 +33,7 @@ pub fn load_wad_project(
     let mut file = fs::File::open(path)?;
     let mut assets = AssetStore::default();
 
-    load_wad_into_store(ctx, &mut file, &mut assets)?;
+    load_wad_into_store(ctx, &mut file, &mut assets, false)?;
 
     file.seek(std::io::SeekFrom::Start(0))?;
     let mut header = [0u8; 12];
@@ -95,9 +95,10 @@ pub fn load_wad_project(
 /// If the WAD is an IWAD, this function also captures PNAMES and TEXTUREx
 /// tables to be used as a template for later exports.
 pub fn load_wad_into_store(
-    _ctx: &eframe::egui::Context,
+    ctx: &eframe::egui::Context,
     file: &mut fs::File,
     assets: &mut AssetStore,
+    strict: bool,
 ) -> anyhow::Result<()> {
     let mut header = [0u8; 12];
     file.read_exact(&mut header).ok();
@@ -173,7 +174,9 @@ pub fn load_wad_into_store(
             continue;
         }
 
-        if is_graphic_lump(&name) {
+        let should_try_load = !strict || is_graphic_lump(&name);
+
+        if should_try_load {
             let mut lump_data = vec![0u8; size];
             file.seek(std::io::SeekFrom::Start(file_pos))?;
             file.read_exact(&mut lump_data)?;
@@ -181,17 +184,91 @@ pub fn load_wad_into_store(
             if let Some((width, height, left, top, pixels)) =
                 patch::decode_doom_patch(&lump_data, &assets.palette)
             {
-                assets.load_rgba_with_offset(_ctx, &name, width, height, left, top, &pixels);
+                if width <= 2048 && height <= 2048 {
+                    assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
+                }
             } else if size == 4096 {
                 if let Some((w, h, pixels)) = patch::decode_doom_flat(&lump_data, &assets.palette) {
-                    assets.load_rgba(_ctx, &name, w, h, &pixels);
+                    assets.load_rgba(ctx, &name, w, h, &pixels);
                 }
             } else {
-                assets.load_reference_image(_ctx, &name, &lump_data);
+                if !strict || lump_data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+                    assets.load_reference_image(ctx, &name, &lump_data);
+                }
             }
         }
     }
     Ok(())
+}
+
+/// Performs a highly targeted search of the IWAD for specific lump names requested by the editor.
+pub fn deep_search_iwad(
+    ctx: &eframe::egui::Context,
+    iwad_path: &str,
+    targets: &[String],
+    assets: &mut AssetStore,
+) -> std::collections::HashSet<String> {
+    let mut found = std::collections::HashSet::new();
+    if targets.is_empty() {
+        return found;
+    }
+
+    let mut file = match fs::File::open(iwad_path) {
+        Ok(f) => f,
+        Err(_) => return found,
+    };
+
+    let mut header = [0u8; 12];
+    if file.read_exact(&mut header).is_err() {
+        return found;
+    }
+
+    let num_lumps = i32::from_le_bytes(header[4..8].try_into().unwrap_or([0; 4])) as usize;
+    let dir_offset = i32::from_le_bytes(header[8..12].try_into().unwrap_or([0; 4])) as u64;
+
+    if file.seek(std::io::SeekFrom::Start(dir_offset)).is_err() {
+        return found;
+    }
+    let mut dir_buffer = vec![0u8; num_lumps * 16];
+    if file.read_exact(&mut dir_buffer).is_err() {
+        return found;
+    }
+
+    let target_set: std::collections::HashSet<&str> = targets.iter().map(|s| s.as_str()).collect();
+
+    for i in 0..num_lumps {
+        let entry = &dir_buffer[i * 16..(i + 1) * 16];
+        let name = parse_lump_name(&entry[8..16]);
+        let size = i32::from_le_bytes(entry[4..8].try_into().unwrap_or([0; 4])) as usize;
+        let file_pos = i32::from_le_bytes(entry[0..4].try_into().unwrap_or([0; 4])) as u64;
+
+        if size > 0 && target_set.contains(name.as_str()) {
+            let mut lump_data = vec![0u8; size];
+            if file.seek(std::io::SeekFrom::Start(file_pos)).is_ok()
+                && file.read_exact(&mut lump_data).is_ok()
+            {
+                if let Some((width, height, left, top, pixels)) =
+                    patch::decode_doom_patch(&lump_data, &assets.palette)
+                {
+                    if width <= 2048 && height <= 2048 {
+                        assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
+                        found.insert(name.clone());
+                    }
+                } else if size == 4096 {
+                    if let Some((w, h, pixels)) =
+                        patch::decode_doom_flat(&lump_data, &assets.palette)
+                    {
+                        assets.load_rgba(ctx, &name, w, h, &pixels);
+                        found.insert(name.clone());
+                    }
+                } else {
+                    assets.load_reference_image(ctx, &name, &lump_data);
+                    found.insert(name.clone());
+                }
+            }
+        }
+    }
+    found
 }
 
 /// Writes a collection of ID24 project lumps and associated assets into a new PWAD.

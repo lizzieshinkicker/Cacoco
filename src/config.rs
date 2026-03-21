@@ -69,6 +69,8 @@ pub struct AppConfig {
     pub source_ports: Vec<SourcePortConfig>,
     #[serde(default)]
     pub recent_files: VecDeque<String>,
+    #[serde(default)]
+    pub resource_paths: Vec<String>,
 }
 
 /// Custom deserializer to migrate Vec<String> to Vec<SourcePortConfig>.

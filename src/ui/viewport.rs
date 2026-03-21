@@ -595,6 +595,13 @@ pub(crate) fn render_statusbar_workspace(
             .image(tex.id(), draw_rect, uv_rect, egui::Color32::WHITE);
     }
 
+    let mut world_clip_rect = proj.screen_rect;
+    world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
+
+    ui.scope_builder(egui::UiBuilder::new().max_rect(world_clip_rect), |ui| {
+        render_player_weapon(ui, state, assets, proj, y_offset_from_top);
+    });
+
     if !bar.fullscreen_render && bar_height > 0.0 {
         let flat_key = bar
             .fill_flat
@@ -632,13 +639,6 @@ pub(crate) fn render_statusbar_workspace(
             }
         }
     }
-
-    let mut world_clip_rect = proj.screen_rect;
-    world_clip_rect.max.y -= (200.0 - h_view) * proj.final_scale_y;
-
-    ui.scope_builder(egui::UiBuilder::new().max_rect(world_clip_rect), |ui| {
-        render_player_weapon(ui, state, assets, proj, y_offset_from_top);
-    });
 }
 
 fn render_player_weapon(
@@ -648,53 +648,56 @@ fn render_player_weapon(
     proj: &ViewportProjection,
     v_shift: f32,
 ) {
-    let (weapon_lump_name, constant_offset) = match state.viewer.display_weapon_slot {
-        1 => (
-            Some(
-                if state.sim.inventory.has_chainsaw
-                    && state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla
-                {
-                    "SAWGC0"
-                } else {
-                    "PUNGA0"
-                },
-            ),
-            0.0,
+    let weapon_lump_name = match state.viewer.display_weapon_slot {
+        1 => Some(
+            if state.sim.inventory.has_chainsaw
+                && state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla
+            {
+                "SAWGC0"
+            } else {
+                "PUNGA0"
+            },
         ),
-        2 => (Some("PISGA0"), 0.0),
-        3 => (
-            Some(
-                if state.viewer.display_super_shotgun
-                    && state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla
-                {
-                    "SHT2A0"
-                } else {
-                    "SHTGA0"
-                },
-            ),
-            0.0,
+        2 => Some("PISGA0"),
+        3 => Some(
+            if state.viewer.display_super_shotgun
+                && state.sim.engine.slot_mapping == crate::state::SlotMapping::Vanilla
+            {
+                "SHT2A0"
+            } else {
+                "SHTGA0"
+            },
         ),
-        4 => (Some("CHGGA0"), 32.0),
-        5 => (Some("MISGA0"), 32.0),
-        6 => (Some("PLSGA0"), 0.0),
-        7 => (Some("BFGGA0"), 32.0),
-        8 => (Some("SAWGC0"), 0.0),
-        9 => (Some("SHT2A0"), 0.0),
-        _ => (None, 0.0),
+        4 => Some("CHGGA0"),
+        5 => Some("MISGA0"),
+        6 => Some("PLSGA0"),
+        7 => Some("BFGGA0"),
+        8 => Some("SAWGC0"),
+        9 => Some("SHT2A0"),
+        _ => None,
     };
 
     if let Some(lump) = weapon_lump_name {
         let id = AssetId::new(lump);
         if let Some(tex) = assets.textures.get(&id) {
             let tex_size = tex.size_vec2();
+
+            let (left_off, top_off) = assets
+                .offsets
+                .get(&id)
+                .map(|(l, t)| (*l as f32, *t as f32))
+                .unwrap_or((-(160.0 - tex_size.x / 2.0), -(200.0 - tex_size.y - 32.0)));
+
+            let virtual_x = -left_off + proj.origin_x;
+            let virtual_y = 32.0 - top_off + state.viewer.weapon_offset_y + v_shift;
+
+            let draw_x = proj.screen_rect.min.x + (virtual_x * proj.final_scale_x);
+            let draw_y = proj.screen_rect.min.y + (virtual_y * proj.final_scale_y);
+
             let scaled_size = egui::vec2(
                 tex_size.x * proj.final_scale_x,
                 tex_size.y * proj.final_scale_y,
             );
-            let draw_x = proj.screen_rect.center().x - (scaled_size.x / 2.0);
-            let total_offset_y =
-                (state.viewer.weapon_offset_y + constant_offset + v_shift) * proj.final_scale_y;
-            let draw_y = (proj.screen_rect.max.y - scaled_size.y) + total_offset_y;
 
             ui.painter().image(
                 tex.id(),

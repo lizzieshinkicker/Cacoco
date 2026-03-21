@@ -93,6 +93,8 @@ pub struct CacocoApp {
     pub last_selection: HashSet<Vec<usize>>,
     /// Controls the visibility of the settings modal.
     pub settings_open: bool,
+    /// Controls the visibility of the resource manager modal.
+    pub resources_open: bool,
     /// State for the font auto-detection wizard.
     pub font_wizard: Option<FontWizardState>,
     /// State for any active confirmation dialog.
@@ -119,6 +121,7 @@ impl Default for CacocoApp {
             current_statusbar_idx: 0,
             last_selection: HashSet::new(),
             settings_open: false,
+            resources_open: false,
             font_wizard: None,
             confirmation_modal: None,
             hotkeys: crate::hotkeys::HotkeyRegistry::default(),
@@ -135,7 +138,6 @@ impl CacocoApp {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
 
         let mut app = Self::default();
-        app.load_system_assets(&cc.egui_ctx);
 
         if app.config.base_wad_path.is_none() {
             if let Some(auto_path) = crate::discovery::find_iwad() {
@@ -146,20 +148,56 @@ impl CacocoApp {
             }
         }
 
-        if let Some(path) = &app.config.base_wad_path {
-            app.iwad_verified = io::load_wad_from_path(&cc.egui_ctx, path, &mut app.assets);
-        }
-
         if let Some(file_path) = open_file_path {
             if let Some(loaded) = io::load_project_from_path(&cc.egui_ctx, &file_path) {
                 app.load_project(&cc.egui_ctx, loaded, &file_path);
                 println!("Loaded project from command line: {}", file_path);
             } else {
                 eprintln!("Failed to load project from command line: {}", file_path);
+                app.reload_resources(&cc.egui_ctx);
             }
+        } else {
+            app.reload_resources(&cc.egui_ctx);
+        }
+
+        if app.assets.palette.colors[0] != egui::Color32::TRANSPARENT {
+            app.iwad_verified = true;
         }
 
         app
+    }
+
+    /// Unified reloader that guarantees exact asset layering: IWAD -> Global -> Project -> Custom
+    pub fn reload_resources(&mut self, ctx: &egui::Context) {
+        let mut new_assets = AssetStore::default();
+
+        if let Some(path) = &self.config.base_wad_path {
+            io::load_wad_from_path(ctx, path, &mut new_assets, true);
+        }
+
+        for res_path in &self.config.resource_paths {
+            io::load_resource_file(ctx, res_path, &mut new_assets);
+        }
+
+        for (id, bytes) in &self.assets.raw_files {
+            let name = self
+                .assets
+                .names
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            new_assets.load_image(ctx, &name, bytes);
+            if let Some(off) = self.assets.offsets.get(id) {
+                new_assets.offsets.insert(*id, *off);
+            }
+        }
+
+        new_assets.base_pnames = self.assets.base_pnames.clone();
+        new_assets.base_texture1 = self.assets.base_texture1.clone();
+        new_assets.base_texture2 = self.assets.base_texture2.clone();
+
+        self.assets = new_assets;
+        self.load_system_assets(ctx);
     }
 
     /// Loads built-in branding, badges, and template assets into the store.
@@ -215,13 +253,31 @@ impl CacocoApp {
             dirty: false,
         });
 
-        self.assets = loaded.assets;
-        self.preview_state = PreviewState::default();
-
-        self.load_system_assets(ctx);
+        let mut new_assets = AssetStore::default();
         if let Some(path) = &self.config.base_wad_path {
-            io::load_wad_from_path(ctx, path, &mut self.assets);
+            io::load_wad_from_path(ctx, path, &mut new_assets, true);
         }
+        for res_path in &self.config.resource_paths {
+            io::load_resource_file(ctx, res_path, &mut new_assets);
+        }
+
+        new_assets.textures.extend(loaded.assets.textures);
+        new_assets.raw_files.extend(loaded.assets.raw_files);
+        new_assets.offsets.extend(loaded.assets.offsets);
+        new_assets.names.extend(loaded.assets.names);
+        if !loaded.assets.base_pnames.is_empty() {
+            new_assets.base_pnames = loaded.assets.base_pnames;
+        }
+        if !loaded.assets.base_texture1.is_empty() {
+            new_assets.base_texture1 = loaded.assets.base_texture1;
+        }
+        if !loaded.assets.base_texture2.is_empty() {
+            new_assets.base_texture2 = loaded.assets.base_texture2;
+        }
+
+        self.assets = new_assets;
+        self.load_system_assets(ctx);
+        self.preview_state = PreviewState::default();
 
         self.last_selection.clear();
         self.current_statusbar_idx = 0;
@@ -237,13 +293,11 @@ impl CacocoApp {
     pub fn new_project(&mut self, ctx: &egui::Context, data: crate::models::ProjectData) {
         self.active_mode = ProjectMode::from_data(&data);
         self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
-        self.assets = AssetStore::default();
-        self.preview_state = PreviewState::default();
 
-        self.load_system_assets(ctx);
-        if let Some(path) = &self.config.base_wad_path {
-            io::load_wad_from_path(ctx, path, &mut self.assets);
-        }
+        self.assets = AssetStore::default();
+        self.reload_resources(ctx);
+
+        self.preview_state = PreviewState::default();
 
         self.last_selection.clear();
         self.current_statusbar_idx = 0;
@@ -287,11 +341,8 @@ impl CacocoApp {
                 } else {
                     self.doc = Some(ProjectDocument::new(data, Vec::new(), None));
                     self.assets = AssetStore::default();
+                    self.reload_resources(ctx);
                     self.preview_state = PreviewState::default();
-                    self.load_system_assets(ctx);
-                    if let Some(path) = &self.config.base_wad_path {
-                        io::load_wad_from_path(ctx, path, &mut self.assets);
-                    }
                 }
 
                 self.last_selection.clear();
@@ -346,6 +397,13 @@ impl CacocoApp {
 
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if let Some(doc) = &self.doc {
+            if let Some(iwad_path) = &self.config.base_wad_path {
+                self.assets
+                    .scan_and_load_missing_iwad_assets(ctx, &doc.lumps, iwad_path);
+            }
+        }
+
         let time = ctx.input(|i| i.time);
 
         if let Some(doc) = &mut self.doc {

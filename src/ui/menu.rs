@@ -29,6 +29,7 @@ pub fn draw_menu_bar(
     config: &mut AppConfig,
     assets: &mut AssetStore,
     settings_open: &mut bool,
+    resources_open: &mut bool,
 ) -> MenuAction {
     let mut action = MenuAction::None;
 
@@ -171,6 +172,10 @@ pub fn draw_menu_bar(
             }
 
             ui.separator();
+            if ContextMenu::button(ui, "Resources...", true) {
+                *resources_open = true;
+                ContextMenu::close(ui);
+            }
             if ContextMenu::button(ui, "Settings...", true) {
                 *settings_open = true;
                 ContextMenu::close(ui);
@@ -200,6 +205,9 @@ pub fn draw_menu_bar(
                     if ContextMenu::button(ui, &format!("Launch in {}", port.name), has_file) {
                         if let (Some(d), Some(iwad)) = (doc.as_ref(), config.base_wad_path.as_ref())
                         {
+                            let resources: Vec<String> =
+                                config.resource_paths.iter().cloned().collect();
+
                             io::launch_game(
                                 assets,
                                 &port.command,
@@ -207,6 +215,7 @@ pub fn draw_menu_bar(
                                 d.lumps[0].target(),
                                 &d.lumps,
                                 &d.passthrough_lumps,
+                                &resources,
                             );
                         }
                         ContextMenu::close(ui);
@@ -386,7 +395,7 @@ pub fn draw_settings_window(
                                 });
                             });
 
-                            if draw_delete_card(ui, delete_w) {
+                            if draw_delete_card(ui, delete_w, 70.0) {
                                 to_remove = Some(idx);
                             }
                         });
@@ -488,8 +497,7 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
 }
 
 /// Renders a specialized delete button for use in list views.
-pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
-    let height = 70.0;
+pub fn draw_delete_card(ui: &mut egui::Ui, width: f32, height: f32) -> bool {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
 
     let (bg_color, stroke_color) = if response.hovered() {
