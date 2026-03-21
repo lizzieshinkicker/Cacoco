@@ -60,9 +60,10 @@ fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetSt
 
         PatchEmpty | PatchNotEmpty => {
             let patch_name = condition.param_string.as_deref().unwrap_or("");
-
             let id = AssetId::new(patch_name);
-            let exists = assets.textures.contains_key(&id);
+
+            let is_sentinel = assets.offsets.get(&id) == Some(&(32767, 32767));
+            let exists = assets.textures.contains_key(&id) && !is_sentinel;
 
             if condition.condition == PatchEmpty {
                 !exists

@@ -17,7 +17,12 @@ pub fn decode_doom_patch(
         return None;
     }
 
+    if width == 0 || height == 0 {
+        return Some((0, 0, 32767, 32767, vec![]));
+    }
+
     let mut pixels = vec![0u8; (width * height * 4) as usize];
+    let mut pixels_written = 0;
 
     let col_offsets_start = 8;
     let col_offsets_end = 8 + (width as usize * 4);
@@ -58,12 +63,18 @@ pub fn decode_doom_patch(
                         pixels[pixel_idx + 1] = color.g();
                         pixels[pixel_idx + 2] = color.b();
                         pixels[pixel_idx + 3] = 255;
+                        pixels_written += 1;
                     }
                 }
             }
             cursor += 1;
         }
     }
+
+    if pixels_written == 0 {
+        return Some((0, 0, 32767, 32767, vec![]));
+    }
+
     Some((width, height, left_offset, top_offset, pixels))
 }
 

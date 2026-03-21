@@ -60,8 +60,9 @@ pub fn draw_resource_manager(ctx: &egui::Context, app: &mut CacocoApp) {
 
                     if app.config.resource_paths.is_empty() {
                         ui.vertical_centered(|ui| {
-                            ui.add_space(20.0);
+                            ui.add_space(5.0);
                             ui.label(egui::RichText::new("No resources loaded.").weak().italics());
+                            ui.add_space(1.0);
                         });
                     } else {
                         let total_w = ui.available_width();
@@ -100,6 +101,7 @@ pub fn draw_resource_manager(ctx: &egui::Context, app: &mut CacocoApp) {
                                 }
                             });
                         }
+                        ui.add_space(-2.0);
                     }
                 });
 

@@ -22,6 +22,10 @@ pub(super) fn draw_simple_graphic_patch(
     alpha: f32,
     crop: &Option<CropDef>,
 ) {
+    if ctx.assets.offsets.get(&patch_id) == Some(&(32767, 32767)) {
+        return;
+    }
+
     if let Some(tex) = ctx.assets.textures.get(&patch_id) {
         let mut size = tex.size_vec2();
         let (base_scale_x, base_scale_y) = ctx.get_native_scale_factor();
