@@ -293,11 +293,14 @@ pub const GROUPS: &[ConditionGroup] = &[
         ],
     },
     ConditionGroup {
-        name: "Widgets",
+        name: "Components",
         icon: Some("M_OPTION"),
         style: GroupStyle::Standard,
         default_param: 0,
-        variants: &[v!("Enabled", WidgetEnabled), v!("Disabled", WidgetDisabled)],
+        variants: &[
+            v!("Enabled", ComponentEnabled),
+            v!("Disabled", ComponentDisabled),
+        ],
     },
 ];
 
@@ -329,7 +332,7 @@ pub fn get_param_usage(condition: ConditionType) -> ParamUsage {
         PowerupTimeGe | PowerupTimeLt | PowerupTimePercentGe | PowerupTimePercentLt => {
             ParamUsage::Both
         }
-        PatchEmpty | PatchNotEmpty | WidgetEnabled | WidgetDisabled => ParamUsage::String,
+        PatchEmpty | PatchNotEmpty | ComponentEnabled | ComponentDisabled => ParamUsage::String,
         _ => ParamUsage::Param1,
     }
 }
@@ -380,8 +383,8 @@ pub fn resolve_condition_icon(
     }
 
     let specific_icon = match cond.condition {
-        WidgetEnabled => Some("M_SKULL1"),
-        WidgetDisabled => Some("M_SKULL2"),
+        ComponentEnabled => Some("M_SKULL1"),
+        ComponentDisabled => Some("M_SKULL2"),
         WeaponOwned | WeaponNotOwned | WeaponSelected | WeaponNotSelected | WeaponHasAmmo => {
             find_icon(WEAPONS, cond.param)
         }

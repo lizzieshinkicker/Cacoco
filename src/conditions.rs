@@ -53,7 +53,7 @@ fn check_single(condition: &ConditionDef, state: &PreviewState, assets: &AssetSt
         | AmmoPercentLt => check_vitals_condition(condition, state),
 
         GameVersionGe | GameVersionLt | SessionTypeEq | SessionTypeNeq | GameModeEq
-        | GameModeNeq | HudModeEq | AutomapModeEq | WidgetEnabled | WidgetDisabled
+        | GameModeNeq | HudModeEq | AutomapModeEq | ComponentEnabled | ComponentDisabled
         | WidescreenModeEq => check_game_state_condition(condition, state),
 
         EpisodeEq | LevelGe | LevelLt => check_map_condition(condition, state),
@@ -309,18 +309,18 @@ fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) ->
             }
             true
         }
-        WidgetEnabled => {
+        ComponentEnabled => {
             if let Some(name) = &condition.param_string {
                 !engine.disabled_components.contains(name)
             } else {
-                !engine.disabled_widgets.contains(&param)
+                !engine.disabled_components.contains(&param.to_string())
             }
         }
-        WidgetDisabled => {
+        ComponentDisabled => {
             if let Some(name) = &condition.param_string {
                 engine.disabled_components.contains(name)
             } else {
-                engine.disabled_widgets.contains(&param)
+                engine.disabled_components.contains(&param.to_string())
             }
         }
         WidescreenModeEq => engine.widescreen_mode == (param != 0),
