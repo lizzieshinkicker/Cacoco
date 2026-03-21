@@ -184,7 +184,11 @@ pub fn load_wad_into_store(
             if let Some((width, height, left, top, pixels)) =
                 patch::decode_doom_patch(&lump_data, &assets.palette)
             {
-                if width <= 2048 && height <= 2048 {
+                if width == 0 && height == 0 {
+                    let id = crate::assets::AssetId::new(&name);
+                    assets.load_rgba(ctx, &name, 1, 1, &[0, 0, 0, 0]);
+                    assets.offsets.insert(id, (32767, 32767));
+                } else if width <= 2048 && height <= 2048 {
                     assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
                 }
             } else if size == 4096 {
@@ -250,7 +254,12 @@ pub fn deep_search_iwad(
                 if let Some((width, height, left, top, pixels)) =
                     patch::decode_doom_patch(&lump_data, &assets.palette)
                 {
-                    if width <= 2048 && height <= 2048 {
+                    if width == 0 && height == 0 {
+                        let id = crate::assets::AssetId::new(&name);
+                        assets.load_rgba(ctx, &name, 1, 1, &[0, 0, 0, 0]);
+                        assets.offsets.insert(id, (32767, 32767));
+                        found.insert(name.clone());
+                    } else if width <= 2048 && height <= 2048 {
                         assets.load_rgba_with_offset(ctx, &name, width, height, left, top, &pixels);
                         found.insert(name.clone());
                     }

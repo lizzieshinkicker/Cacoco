@@ -114,9 +114,6 @@ pub fn draw_element_wrapper(
     }
 
     let mut alpha = if !visible_in_game { 0.30 } else { 1.0 };
-    if common.translucency {
-        alpha *= 0.5;
-    }
 
     let is_hovered_branch = ctx
         .state
@@ -168,6 +165,12 @@ pub fn draw_element_wrapper(
     let should_render_content = match ctx.pass {
         RenderPass::Background => true,
         RenderPass::Foreground => is_selected_branch,
+    };
+
+    let alpha = if common.translucency {
+        alpha * 0.66
+    } else {
+        alpha
     };
 
     if should_render_content {
