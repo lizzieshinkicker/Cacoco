@@ -395,7 +395,7 @@ pub fn draw_settings_window(
                                 });
                             });
 
-                            if draw_delete_card(ui, delete_w) {
+                            if draw_delete_card(ui, delete_w, 70.0) {
                                 to_remove = Some(idx);
                             }
                         });
@@ -497,8 +497,7 @@ pub fn draw_menu_card(ui: &mut egui::Ui, title: &str, desc: &str) -> bool {
 }
 
 /// Renders a specialized delete button for use in list views.
-pub fn draw_delete_card(ui: &mut egui::Ui, width: f32) -> bool {
-    let height = 70.0;
+pub fn draw_delete_card(ui: &mut egui::Ui, width: f32, height: f32) -> bool {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
 
     let (bg_color, stroke_color) = if response.hovered() {
