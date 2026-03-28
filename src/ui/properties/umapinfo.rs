@@ -6,7 +6,7 @@ use crate::models::umapinfo::{MapEntry, UmapField, UmapInfoFile};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::properties::common;
-use crate::ui::shared;
+use crate::ui::{colors, shared};
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -489,7 +489,7 @@ impl LumpUI for UmapInfoFile {
             "UMAPINFO".to_string(),
             "Defines the structure, names of maps, and flow of progression through the WAD."
                 .to_string(),
-            egui::Color32::from_rgb(60, 40, 40),
+            colors::as_header_bg(colors::LUMP_UMAPINFO),
         )
     }
 

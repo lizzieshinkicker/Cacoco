@@ -1,5 +1,6 @@
 use crate::document::actions::DocumentAction;
 use crate::models::finale::FinaleDefFile;
+use crate::ui::colors;
 use crate::ui::properties::editor::{
     LayerContext, LumpUI, PropertyContext, TickContext, ViewportContext,
 };
@@ -23,7 +24,7 @@ impl LumpUI for FinaleDefFile {
         (
             "Finale Definition".into(),
             "Art screens and cast calls.".into(),
-            egui::Color32::from_rgb(60, 40, 60),
+            colors::as_header_bg(colors::LUMP_FINALE),
         )
     }
 

@@ -1,3 +1,4 @@
+pub mod colors;
 pub mod context_menu;
 pub mod font_wizard;
 pub mod gamestate;

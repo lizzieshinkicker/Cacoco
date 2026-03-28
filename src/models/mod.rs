@@ -24,6 +24,25 @@ pub enum ProjectData {
 
 #[allow(dead_code)]
 impl ProjectData {
+    pub fn get_export_entries(&self, assets: &crate::assets::AssetStore) -> Vec<(String, String)> {
+        match self {
+            ProjectData::Interlevel(f) => f
+                .screens
+                .iter()
+                .map(|s| {
+                    (
+                        s.name.clone(),
+                        self.wrap_lump("interlevel", &s.version, &s.metadata, &s.data),
+                    )
+                })
+                .collect(),
+            _ => vec![(
+                self.standard_lump_name().to_string(),
+                self.to_sanitized_json(assets),
+            )],
+        }
+    }
+
     pub fn standard_lump_name(&self) -> &str {
         match self {
             ProjectData::StatusBar(_) => "SBARDEF",
@@ -39,7 +58,11 @@ impl ProjectData {
             ProjectData::StatusBar(f) => &f.version,
             ProjectData::Finale(f) => &f.version,
             ProjectData::Sky(f) => &f.version,
-            ProjectData::Interlevel(f) => &f.version,
+            ProjectData::Interlevel(f) => f
+                .screens
+                .first()
+                .map(|s| s.version.as_str())
+                .unwrap_or("1.0.0"),
             ProjectData::UmapInfo(f) => &f.version,
         }
     }
@@ -131,7 +154,12 @@ impl ProjectData {
             ProjectData::StatusBar(f) => f.to_sanitized_json(assets),
             ProjectData::Sky(f) => self.wrap_lump("skydefs", &f.version, &f.metadata, &f.data),
             ProjectData::Interlevel(f) => {
-                self.wrap_lump("interlevel", &f.version, &f.metadata, &f.data)
+                if f.screens.len() == 1 {
+                    let s = &f.screens[0];
+                    self.wrap_lump("interlevel", &s.version, &s.metadata, &s.data)
+                } else {
+                    "/* MULTI-SCREEN INTERLEVEL PROJECT - USE WAD/PK3 EXPORT */".to_string()
+                }
             }
             ProjectData::Finale(f) => self.wrap_lump("finale", &f.version, &f.metadata, &f.data),
             ProjectData::UmapInfo(f) => f.to_umapinfo_text(),
@@ -265,17 +293,41 @@ impl ProjectData {
     /// Centralized lump parser for ID24 JSON and UMAPINFO text formats.
     pub fn parse_lump(name: &str, data: &[u8]) -> Option<Self> {
         let content = String::from_utf8_lossy(data);
-        if let Ok(mut parsed) = serde_json::from_str::<Self>(&content) {
-            parsed.set_target(parsed.determine_target());
-            parsed.normalize_for_target();
-            Some(parsed)
-        } else if name.eq_ignore_ascii_case("UMAPINFO") {
-            Some(Self::UmapInfo(umapinfo::UmapInfoFile::from_umapinfo_text(
-                &content,
-            )))
-        } else {
-            None
+
+        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(t) = json_val.get("type").and_then(|v| v.as_str()) {
+                if t == "interlevel" {
+                    match serde_json::from_value::<interlevel::InterlevelScreen>(json_val) {
+                        Ok(mut screen) => {
+                            screen.name = name.to_uppercase();
+                            return Some(Self::Interlevel(interlevel::InterlevelDefFile {
+                                screens: vec![screen],
+                            }));
+                        }
+                        Err(e) => {
+                            eprintln!("!!! INTERLEVEL PARSE ERROR in lump '{}': {}", name, e);
+                        }
+                    }
+                }
+            }
         }
+
+        match serde_json::from_str::<Self>(&content) {
+            Ok(mut parsed) => {
+                parsed.set_target(parsed.determine_target());
+                parsed.normalize_for_target();
+                return Some(parsed);
+            }
+            Err(_e) => {}
+        }
+
+        if name.eq_ignore_ascii_case("UMAPINFO") {
+            return Some(Self::UmapInfo(umapinfo::UmapInfoFile::from_umapinfo_text(
+                &content,
+            )));
+        }
+
+        None
     }
 }
 

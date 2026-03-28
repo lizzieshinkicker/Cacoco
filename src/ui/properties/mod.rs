@@ -2,7 +2,7 @@ use crate::assets::AssetStore;
 use crate::models::ProjectData;
 use crate::models::sbardef::{Element, ElementWrapper, ExportTarget};
 use crate::state::PreviewState;
-use crate::ui::layers::colors;
+use crate::ui::colors;
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -170,7 +170,7 @@ pub fn draw_properties_panel(
     changed
 }
 
-fn draw_static_header(ui: &mut egui::Ui, title: &str, desc: &str, color: egui::Color32) {
+pub(crate) fn draw_static_header(ui: &mut egui::Ui, title: &str, desc: &str, color: egui::Color32) {
     let frame = egui::Frame::NONE
         .inner_margin(8.0)
         .corner_radius(4.0)

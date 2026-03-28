@@ -1,6 +1,7 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::assets::AssetId;
 use crate::document::actions::{DocumentAction, SBarAction, SkyAction, TreeAction};
+use crate::ui::colors;
 use crate::ui::messages::{self, EditorEvent};
 use eframe::egui;
 
@@ -98,7 +99,7 @@ pub fn draw_confirmation_modal(
                 ConfirmationRequest::DowngradeTarget(_) => {
                     ui.label(
                         egui::RichText::new("Warning: Extended Features Detected")
-                            .color(egui::Color32::from_rgb(200, 100, 100))
+                            .color(colors::DESTRUCTIVE)
                             .strong(),
                     );
                     ui.add_space(8.0);
@@ -116,12 +117,12 @@ pub fn draw_confirmation_modal(
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let (text, color) = match request {
                         ConfirmationRequest::DiscardChanges(_) => {
-                            ("Discard", egui::Color32::from_rgb(110, 40, 40))
+                            ("Discard", colors::DESTRUCTIVE)
                         }
                         ConfirmationRequest::DowngradeTarget(_) => {
-                            ("Downgrade", egui::Color32::from_rgb(110, 40, 40))
+                            ("Downgrade", colors::DESTRUCTIVE)
                         }
-                        _ => ("Delete", egui::Color32::from_rgb(110, 40, 40)),
+                        _ => ("Delete", colors::DESTRUCTIVE),
                     };
 
                     let btn = egui::Button::new(text).fill(color);
@@ -181,8 +182,13 @@ pub fn draw_confirmation_modal(
                     PendingAction::Load(path) => {
                         if path.is_empty() {
                             app.open_project_ui(ctx);
-                        } else if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                            app.load_project(ctx, loaded, &path);
+                        } else {
+                            let iwad = app.config.base_wad_path.clone();
+                            if let Some(loaded) =
+                                crate::io::load_project_from_path(ctx, &path, iwad.as_deref())
+                            {
+                                app.load_project(ctx, loaded, &path);
+                            }
                         }
                     }
                     PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),

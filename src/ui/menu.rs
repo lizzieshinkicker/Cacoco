@@ -127,8 +127,13 @@ pub fn draw_menu_bar(
                 if let Some(path) = file_to_load {
                     if dirty {
                         action = MenuAction::RequestDiscard(PendingAction::Load(path));
-                    } else if let Some(loaded) = io::load_project_from_path(ctx, &path) {
-                        action = MenuAction::LoadProject(loaded, path);
+                    } else {
+                        let iwad = config.base_wad_path.clone();
+                        if let Some(loaded) =
+                            io::load_project_from_path(ctx, &path, iwad.as_deref())
+                        {
+                            action = MenuAction::LoadProject(loaded, path);
+                        }
                     }
                     ContextMenu::close(ui);
                 }
@@ -586,14 +591,14 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                             ) {
                                 app.creation_modal = CreationModal::SkyDefs;
                             }
-                            /* TODO: Not quite ready yet...
                             if draw_menu_card(
                                 ui,
-                                "Interlevel Animations",
+                                "Interlevel (INTERLEVEL)",
                                 "Exiting that last map. Here's your statistics. Entering the next one.",
                             ) {
                                 app.creation_modal = CreationModal::Interlevel;
                             }
+                            /* TODO: Finale is not quite ready yet...
                             if draw_menu_card(
                                 ui,
                                 "Finale Definitions",

@@ -373,8 +373,8 @@ impl LumpUI for SBarDefFile {
             if path.len() > 1 {
                 if let Some(el) = self.get_element(path) {
                     let color = colors::get_layer_color(el)
-                        .unwrap_or(egui::Color32::TRANSPARENT)
-                        .linear_multiply(0.05);
+                        .map(colors::as_header_bg)
+                        .unwrap_or(egui::Color32::TRANSPARENT);
                     return (
                         el.display_name(),
                         descriptions::get_helper_text(el).to_string(),
@@ -385,14 +385,14 @@ impl LumpUI for SBarDefFile {
                 return (
                     format!("Layout #{}", path[0]),
                     "Root configuration for a HUD layout.".to_string(),
-                    egui::Color32::from_white_alpha(10),
+                    colors::as_header_bg(colors::LUMP_SBARDEF),
                 );
             }
         }
         (
             "SBARDEF".into(),
             "Select a layer to edit properties.".into(),
-            egui::Color32::TRANSPARENT,
+            colors::as_header_bg(colors::LUMP_SBARDEF),
         )
     }
 

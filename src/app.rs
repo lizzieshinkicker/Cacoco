@@ -45,7 +45,6 @@ pub enum CreationModal {
     LumpSelector,
     SBarDef,
     SkyDefs,
-    #[allow(dead_code)]
     Interlevel,
     #[allow(dead_code)]
     Finale,
@@ -149,7 +148,10 @@ impl CacocoApp {
         }
 
         if let Some(file_path) = open_file_path {
-            if let Some(loaded) = io::load_project_from_path(&cc.egui_ctx, &file_path) {
+            let iwad = app.config.base_wad_path.clone();
+            if let Some(loaded) =
+                io::load_project_from_path(&cc.egui_ctx, &file_path, iwad.as_deref())
+            {
                 app.load_project(&cc.egui_ctx, loaded, &file_path);
                 println!("Loaded project from command line: {}", file_path);
             } else {
@@ -388,7 +390,8 @@ impl CacocoApp {
     /// Opens the system dialog to pick a project and loads it if successful.
     pub fn open_project_ui(&mut self, ctx: &egui::Context) {
         if let Some(path) = io::open_project_dialog() {
-            if let Some(loaded) = io::load_project_from_path(ctx, &path) {
+            let iwad = self.config.base_wad_path.clone();
+            if let Some(loaded) = io::load_project_from_path(ctx, &path, iwad.as_deref()) {
                 self.load_project(ctx, loaded, &path);
             }
         }

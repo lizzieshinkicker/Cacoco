@@ -12,6 +12,8 @@ pub enum DocumentAction {
     Sky(SkyAction),
     /// Specialized UMAPINFO actions.
     Umap(UmapAction),
+    /// Specialized INTERLEVEL actions.
+    Interlevel(InterlevelAction),
 }
 
 #[derive(Debug, Clone)]
@@ -85,4 +87,35 @@ pub enum UmapAction {
     ClearNormalExit(String),
     /// Clear the secret exit (nextsecret) for a map node
     ClearSecretExit(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum InterlevelAction {
+    AddScreen,
+    DuplicateScreen(usize),
+    DeleteScreen(usize),
+    RenameScreen(usize, String),
+    AddLayer {
+        screen_idx: usize,
+    },
+    AddAnim {
+        screen_idx: usize,
+        layer_idx: usize,
+    },
+    Delete {
+        screen_idx: usize,
+        paths: Vec<Vec<usize>>,
+    },
+    MoveUp {
+        screen_idx: usize,
+        path: Vec<usize>,
+    },
+    MoveDown {
+        screen_idx: usize,
+        path: Vec<usize>,
+    },
+    Duplicate {
+        screen_idx: usize,
+        path: Vec<usize>,
+    },
 }
