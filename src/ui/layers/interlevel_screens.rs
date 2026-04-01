@@ -1,3 +1,4 @@
+use crate::assets::{AssetId, AssetStore};
 use crate::document::actions::{DocumentAction, InterlevelAction};
 use crate::models::interlevel::InterlevelDefFile;
 use crate::ui::layers::thumbnails::ListRow;
@@ -8,6 +9,7 @@ pub fn draw_screens_browser(
     file: &mut InterlevelDefFile,
     selection: &mut std::collections::HashSet<Vec<usize>>,
     current_idx: &mut usize,
+    assets: &AssetStore,
     actions: &mut Vec<DocumentAction>,
 ) -> bool {
     let mut changed = false;
@@ -23,8 +25,13 @@ pub fn draw_screens_browser(
 
     for (idx, screen) in file.screens.iter_mut().enumerate() {
         let is_active = *current_idx == idx;
+
+        let bg_id = AssetId::new(&screen.data.backgroundimage);
+        let tex = assets.textures.get(&bg_id);
+
         let row = ListRow::new(&screen.name)
             .active(is_active)
+            .texture(tex)
             .fallback("📺")
             .show(ui);
 

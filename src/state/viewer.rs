@@ -16,6 +16,10 @@ pub struct ViewerState {
     pub weapon_offset_y: f32,
     pub sky_yaw: i32,
     pub fire_sims: HashMap<AssetId, FireSimulation>,
+    pub ilvl_current_map: i32,
+    pub ilvl_is_secret_map: bool,
+    pub ilvl_is_tally: bool,
+    pub ilvl_secret_visited: bool,
 }
 
 impl Default for ViewerState {
@@ -31,6 +35,10 @@ impl Default for ViewerState {
             weapon_offset_y: 0.0,
             sky_yaw: 0,
             fire_sims: HashMap::new(),
+            ilvl_current_map: 1,
+            ilvl_is_secret_map: false,
+            ilvl_is_tally: true,
+            ilvl_secret_visited: false,
         }
     }
 }

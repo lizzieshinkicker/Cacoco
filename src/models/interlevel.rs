@@ -1,13 +1,5 @@
-use serde::{Deserialize, Deserializer, Serialize};
-
-fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    T: Default + Deserialize<'de>,
-    D: Deserializer<'de>,
-{
-    let opt = Option::deserialize(deserializer)?;
-    Ok(opt.unwrap_or_default())
-}
+use crate::models::deserialize_null_default;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InterlevelDefFile {
@@ -48,20 +40,40 @@ pub struct InterlevelDefinition {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InterlevelLayer {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub _cacoco_name: Option<String>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub anims: Vec<InterlevelAnim>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub conditions: Vec<InterlevelCondition>,
 }
 
+impl InterlevelLayer {
+    pub fn display_name(&self, default_idx: usize) -> String {
+        self._cacoco_name
+            .clone()
+            .unwrap_or_else(|| format!("Layer {}", default_idx))
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InterlevelAnim {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub _cacoco_name: Option<String>,
     pub x: i32,
     pub y: i32,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub frames: Vec<InterlevelFrame>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub conditions: Vec<InterlevelCondition>,
+}
+
+impl InterlevelAnim {
+    pub fn display_name(&self, default_idx: usize) -> String {
+        self._cacoco_name
+            .clone()
+            .unwrap_or_else(|| format!("Animation {}", default_idx))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

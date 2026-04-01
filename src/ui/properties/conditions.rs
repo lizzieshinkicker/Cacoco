@@ -125,11 +125,7 @@ fn draw_condition_card(
     let mut changed = false;
     let is_true = crate::conditions::resolve(&[cond.clone()], state, assets);
 
-    let frame = egui::Frame::new()
-        .inner_margin(4.0)
-        .corner_radius(4.0)
-        .fill(egui::Color32::from_white_alpha(5))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_white_alpha(15)));
+    let frame = shared::condition_box_frame();
 
     let response = frame.show(ui, |ui| {
         let master_icon_name = lookups::resolve_condition_icon(cond, state);

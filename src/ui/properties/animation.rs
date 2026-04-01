@@ -186,31 +186,7 @@ fn draw_frame_row(
     );
 
     if response.clicked() {
-        let modifiers = ui.input(|i| i.modifiers);
-        if modifiers.ctrl || modifiers.command {
-            if is_selected {
-                selection.remove(&idx);
-            } else {
-                selection.insert(idx);
-                *pivot = Some(idx);
-            }
-        } else if modifiers.shift {
-            if let Some(p) = *pivot {
-                let min = p.min(idx);
-                let max = p.max(idx);
-                selection.clear();
-                for i in min..=max {
-                    selection.insert(i);
-                }
-            } else {
-                selection.insert(idx);
-                *pivot = Some(idx);
-            }
-        } else {
-            selection.clear();
-            selection.insert(idx);
-            *pivot = Some(idx);
-        }
+        shared::handle_list_selection(ui, is_selected, idx, selection, pivot);
     }
 
     if response.drag_started() {
@@ -325,18 +301,7 @@ fn draw_frame_row(
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(8.0);
-            let mut tics = (frame.duration * DOOM_TICS_PER_SEC).round() as i32;
-            if ui
-                .add(
-                    egui::DragValue::new(&mut tics)
-                        .suffix(" tics")
-                        .range(1..=3500),
-                )
-                .changed()
-            {
-                frame.duration = tics as f64 / DOOM_TICS_PER_SEC;
-                changed = true;
-            }
+            changed |= crate::ui::properties::common::draw_tic_drag_value(ui, &mut frame.duration);
         });
     });
 

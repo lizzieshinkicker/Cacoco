@@ -347,3 +347,13 @@ fn sanitize_json_value(v: &mut serde_json::Value) {
         }
     }
 }
+
+/// A helper for serde to handle null values by falling back to the Default implementation.
+pub fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}

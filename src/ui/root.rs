@@ -299,19 +299,49 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 let btn_w = (ui.available_width() - 4.0) / 2.0;
+                let is_interlevel = app.active_mode == ProjectMode::Interlevel;
 
-                let items_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
-                    ui::shared::section_header_button(ui, "Held Items", None, tab_idx == Some(0))
-                });
-                if items_res.clicked() {
-                    tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
-                }
+                if is_interlevel {
+                    let full_w = ui.available_width();
+                    let items_res = ui.add_sized([full_w, 28.0], |ui: &mut egui::Ui| {
+                        ui::shared::section_header_button(
+                            ui,
+                            "Interlevel Simulator",
+                            None,
+                            tab_idx == Some(0),
+                        )
+                    });
+                    if items_res.clicked() {
+                        tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
+                    }
+                    if tab_idx == Some(1) {
+                        tab_idx = Some(0);
+                        last_tab = 0;
+                    }
+                } else {
+                    let items_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+                        ui::shared::section_header_button(
+                            ui,
+                            "Held Items",
+                            None,
+                            tab_idx == Some(0),
+                        )
+                    });
+                    if items_res.clicked() {
+                        tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
+                    }
 
-                let ctx_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
-                    ui::shared::section_header_button(ui, "Game Context", None, tab_idx == Some(1))
-                });
-                if ctx_res.clicked() {
-                    tab_idx = if tab_idx == Some(1) { None } else { Some(1) };
+                    let ctx_res = ui.add_sized([btn_w, 28.0], |ui: &mut egui::Ui| {
+                        ui::shared::section_header_button(
+                            ui,
+                            "Game Context",
+                            None,
+                            tab_idx == Some(1),
+                        )
+                    });
+                    if ctx_res.clicked() {
+                        tab_idx = if tab_idx == Some(1) { None } else { Some(1) };
+                    }
                 }
             });
 
@@ -321,10 +351,20 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     let inner_response = ui.vertical(|ui| {
                         ui.add_space(3.0);
+                        let is_interlevel = app.active_mode == ProjectMode::Interlevel;
                         if last_tab == 0 {
-                            ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
+                            if is_interlevel {
+                                ui::properties::interlevel::simulator::draw_simulator_panel(
+                                    ui,
+                                    &mut app.preview_state,
+                                );
+                            } else {
+                                ui::draw_gamestate_panel(ui, &mut app.preview_state, &app.assets);
+                            }
                         } else {
-                            ui::draw_context_panel(ui, &mut app.preview_state, &app.assets);
+                            if !is_interlevel {
+                                ui::draw_context_panel(ui, &mut app.preview_state, &app.assets);
+                            }
                         }
                         ui.add_space(10.0);
                     });

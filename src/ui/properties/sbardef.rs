@@ -72,22 +72,7 @@ impl LumpUI for SBarDefFile {
                         if let Some(el) = self.get_element_mut(path) {
                             ui.vertical_centered(|ui| {
                                 if el._cacoco_text.is_none() {
-                                    ui.horizontal(|ui| {
-                                        ui.add_space((ui.available_width() - 210.0).max(0.0) / 2.0);
-                                        ui.label("Name:");
-                                        let mut name = el._cacoco_name.clone().unwrap_or_default();
-                                        if ui
-                                            .add(
-                                                egui::TextEdit::singleline(&mut name)
-                                                    .desired_width(150.0),
-                                            )
-                                            .changed()
-                                        {
-                                            el._cacoco_name =
-                                                if name.is_empty() { None } else { Some(name) };
-                                            changed = true;
-                                        }
-                                    });
+                                    changed |= common::draw_name_field(ui, &mut el._cacoco_name);
                                     ui.add_space(4.0);
                                 }
                                 changed |= common::draw_transform_editor(ui, el, current_target);

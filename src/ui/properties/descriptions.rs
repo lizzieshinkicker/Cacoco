@@ -75,3 +75,11 @@ pub fn get_helper_text(element: &ElementWrapper) -> &'static str {
         Element::Minimap(_) => "Renders a real-time minimap of the current level.",
     }
 }
+
+pub fn get_interlevel_layer_desc() -> &'static str {
+    "A container that groups multiple animation sequences together."
+}
+
+pub fn get_interlevel_anim_desc() -> &'static str {
+    "A sequence of frames played at a set position on the screen."
+}

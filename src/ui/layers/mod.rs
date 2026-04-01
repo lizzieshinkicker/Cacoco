@@ -152,6 +152,7 @@ pub fn draw_layers_panel(
                                 ilvl,
                                 selection,
                                 current_bar_idx,
+                                assets,
                                 &mut actions,
                             );
                         } else {

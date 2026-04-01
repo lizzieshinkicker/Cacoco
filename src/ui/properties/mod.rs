@@ -17,7 +17,7 @@ mod face;
 mod finale;
 pub(crate) mod font_cache;
 mod graphics;
-mod interlevel;
+pub(crate) mod interlevel;
 mod list;
 mod lookups;
 mod minimap;

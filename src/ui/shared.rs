@@ -365,3 +365,47 @@ pub fn drag_percentage(ui: &mut egui::Ui, label: &str, value: &mut f32) -> bool 
     }
     false
 }
+
+/// Standard frame style for condition rule boxes.
+pub fn condition_box_frame() -> egui::Frame {
+    egui::Frame::new()
+        .inner_margin(4.0)
+        .corner_radius(4.0)
+        .fill(egui::Color32::from_white_alpha(5))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_white_alpha(15)))
+}
+
+/// Handles standard list selection logic (Click, Ctrl-Click for toggle, Shift-Click for range).
+pub fn handle_list_selection(
+    ui: &mut egui::Ui,
+    is_selected: bool,
+    idx: usize,
+    selection: &mut std::collections::HashSet<usize>,
+    pivot: &mut Option<usize>,
+) {
+    let modifiers = ui.input(|i| i.modifiers);
+    if modifiers.ctrl || modifiers.command {
+        if is_selected {
+            selection.remove(&idx);
+        } else {
+            selection.insert(idx);
+            *pivot = Some(idx);
+        }
+    } else if modifiers.shift {
+        if let Some(p) = *pivot {
+            let min = p.min(idx);
+            let max = p.max(idx);
+            selection.clear();
+            for i in min..=max {
+                selection.insert(i);
+            }
+        } else {
+            selection.insert(idx);
+            *pivot = Some(idx);
+        }
+    } else {
+        selection.clear();
+        selection.insert(idx);
+        *pivot = Some(idx);
+    }
+}

@@ -1,3 +1,4 @@
+use crate::models::deserialize_null_default;
 use bitflags::bitflags;
 use rand::RngExt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -15,16 +16,6 @@ fn default_scale() -> f32 {
 
 fn is_zero(num: &i32) -> bool {
     *num == 0
-}
-
-/// A helper for serde to handle null values by falling back to the Default implementation.
-fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    T: Default + Deserialize<'de>,
-    D: Deserializer<'de>,
-{
-    let opt = Option::deserialize(deserializer)?;
-    Ok(opt.unwrap_or_default())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
