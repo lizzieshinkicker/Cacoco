@@ -218,6 +218,13 @@ impl AssetStore {
             "_BADGE_RADSUIT",
             include_bytes!("../assets/badges/Radsuit.png"),
         );
+
+        let tnt1_name = "TNT1A0";
+        let tnt1_id = AssetId::new(tnt1_name);
+        if !self.textures.contains_key(&tnt1_id) {
+            self.load_rgba(ctx, tnt1_name, 1, 1, &[0, 0, 0, 0]);
+            self.offsets.insert(tnt1_id, (32767, 32767));
+        }
     }
 
     /// Scans the project data for any string that looks like a Doom patch name.

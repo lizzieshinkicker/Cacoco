@@ -16,7 +16,7 @@ use std::io::{Read, Seek, Write};
 use crate::models::ProjectData;
 pub use legacy::{build_merged_pnames, build_merged_texture1, serialize_pnames};
 pub use umapinfo::generate_simple_umapinfo;
-pub use util::{is_graphic_lump, parse_lump_name};
+pub use util::{is_graphic_lump, is_known_non_graphic_lump, parse_lump_name};
 
 /// Represents a lump Cacoco doesn't interpret, but preserves.
 #[derive(Clone)]
@@ -212,7 +212,8 @@ pub fn load_wad_into_store(
         file.read_exact(&mut lump_data)?;
 
         let is_json = lump_data.iter().find(|b: &&u8| !b.is_ascii_whitespace()) == Some(&b'{');
-        let should_try_load = (!strict || is_graphic_lump(&name)) && !is_json;
+        let is_non_graphic = is_known_non_graphic_lump(&name);
+        let should_try_load = (!strict || is_graphic_lump(&name)) && !is_json && !is_non_graphic;
 
         if should_try_load {
             if let Some((width, height, left, top, pixels)) =
@@ -281,6 +282,10 @@ pub fn deep_search_iwad(
         let file_pos = i32::from_le_bytes(entry[0..4].try_into().unwrap_or([0; 4])) as u64;
 
         if size > 0 && target_set.contains(name.as_str()) {
+            if is_known_non_graphic_lump(&name) {
+                continue;
+            }
+
             let mut lump_data = vec![0u8; size];
             if file.seek(std::io::SeekFrom::Start(file_pos)).is_ok()
                 && file.read_exact(&mut lump_data).is_ok()

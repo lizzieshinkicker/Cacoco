@@ -15,12 +15,55 @@ pub static GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     prefixes.into_iter().collect()
 });
 
+/// A collection of exact names for known non-graphic lumps (metadata, maps, tables).
+pub static NON_GRAPHIC_EXACT: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let names = [
+        "PLAYPAL", "COLORMAP", "TINTTAB", "PNAMES", "TEXTURE1", "TEXTURE2", "SWANTBLS", "ANIMATED",
+        "SWITCHES", "THINGS", "LINEDEFS", "SIDEDEFS", "VERTEXES", "SEGS", "SSECTORS", "NODES",
+        "SECTORS", "REJECT", "BLOCKMAP", "UMAPINFO", "ZMAPINFO", "MAPINFO", "EMAPINFO", "SNDINFO",
+        "MUSINFO", "LOCKDEFS", "DEHACKED", "COMPLVL", "CCARDS", "DECLARE", "ENDOOM", "REDMAP",
+        "RED2MAP", "BLUEMAP", "GREENMAP", "YELLOMAP", "BLACKMAP", "TRANSRM2", "TRANSRED", "IN_E1",
+        "IN_E2", "IN_E3",
+    ];
+    names.into_iter().collect()
+});
+
+/// A collection of prefixes for known non-graphic lumps (sounds, music, demos).
+pub static NON_GRAPHIC_PREFIXES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let prefixes = ["DS", "D_", "DP"];
+    prefixes.into_iter().collect()
+});
+
+/// Returns true if the given lump is definitively known to not be graphical.
+pub fn is_known_non_graphic_lump(name: &str) -> bool {
+    if NON_GRAPHIC_EXACT.contains(name) {
+        return true;
+    }
+    if NON_GRAPHIC_PREFIXES
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+    {
+        return true;
+    }
+    if name.starts_with("DEMO") {
+        return true;
+    }
+    if name.ends_with("MAP")
+        && name.starts_with('R')
+        && name.len() > 3
+        && name.chars().nth(1).unwrap().is_ascii_digit()
+    {
+        return true;
+    }
+    false
+}
+
 /// Converts a fixed-length null-terminated or space-padded byte slice
 /// from a WAD directory into a clean, uppercase Rust String.
 pub fn parse_lump_name(bytes: &[u8]) -> String {
     let len = bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len());
     String::from_utf8_lossy(&bytes[0..len])
-        .to_string()
+        .trim()
         .to_uppercase()
 }
 

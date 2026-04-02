@@ -304,12 +304,7 @@ fn draw_left_sidebar_drawer(ui: &mut egui::Ui, app: &mut CacocoApp) {
                 if is_interlevel {
                     let full_w = ui.available_width();
                     let items_res = ui.add_sized([full_w, 28.0], |ui: &mut egui::Ui| {
-                        ui::shared::section_header_button(
-                            ui,
-                            "Interlevel Simulator",
-                            None,
-                            tab_idx == Some(0),
-                        )
+                        ui::shared::section_header_button(ui, "Simulator", None, tab_idx == Some(0))
                     });
                     if items_res.clicked() {
                         tab_idx = if tab_idx == Some(0) { None } else { Some(0) };
