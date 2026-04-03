@@ -26,8 +26,11 @@ pub(super) fn is_condition_true(
         1 => state.viewer.ilvl_current_map > cond.param,
         2 => state.viewer.ilvl_current_map == cond.param,
         3 => {
-            state.viewer.ilvl_current_map == cond.param
-                || (state.viewer.ilvl_earlier_visited && state.viewer.ilvl_current_map > cond.param)
+            if state.viewer.ilvl_earlier_visited {
+                state.viewer.ilvl_current_map > cond.param
+            } else {
+                state.viewer.ilvl_current_map == cond.param + 1
+            }
         }
         4 => !state.viewer.ilvl_is_secret_map,
         5 => state.viewer.ilvl_secret_visited,

@@ -20,8 +20,11 @@ fn eval_conditions(
             1 => state.ilvl_current_map > c.param,
             2 => state.ilvl_current_map == c.param,
             3 => {
-                state.ilvl_current_map == c.param
-                    || (state.ilvl_earlier_visited && state.ilvl_current_map > c.param)
+                if state.ilvl_earlier_visited {
+                    state.ilvl_current_map > c.param
+                } else {
+                    state.ilvl_current_map == c.param + 1
+                }
             }
             4 => !state.ilvl_is_secret_map,
             5 => state.ilvl_secret_visited,

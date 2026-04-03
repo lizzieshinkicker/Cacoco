@@ -54,7 +54,6 @@ pub fn load_wad_project(
 
     let mut lumps = Vec::new();
     let mut passthrough_lumps = Vec::new();
-    let _managed_names = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE", "UMAPINFO"];
 
     for i in 0..num_lumps {
         let entry = &dir_buffer[i * 16..(i + 1) * 16];
@@ -62,13 +61,11 @@ pub fn load_wad_project(
         let size = i32::from_le_bytes(entry[4..8].try_into()?) as usize;
         let file_pos = i32::from_le_bytes(entry[0..4].try_into()?) as u64;
 
-        if size == 0 {
-            continue;
-        }
-
         let mut lump_data = vec![0u8; size];
-        file.seek(std::io::SeekFrom::Start(file_pos))?;
-        file.read_exact(&mut lump_data)?;
+        if size > 0 {
+            file.seek(std::io::SeekFrom::Start(file_pos))?;
+            file.read_exact(&mut lump_data)?;
+        }
 
         let managed_names = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE", "UMAPINFO"];
         let is_known_name = managed_names.iter().any(|&m| m.eq_ignore_ascii_case(&name));
@@ -80,7 +77,7 @@ pub fn load_wad_project(
 
         let mut claimed_by_cacoco = false;
 
-        if is_known_name || looks_like_json {
+        if size > 0 && (is_known_name || looks_like_json) {
             println!(">>> ATTEMPTING TO PARSE LUMP: {}", name);
             if let Some(parsed) = ProjectData::parse_lump(&name, &lump_data) {
                 println!("    SUCCESSFULLY CLAIMED: {}", name);
@@ -102,7 +99,12 @@ pub fn load_wad_project(
             }
         }
 
-        if !claimed_by_cacoco {
+        if claimed_by_cacoco {
+            passthrough_lumps.push(RawLump {
+                name: format!("__CACOCO_CLAIMED_{}", name),
+                data: Vec::new(),
+            });
+        } else {
             passthrough_lumps.push(RawLump {
                 name: name.clone(),
                 data: lump_data,
@@ -338,22 +340,29 @@ pub fn write_wad_to_file<W: Write + Seek>(
     let mut managed_map = std::collections::HashMap::new();
     for l in lumps {
         for (name, content) in l.get_export_entries(assets) {
-            managed_map.insert(name, content);
+            managed_map.insert(name.to_uppercase(), content);
         }
     }
 
     for raw in passthrough {
         let name_upper = raw.name.to_uppercase();
-        let pos = writer.stream_position()? as u32;
-        let mut size = raw.data.len() as u32;
 
-        if let Some(managed) = managed_map.remove(&name_upper) {
-            let new_data = managed;
-            writer.write_all(new_data.as_bytes())?;
-            size = new_data.len() as u32;
-        } else {
-            writer.write_all(&raw.data)?;
+        if let Some(real_name) = name_upper.strip_prefix("__CACOCO_CLAIMED_") {
+            if let Some(managed) = managed_map.remove(real_name) {
+                let pos = writer.stream_position()? as u32;
+                writer.write_all(managed.as_bytes())?;
+                records.push(Record {
+                    pos,
+                    size: managed.len() as u32,
+                    name: real_name.to_string(),
+                });
+            }
+            continue;
         }
+
+        let pos = writer.stream_position()? as u32;
+        let size = raw.data.len() as u32;
+        writer.write_all(&raw.data)?;
 
         records.push(Record {
             pos,

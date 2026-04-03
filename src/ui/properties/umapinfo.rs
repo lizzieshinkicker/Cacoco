@@ -54,6 +54,16 @@ const FIELD_REGISTRY: &[FieldMetadata] = &[
         group: "Graphics",
     },
     FieldMetadata {
+        label: "Exit Anim (ID24)",
+        key_name: "exitanim",
+        group: "Graphics",
+    },
+    FieldMetadata {
+        label: "Enter Anim (ID24)",
+        key_name: "enteranim",
+        group: "Graphics",
+    },
+    FieldMetadata {
         label: "Music",
         key_name: "music",
         group: "Audio",
@@ -91,6 +101,11 @@ const FIELD_REGISTRY: &[FieldMetadata] = &[
     FieldMetadata {
         label: "End Cast",
         key_name: "endcast",
+        group: "Completion",
+    },
+    FieldMetadata {
+        label: "End Finale (ID24)",
+        key_name: "endfinale",
         group: "Completion",
     },
     FieldMetadata {
@@ -415,8 +430,11 @@ fn create_default_field(key: &str) -> UmapField {
         "music" => UmapField::Music(String::new()),
         "exitpic" => UmapField::ExitPic(String::new()),
         "enterpic" => UmapField::EnterPic(String::new()),
+        "exitanim" => UmapField::ExitAnim(String::new()),
+        "enteranim" => UmapField::EnterAnim(String::new()),
         "levelpic" => UmapField::LevelPic(String::new()),
         "endpic" => UmapField::EndPic(String::new()),
+        "endfinale" => UmapField::EndFinale(String::new()),
         "interbackdrop" => UmapField::InterBackdrop(String::new()),
         "intermusic" => UmapField::InterMusic(String::new()),
         "next" => UmapField::Next(String::new()),
