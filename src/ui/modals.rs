@@ -1,6 +1,7 @@
 use crate::app::{CacocoApp, ConfirmationRequest, PendingAction};
 use crate::assets::AssetId;
 use crate::document::actions::{DocumentAction, SBarAction, SkyAction, TreeAction};
+use crate::ui::colors;
 use crate::ui::messages::{self, EditorEvent};
 use eframe::egui;
 
@@ -98,7 +99,7 @@ pub fn draw_confirmation_modal(
                 ConfirmationRequest::DowngradeTarget(_) => {
                     ui.label(
                         egui::RichText::new("Warning: Extended Features Detected")
-                            .color(egui::Color32::from_rgb(200, 100, 100))
+                            .color(colors::DESTRUCTIVE)
                             .strong(),
                     );
                     ui.add_space(8.0);
@@ -116,12 +117,12 @@ pub fn draw_confirmation_modal(
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let (text, color) = match request {
                         ConfirmationRequest::DiscardChanges(_) => {
-                            ("Discard", egui::Color32::from_rgb(110, 40, 40))
+                            ("Discard", colors::DESTRUCTIVE)
                         }
                         ConfirmationRequest::DowngradeTarget(_) => {
-                            ("Downgrade", egui::Color32::from_rgb(110, 40, 40))
+                            ("Downgrade", colors::DESTRUCTIVE)
                         }
-                        _ => ("Delete", egui::Color32::from_rgb(110, 40, 40)),
+                        _ => ("Delete", colors::DESTRUCTIVE),
                     };
 
                     let btn = egui::Button::new(text).fill(color);
@@ -181,8 +182,8 @@ pub fn draw_confirmation_modal(
                     PendingAction::Load(path) => {
                         if path.is_empty() {
                             app.open_project_ui(ctx);
-                        } else if let Some(loaded) = crate::io::load_project_from_path(ctx, &path) {
-                            app.load_project(ctx, loaded, &path);
+                        } else {
+                            app.spawn_load_task(ctx, path.clone());
                         }
                     }
                     PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
@@ -203,4 +204,27 @@ pub fn draw_confirmation_modal(
     if close_modal {
         app.confirmation_modal = None;
     }
+}
+
+/// Renders a non-dismissible loading overlay when a project is being parsed on a background thread.
+pub fn draw_loading_modal(ctx: &egui::Context) {
+    egui::Area::new(egui::Id::new("loading_modal"))
+        .order(egui::Order::Foreground)
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .show(ctx, |ui| {
+            egui::Frame::window(&ui.style())
+                .inner_margin(20.0)
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(80)))
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add(egui::Spinner::new().size(32.0));
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new("Cacodemons are now praying...")
+                                .weak()
+                                .italics(),
+                        );
+                    });
+                });
+        });
 }

@@ -5,7 +5,7 @@ use crate::models::skydefs::{SkyDefsFile, SkyType};
 use crate::state::PreviewState;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::properties::common;
-use crate::ui::shared;
+use crate::ui::{colors, shared};
 use eframe::egui;
 use std::collections::HashSet;
 
@@ -450,14 +450,14 @@ impl LumpUI for SkyDefsFile {
                 return (
                     format!("Sky: {}", s.name),
                     "Configuration for custom ID24 cylindrical sky panoramas.".to_string(),
-                    egui::Color32::from_rgb(40, 40, 60),
+                    colors::as_header_bg(colors::LUMP_SKYDEFS),
                 );
             }
         }
         (
             "Sky Definitions".into(),
             "Select a sky from the list to edit its parameters.".into(),
-            egui::Color32::TRANSPARENT,
+            colors::as_header_bg(colors::LUMP_SKYDEFS),
         )
     }
 

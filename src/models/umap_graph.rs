@@ -95,12 +95,8 @@ impl ParsedMapData {
 impl UmapGraph {
     /// Parses a standard UMAPINFO file and projects it into a visual node graph.
     pub fn build(file: &UmapInfoFile) -> Self {
-        let mut map_coords = HashMap::new();
-        for (idx, map) in file.data.maps.iter().enumerate() {
-            let offset = (idx % 2) as f32 * 40.0;
-            map_coords.insert(map.mapname.to_uppercase(), (offset, idx as f32 * 100.0));
-        }
-
+        let spine_counts = Self::count_spine_blockers(file);
+        let map_coords = Self::calculate_topological_grid(file, &spine_counts);
         Self::construct_graph(file, &map_coords)
     }
 

@@ -8,8 +8,8 @@ use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
 
-use super::colors;
 use super::thumbnails;
+use crate::ui::colors;
 
 const ROW_HEIGHT: f32 = 42.0;
 

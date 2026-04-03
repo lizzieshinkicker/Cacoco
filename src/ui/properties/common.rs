@@ -382,3 +382,48 @@ pub fn paint_thumb_content(
         );
     }
 }
+
+/// Renders a standardized text input for the `_cacoco_name` property.
+pub fn draw_name_field(ui: &mut egui::Ui, name_opt: &mut Option<String>) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.add_space((ui.available_width() - 210.0).max(0.0) / 2.0);
+        ui.label("Name:");
+        let mut name = name_opt.clone().unwrap_or_default();
+        if ui
+            .add(egui::TextEdit::singleline(&mut name).desired_width(150.0))
+            .changed()
+        {
+            *name_opt = if name.is_empty() { None } else { Some(name) };
+            changed = true;
+        }
+    });
+    changed
+}
+
+/// Renders a DragValue that converts internally from f64 seconds to Doom Tics.
+pub fn draw_tic_drag_value(ui: &mut egui::Ui, duration_seconds: &mut f64) -> bool {
+    let mut tics = (*duration_seconds * crate::constants::DOOM_TICS_PER_SEC).round() as i32;
+    let res = ui.add(
+        egui::DragValue::new(&mut tics)
+            .suffix(" tics")
+            .range(1..=3500),
+    );
+    if res.changed() {
+        *duration_seconds = tics as f64 / crate::constants::DOOM_TICS_PER_SEC;
+        true
+    } else {
+        false
+    }
+}
+
+/// Renders a gray placeholder with a question mark for missing textures.
+pub fn draw_type_placeholder(painter: &egui::Painter, rect: egui::Rect) {
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "?",
+        egui::FontId::proportional(18.0),
+        egui::Color32::from_gray(100),
+    );
+}

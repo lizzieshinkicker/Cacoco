@@ -16,7 +16,7 @@ use std::io::{Read, Seek, Write};
 use crate::models::ProjectData;
 pub use legacy::{build_merged_pnames, build_merged_texture1, serialize_pnames};
 pub use umapinfo::generate_simple_umapinfo;
-pub use util::{is_graphic_lump, parse_lump_name};
+pub use util::{is_graphic_lump, is_known_non_graphic_lump, parse_lump_name};
 
 /// Represents a lump Cacoco doesn't interpret, but preserves.
 #[derive(Clone)]
@@ -29,9 +29,16 @@ pub struct RawLump {
 pub fn load_wad_project(
     ctx: &eframe::egui::Context,
     path: &std::path::PathBuf,
+    base_iwad: Option<&str>,
 ) -> anyhow::Result<crate::io::LoadedProject> {
     let mut file = fs::File::open(path)?;
     let mut assets = AssetStore::default();
+
+    if let Some(iwad_path) = base_iwad {
+        if let Ok(mut iwad_file) = fs::File::open(iwad_path) {
+            let _ = load_wad_into_store(ctx, &mut iwad_file, &mut assets, true);
+        }
+    }
 
     load_wad_into_store(ctx, &mut file, &mut assets, false)?;
 
@@ -47,7 +54,6 @@ pub fn load_wad_project(
 
     let mut lumps = Vec::new();
     let mut passthrough_lumps = Vec::new();
-    let _managed_names = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE", "UMAPINFO"];
 
     for i in 0..num_lumps {
         let entry = &dir_buffer[i * 16..(i + 1) * 16];
@@ -57,23 +63,52 @@ pub fn load_wad_project(
 
         let mut lump_data = vec![0u8; size];
         if size > 0 {
-            let current_pos = file.stream_position()?;
             file.seek(std::io::SeekFrom::Start(file_pos))?;
             file.read_exact(&mut lump_data)?;
-            file.seek(std::io::SeekFrom::Start(current_pos))?;
         }
 
-        passthrough_lumps.push(RawLump {
-            name: name.clone(),
-            data: lump_data.clone(),
-        });
-
         let managed_names = ["SBARDEF", "SKYDEFS", "INTERLEVEL", "FINALE", "UMAPINFO"];
+        let is_known_name = managed_names.iter().any(|&m| m.eq_ignore_ascii_case(&name));
 
-        if managed_names.iter().any(|&m| m.eq_ignore_ascii_case(&name)) {
+        let looks_like_json = lump_data
+            .iter()
+            .find(|b| !b.is_ascii_whitespace())
+            .map_or(false, |&b| b == b'{');
+
+        let mut claimed_by_cacoco = false;
+
+        if size > 0 && (is_known_name || looks_like_json) {
+            println!(">>> ATTEMPTING TO PARSE LUMP: {}", name);
             if let Some(parsed) = ProjectData::parse_lump(&name, &lump_data) {
-                lumps.push(parsed);
+                println!("    SUCCESSFULLY CLAIMED: {}", name);
+                if let ProjectData::Interlevel(mut new_ilvl) = parsed {
+                    if let Some(ProjectData::Interlevel(existing)) = lumps
+                        .iter_mut()
+                        .find(|l| matches!(l, ProjectData::Interlevel(_)))
+                    {
+                        existing.screens.append(&mut new_ilvl.screens);
+                    } else {
+                        lumps.push(ProjectData::Interlevel(new_ilvl));
+                    }
+                } else {
+                    lumps.push(parsed);
+                }
+                claimed_by_cacoco = true;
+            } else {
+                println!("    FAILED TO PARSE AS ID24: {}", name);
             }
+        }
+
+        if claimed_by_cacoco {
+            passthrough_lumps.push(RawLump {
+                name: format!("__CACOCO_CLAIMED_{}", name),
+                data: Vec::new(),
+            });
+        } else {
+            passthrough_lumps.push(RawLump {
+                name: name.clone(),
+                data: lump_data,
+            });
         }
     }
 
@@ -174,13 +209,15 @@ pub fn load_wad_into_store(
             continue;
         }
 
-        let should_try_load = !strict || is_graphic_lump(&name);
+        let mut lump_data = vec![0u8; size];
+        file.seek(std::io::SeekFrom::Start(file_pos))?;
+        file.read_exact(&mut lump_data)?;
+
+        let is_json = lump_data.iter().find(|b: &&u8| !b.is_ascii_whitespace()) == Some(&b'{');
+        let is_non_graphic = is_known_non_graphic_lump(&name);
+        let should_try_load = (!strict || is_graphic_lump(&name)) && !is_json && !is_non_graphic;
 
         if should_try_load {
-            let mut lump_data = vec![0u8; size];
-            file.seek(std::io::SeekFrom::Start(file_pos))?;
-            file.read_exact(&mut lump_data)?;
-
             if let Some((width, height, left, top, pixels)) =
                 patch::decode_doom_patch(&lump_data, &assets.palette)
             {
@@ -247,6 +284,10 @@ pub fn deep_search_iwad(
         let file_pos = i32::from_le_bytes(entry[0..4].try_into().unwrap_or([0; 4])) as u64;
 
         if size > 0 && target_set.contains(name.as_str()) {
+            if is_known_non_graphic_lump(&name) {
+                continue;
+            }
+
             let mut lump_data = vec![0u8; size];
             if file.seek(std::io::SeekFrom::Start(file_pos)).is_ok()
                 && file.read_exact(&mut lump_data).is_ok()
@@ -298,21 +339,30 @@ pub fn write_wad_to_file<W: Write + Seek>(
 
     let mut managed_map = std::collections::HashMap::new();
     for l in lumps {
-        managed_map.insert(l.standard_lump_name().to_string(), l);
+        for (name, content) in l.get_export_entries(assets) {
+            managed_map.insert(name.to_uppercase(), content);
+        }
     }
 
     for raw in passthrough {
         let name_upper = raw.name.to_uppercase();
-        let pos = writer.stream_position()? as u32;
-        let mut size = raw.data.len() as u32;
 
-        if let Some(managed) = managed_map.remove(&name_upper) {
-            let new_data = managed.to_sanitized_json(assets);
-            writer.write_all(new_data.as_bytes())?;
-            size = new_data.len() as u32;
-        } else {
-            writer.write_all(&raw.data)?;
+        if let Some(real_name) = name_upper.strip_prefix("__CACOCO_CLAIMED_") {
+            if let Some(managed) = managed_map.remove(real_name) {
+                let pos = writer.stream_position()? as u32;
+                writer.write_all(managed.as_bytes())?;
+                records.push(Record {
+                    pos,
+                    size: managed.len() as u32,
+                    name: real_name.to_string(),
+                });
+            }
+            continue;
         }
+
+        let pos = writer.stream_position()? as u32;
+        let size = raw.data.len() as u32;
+        writer.write_all(&raw.data)?;
 
         records.push(Record {
             pos,
@@ -323,7 +373,7 @@ pub fn write_wad_to_file<W: Write + Seek>(
 
     for (name, managed) in managed_map {
         let pos = writer.stream_position()? as u32;
-        let new_data = managed.to_sanitized_json(assets);
+        let new_data = managed;
         writer.write_all(new_data.as_bytes())?;
         records.push(Record {
             pos,

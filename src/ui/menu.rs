@@ -1,7 +1,7 @@
 use crate::app::{CreationModal, PendingAction, ProjectMode};
 use crate::assets::AssetStore;
 use crate::config::{AppConfig, SourcePortConfig};
-use crate::io::{self, LoadedProject};
+use crate::io;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
 use eframe::egui;
@@ -9,7 +9,7 @@ use eframe::egui;
 /// Result of a menu interaction that requires application-level handling.
 pub enum MenuAction {
     None,
-    LoadProject(LoadedProject, String),
+    LoadProject(String),
     Open,
     RequestDiscard(PendingAction),
     SaveDone(String),
@@ -127,8 +127,8 @@ pub fn draw_menu_bar(
                 if let Some(path) = file_to_load {
                     if dirty {
                         action = MenuAction::RequestDiscard(PendingAction::Load(path));
-                    } else if let Some(loaded) = io::load_project_from_path(ctx, &path) {
-                        action = MenuAction::LoadProject(loaded, path);
+                    } else {
+                        action = MenuAction::LoadProject(path);
                     }
                     ContextMenu::close(ui);
                 }
@@ -586,14 +586,14 @@ pub fn draw_creation_wizard(ctx: &egui::Context, app: &mut crate::app::CacocoApp
                             ) {
                                 app.creation_modal = CreationModal::SkyDefs;
                             }
-                            /* TODO: Not quite ready yet...
                             if draw_menu_card(
                                 ui,
-                                "Interlevel Animations",
+                                "Interlevel (INTERLEVEL)",
                                 "Exiting that last map. Here's your statistics. Entering the next one.",
                             ) {
                                 app.creation_modal = CreationModal::Interlevel;
                             }
+                            /* TODO: Finale is not quite ready yet...
                             if draw_menu_card(
                                 ui,
                                 "Finale Definitions",

@@ -14,7 +14,10 @@ pub enum UmapField {
     Music(String),
     ExitPic(String),
     EnterPic(String),
+    ExitAnim(String),
+    EnterAnim(String),
     EndPic(String),
+    EndFinale(String),
     InterBackdrop(String),
     InterMusic(String),
     Next(String),
@@ -61,7 +64,10 @@ impl UmapField {
             UmapField::Music(_) => "music",
             UmapField::ExitPic(_) => "exitpic",
             UmapField::EnterPic(_) => "enterpic",
+            UmapField::ExitAnim(_) => "exitanim",
+            UmapField::EnterAnim(_) => "enteranim",
             UmapField::EndPic(_) => "endpic",
+            UmapField::EndFinale(_) => "endfinale",
             UmapField::InterBackdrop(_) => "interbackdrop",
             UmapField::InterMusic(_) => "intermusic",
             UmapField::Next(_) => "next",
@@ -92,8 +98,11 @@ impl UmapField {
             | UmapField::NextSecret(s)
             | UmapField::ExitPic(s)
             | UmapField::EnterPic(s)
+            | UmapField::ExitAnim(s)
+            | UmapField::EnterAnim(s)
             | UmapField::LevelPic(s)
             | UmapField::EndPic(s)
+            | UmapField::EndFinale(s)
             | UmapField::InterBackdrop(s)
             | UmapField::InterMusic(s) => Some(s),
             _ => None,
@@ -224,21 +233,7 @@ impl UmapInfoFile {
                         ));
                     }
                     _ => {
-                        if let Some(s) = match field {
-                            UmapField::LevelName(s)
-                            | UmapField::Author(s)
-                            | UmapField::SkyTexture(s)
-                            | UmapField::Music(s)
-                            | UmapField::ExitPic(s)
-                            | UmapField::EnterPic(s)
-                            | UmapField::LevelPic(s)
-                            | UmapField::EndPic(s)
-                            | UmapField::InterBackdrop(s)
-                            | UmapField::InterMusic(s)
-                            | UmapField::Next(s)
-                            | UmapField::NextSecret(s) => Some(s),
-                            _ => None,
-                        } {
+                        if let Some(s) = field.clone().as_string_mut() {
                             out.push_str(&format!("\t{} = \"{}\"\n", field.key_name(), s));
                         }
                     }
@@ -286,7 +281,10 @@ impl UmapInfoFile {
                 "label" => Some(UmapField::Label(val_clean)),
                 "exitpic" => Some(UmapField::ExitPic(val_clean)),
                 "enterpic" => Some(UmapField::EnterPic(val_clean)),
+                "exitanim" => Some(UmapField::ExitAnim(val_clean)),
+                "enteranim" => Some(UmapField::EnterAnim(val_clean)),
                 "endpic" => Some(UmapField::EndPic(val_clean)),
+                "endfinale" => Some(UmapField::EndFinale(val_clean)),
                 "interbackdrop" => Some(UmapField::InterBackdrop(val_clean)),
                 "intermusic" => Some(UmapField::InterMusic(val_clean)),
                 "partime" => val_clean.parse::<i32>().ok().map(UmapField::ParTime),
@@ -305,11 +303,7 @@ impl UmapInfoFile {
                         };
                         Some(f)
                     } else {
-                        let lines = values
-                            .iter()
-                            .map(|s| clean_segment(s))
-                            .filter(|s| !s.is_empty())
-                            .collect();
+                        let lines = values.iter().map(|s| clean_segment(s)).collect();
                         if key == "intertext" {
                             Some(UmapField::InterText(lines))
                         } else {
@@ -369,8 +363,19 @@ impl UmapInfoFile {
         };
 
         for line in text.lines() {
+            let line = if let Some(idx) = line.find("//") {
+                &line[..idx]
+            } else {
+                line
+            };
+            let line = if let Some(idx) = line.find('#') {
+                &line[..idx]
+            } else {
+                line
+            };
             let line = line.trim();
-            if line.is_empty() || line.starts_with("//") || line.starts_with('#') {
+
+            if line.is_empty() {
                 continue;
             }
 

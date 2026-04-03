@@ -32,7 +32,11 @@ pub fn open_project_dialog() -> Option<String> {
 }
 
 /// Entry point for loading project data from any supported file format.
-pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<LoadedProject> {
+pub fn load_project_from_path(
+    ctx: &egui::Context,
+    path_str: &str,
+    base_iwad: Option<&str>,
+) -> Option<LoadedProject> {
     let path = PathBuf::from(path_str);
     if !path.exists() {
         eprintln!("File not found: {}", path_str);
@@ -48,7 +52,7 @@ pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<Loa
     if ext == "pk3" || ext == "zip" {
         load_pk3(ctx, &path)
     } else if ext == "wad" {
-        match wad::load_wad_project(ctx, &path) {
+        match wad::load_wad_project(ctx, &path, base_iwad) {
             Ok(loaded) => Some(loaded),
             Err(e) => {
                 eprintln!("Failed to load WAD project: {}", e);
@@ -56,9 +60,9 @@ pub fn load_project_from_path(ctx: &egui::Context, path_str: &str) -> Option<Loa
             }
         }
     } else if ext == "json" || ext == "txt" || ext.is_empty() {
-        load_text_file_with_name(&path).or_else(|| load_extensionless_as_wad(ctx, &path))
+        load_text_file_with_name(&path).or_else(|| load_extensionless_as_wad(ctx, &path, base_iwad))
     } else {
-        load_text_file_with_name(&path).or_else(|| load_extensionless_as_wad(ctx, &path))
+        load_text_file_with_name(&path).or_else(|| load_extensionless_as_wad(ctx, &path, base_iwad))
     }
 }
 
@@ -112,13 +116,17 @@ fn load_text_file_with_name(path: &PathBuf) -> Option<LoadedProject> {
 
 /// Attempts to load a file without extension as a WAD or PK3/ZIP file
 /// by checking magic bytes (header sniffing)
-fn load_extensionless_as_wad(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
+fn load_extensionless_as_wad(
+    ctx: &egui::Context,
+    path: &PathBuf,
+    base_iwad: Option<&str>,
+) -> Option<LoadedProject> {
     if let Ok(mut file) = fs::File::open(path) {
         let mut header = [0u8; 4];
         if file.read_exact(&mut header).is_ok() {
             if &header == b"IWAD" || &header == b"PWAD" {
                 eprintln!("Detected WAD file (no extension), attempting to load...");
-                match wad::load_wad_project(ctx, path) {
+                match wad::load_wad_project(ctx, path, base_iwad) {
                     Ok(loaded) => return Some(loaded),
                     Err(e) => eprintln!("Failed to load as WAD: {}", e),
                 }
@@ -154,14 +162,31 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
-        let is_managed_lump = valid_lumps.iter().any(|&l| l.eq_ignore_ascii_case(stem));
+        let is_known_name = valid_lumps.iter().any(|&l| l.eq_ignore_ascii_case(stem));
+        let is_json_ext = name.to_lowercase().ends_with(".json");
         let is_graphic = name.to_lowercase().starts_with("graphics/");
 
-        if is_managed_lump {
+        if is_known_name || is_json_ext {
             let mut lump_data = Vec::new();
             if f.read_to_end(&mut lump_data).is_ok() {
                 if let Some(parsed) = crate::models::ProjectData::parse_lump(&name, &lump_data) {
-                    lumps.push(parsed);
+                    if let crate::models::ProjectData::Interlevel(mut new_ilvl) = parsed {
+                        if let Some(crate::models::ProjectData::Interlevel(existing)) = lumps
+                            .iter_mut()
+                            .find(|l| matches!(l, crate::models::ProjectData::Interlevel(_)))
+                        {
+                            existing.screens.append(&mut new_ilvl.screens);
+                        } else {
+                            lumps.push(crate::models::ProjectData::Interlevel(new_ilvl));
+                        }
+                    } else {
+                        lumps.push(parsed);
+                    }
+                } else {
+                    passthrough_lumps.push(wad::RawLump {
+                        name: name.clone(),
+                        data: lump_data,
+                    });
                 }
             }
         } else if is_graphic {
@@ -201,9 +226,11 @@ fn build_pk3<W: Write + Seek>(
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
-    let mut managed_paths = std::collections::HashSet::new();
+    let mut managed_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
     for lump in lumps {
-        managed_paths.insert(lump.standard_lump_name().to_string());
+        for (name, _) in lump.get_export_entries(assets) {
+            managed_paths.insert(name);
+        }
     }
 
     let has_skydefs = lumps.iter().any(|l| l.standard_lump_name() == "SKYDEFS");

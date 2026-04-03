@@ -1,4 +1,5 @@
 pub mod actions;
+mod interlevel;
 mod layout;
 mod sky;
 mod tree;
@@ -86,7 +87,9 @@ impl ProjectDocument {
                         DocumentAction::Tree(tree_act) => {
                             if let Some(ProjectData::StatusBar(sbar)) = active_lump {
                                 tree::execute_tree_action(sbar, tree_act, selection_ref);
-                            } else if let Some(ProjectData::UmapInfo(_)) = active_lump {
+                            } else if let Some(ProjectData::UmapInfo(_))
+                            | Some(ProjectData::Interlevel(_)) = active_lump
+                            {
                                 if let TreeAction::Select(paths) = tree_act {
                                     selection_ref.clear();
                                     for path in paths {
@@ -103,6 +106,15 @@ impl ProjectDocument {
                         DocumentAction::Umap(umap_act) => {
                             if let Some(ProjectData::UmapInfo(info)) = active_lump {
                                 umapinfo::execute_umapinfo_action(info, umap_act, selection_ref);
+                            }
+                        }
+                        DocumentAction::Interlevel(int_act) => {
+                            if let Some(ProjectData::Interlevel(inter_file)) = active_lump {
+                                interlevel::execute_interlevel_action(
+                                    inter_file,
+                                    selection_ref,
+                                    int_act,
+                                );
                             }
                         }
                         _ => {}

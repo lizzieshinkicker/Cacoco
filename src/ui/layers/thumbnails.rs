@@ -2,12 +2,12 @@ use crate::assets::{AssetId, AssetStore};
 use crate::models::sbardef::{ComponentType, Element, ElementWrapper, NumberType, SBarDefFile};
 use crate::state::PreviewState;
 use crate::state::simulation::LookDirection;
-use crate::ui::shared;
+use crate::ui::{colors, shared};
 use eframe::egui;
 
 pub const THUMB_SIZE: f32 = 36.0;
 const ROUNDING: f32 = 4.0;
-const BG_COLOR: egui::Color32 = egui::Color32::from_rgb(30, 30, 30);
+const BG_COLOR: egui::Color32 = colors::PANEL_BG;
 const INNER_MARGIN: f32 = 2.0;
 
 /// Draws a simple dark background box for a thumbnail.

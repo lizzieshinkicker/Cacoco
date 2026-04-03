@@ -9,7 +9,7 @@ use eframe::egui;
 use std::collections::HashSet;
 
 mod browser;
-pub(crate) mod colors;
+mod interlevel_screens;
 mod layouts;
 pub(crate) mod sky;
 pub mod thumbnails;
@@ -145,6 +145,15 @@ pub fn draw_layers_panel(
                                 current_bar_idx,
                                 &mut actions,
                                 confirmation_modal,
+                            );
+                        } else if let Some(ProjectData::Interlevel(ilvl)) = file {
+                            changed |= interlevel_screens::draw_screens_browser(
+                                ui,
+                                ilvl,
+                                selection,
+                                current_bar_idx,
+                                assets,
+                                &mut actions,
                             );
                         } else {
                             shared::draw_no_file_placeholder(ui);

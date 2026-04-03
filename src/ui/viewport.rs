@@ -6,6 +6,7 @@ use crate::models::sbardef::*;
 use crate::render::projection::ViewportProjection;
 use crate::render::{self, RenderPass};
 use crate::state::PreviewState;
+use crate::ui::colors;
 use crate::ui::properties::editor::ViewportContext;
 use crate::ui::shared::VIEWPORT_RECT_ID;
 use crate::ui::viewport_controller::ViewportController;
@@ -43,7 +44,7 @@ pub fn draw_viewport(
     });
 
     ui.painter()
-        .rect_filled(background_rect, 0.0, egui::Color32::from_rgb(15, 15, 15));
+        .rect_filled(background_rect, 0.0, colors::VIEWPORT_BG);
 
     if project.is_none() {
         ui.scope_builder(egui::UiBuilder::new().max_rect(background_rect), |ui| {
@@ -226,6 +227,7 @@ fn draw_viewport_header(
                     let all_modes = [
                         (ProjectMode::SBarDef, "SBARDEF"),
                         (ProjectMode::SkyDefs, "SKYDEFS"),
+                        (ProjectMode::Interlevel, "INTERLEVEL"),
                         (ProjectMode::UmapInfo, "UMAPINFO"),
                     ];
 
@@ -276,6 +278,11 @@ fn draw_viewport_header(
 
                     add_lump_row("+ SBARDEF", ProjectMode::SBarDef, CreationModal::SBarDef);
                     add_lump_row("+ SKYDEFS", ProjectMode::SkyDefs, CreationModal::SkyDefs);
+                    add_lump_row(
+                        "+ INTERLEVEL",
+                        ProjectMode::Interlevel,
+                        CreationModal::Interlevel,
+                    );
                     add_lump_row("+ UMAPINFO", ProjectMode::UmapInfo, CreationModal::UmapInfo);
                 });
             }
