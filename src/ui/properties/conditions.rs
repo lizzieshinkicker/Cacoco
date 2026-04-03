@@ -143,13 +143,7 @@ fn draw_condition_card(
 
                 paint_thumb_content(ui, rect, tex, None);
                 if tex.is_none() {
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "?",
-                        egui::FontId::proportional(18.0),
-                        egui::Color32::from_gray(100),
-                    );
+                    common::draw_type_placeholder(ui.painter(), rect);
                 }
             });
 

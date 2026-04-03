@@ -28,6 +28,7 @@ enum PropertyTab {
 fn draw_layer_properties(
     ui: &mut egui::Ui,
     layer: &mut InterlevelLayer,
+    ctx: &PropertyContext,
     current_tab: PropertyTab,
 ) -> bool {
     let mut changed = false;
@@ -47,7 +48,12 @@ fn draw_layer_properties(
             });
         }
         PropertyTab::Conditions => {
-            changed |= conditions::draw_interlevel_conditions(ui, &mut layer.conditions);
+            changed |= conditions::draw_interlevel_conditions(
+                ui,
+                &mut layer.conditions,
+                ctx.assets,
+                ctx.state,
+            );
         }
     }
     changed
@@ -82,7 +88,12 @@ fn draw_anim_properties(
             changed |= frames::draw_interlevel_frames_editor(ui, anim, ctx.assets);
         }
         PropertyTab::Conditions => {
-            changed |= conditions::draw_interlevel_conditions(ui, &mut anim.conditions);
+            changed |= conditions::draw_interlevel_conditions(
+                ui,
+                &mut anim.conditions,
+                ctx.assets,
+                ctx.state,
+            );
         }
     }
     changed
@@ -261,7 +272,7 @@ impl LumpUI for InterlevelDefFile {
             Some(path) => match path.as_slice() {
                 [_s, l] => {
                     if let Some(layer) = screen.data.layers.get_mut(*l) {
-                        changed |= draw_layer_properties(ui, layer, current_tab);
+                        changed |= draw_layer_properties(ui, layer, ctx, current_tab);
                     }
                 }
                 [_s, l, a] => {
@@ -313,12 +324,17 @@ impl LumpUI for InterlevelDefFile {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (l_idx, layer) in screen.data.layers.iter().enumerate() {
+                    let is_visible = layer
+                        .conditions
+                        .iter()
+                        .all(|c| conditions::is_condition_true(c, ctx.state));
                     let local_path = vec![l_idx];
                     let full_path = vec![screen_idx, l_idx];
                     let is_selected = ctx.selection.contains(&full_path);
 
                     let row = ListRow::new(layer.display_name(l_idx))
                         .selected(is_selected)
+                        .dimmed(!is_visible)
                         .fallback("📦")
                         .show(ui);
 
@@ -342,6 +358,10 @@ impl LumpUI for InterlevelDefFile {
                         ui.add_space(16.0);
                         ui.vertical(|ui| {
                             for (a_idx, anim) in layer.anims.iter().enumerate() {
+                                let is_visible = anim
+                                    .conditions
+                                    .iter()
+                                    .all(|c| conditions::is_condition_true(c, ctx.state));
                                 let local_anim_path = vec![l_idx, a_idx];
                                 let full_anim_path = vec![screen_idx, l_idx, a_idx];
                                 let anim_selected = ctx.selection.contains(&full_anim_path);
@@ -365,6 +385,7 @@ impl LumpUI for InterlevelDefFile {
 
                                 let a_row = ListRow::new(title)
                                     .selected(anim_selected)
+                                    .dimmed(!is_visible)
                                     .texture(tex)
                                     .fallback("🎞")
                                     .show(ui);

@@ -416,3 +416,14 @@ pub fn draw_tic_drag_value(ui: &mut egui::Ui, duration_seconds: &mut f64) -> boo
         false
     }
 }
+
+/// Renders a gray placeholder with a question mark for missing textures.
+pub fn draw_type_placeholder(painter: &egui::Painter, rect: egui::Rect) {
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "?",
+        egui::FontId::proportional(18.0),
+        egui::Color32::from_gray(100),
+    );
+}

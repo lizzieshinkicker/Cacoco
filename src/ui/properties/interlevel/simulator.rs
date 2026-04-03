@@ -38,6 +38,14 @@ pub fn draw_simulator_panel(ui: &mut egui::Ui, state: &mut PreviewState) {
             ui.checkbox(&mut v.ilvl_secret_visited, "");
         });
 
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.add_space((ui.available_width() - 170.0).max(0.0) / 2.0);
+            ui.label("Earlier Maps Visited:");
+            ui.checkbox(&mut v.ilvl_earlier_visited, "");
+        });
+
         ui.add_space(10.0);
     });
 }

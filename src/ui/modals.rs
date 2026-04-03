@@ -183,12 +183,7 @@ pub fn draw_confirmation_modal(
                         if path.is_empty() {
                             app.open_project_ui(ctx);
                         } else {
-                            let iwad = app.config.base_wad_path.clone();
-                            if let Some(loaded) =
-                                crate::io::load_project_from_path(ctx, &path, iwad.as_deref())
-                            {
-                                app.load_project(ctx, loaded, &path);
-                            }
+                            app.spawn_load_task(ctx, path.clone());
                         }
                     }
                     PendingAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
@@ -209,4 +204,27 @@ pub fn draw_confirmation_modal(
     if close_modal {
         app.confirmation_modal = None;
     }
+}
+
+/// Renders a non-dismissible loading overlay when a project is being parsed on a background thread.
+pub fn draw_loading_modal(ctx: &egui::Context) {
+    egui::Area::new(egui::Id::new("loading_modal"))
+        .order(egui::Order::Foreground)
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .show(ctx, |ui| {
+            egui::Frame::window(&ui.style())
+                .inner_margin(20.0)
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(80)))
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add(egui::Spinner::new().size(32.0));
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new("Cacodemons are now praying...")
+                                .weak()
+                                .italics(),
+                        );
+                    });
+                });
+        });
 }

@@ -1,7 +1,7 @@
 use crate::app::{CreationModal, PendingAction, ProjectMode};
 use crate::assets::AssetStore;
 use crate::config::{AppConfig, SourcePortConfig};
-use crate::io::{self, LoadedProject};
+use crate::io;
 use crate::ui::context_menu::ContextMenu;
 use crate::ui::shared;
 use eframe::egui;
@@ -9,7 +9,7 @@ use eframe::egui;
 /// Result of a menu interaction that requires application-level handling.
 pub enum MenuAction {
     None,
-    LoadProject(LoadedProject, String),
+    LoadProject(String),
     Open,
     RequestDiscard(PendingAction),
     SaveDone(String),
@@ -128,12 +128,7 @@ pub fn draw_menu_bar(
                     if dirty {
                         action = MenuAction::RequestDiscard(PendingAction::Load(path));
                     } else {
-                        let iwad = config.base_wad_path.clone();
-                        if let Some(loaded) =
-                            io::load_project_from_path(ctx, &path, iwad.as_deref())
-                        {
-                            action = MenuAction::LoadProject(loaded, path);
-                        }
+                        action = MenuAction::LoadProject(path);
                     }
                     ContextMenu::close(ui);
                 }

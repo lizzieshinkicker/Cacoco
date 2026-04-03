@@ -17,9 +17,31 @@ pub(super) fn condition_name(val: i32) -> &'static str {
     }
 }
 
+pub(super) fn is_condition_true(
+    cond: &InterlevelCondition,
+    state: &crate::state::PreviewState,
+) -> bool {
+    match cond.condition {
+        0 => true,
+        1 => state.viewer.ilvl_current_map > cond.param,
+        2 => state.viewer.ilvl_current_map == cond.param,
+        3 => {
+            state.viewer.ilvl_current_map == cond.param
+                || (state.viewer.ilvl_earlier_visited && state.viewer.ilvl_current_map > cond.param)
+        }
+        4 => !state.viewer.ilvl_is_secret_map,
+        5 => state.viewer.ilvl_secret_visited,
+        6 => state.viewer.ilvl_is_tally,
+        7 => !state.viewer.ilvl_is_tally,
+        _ => true,
+    }
+}
+
 pub(super) fn draw_interlevel_conditions(
     ui: &mut egui::Ui,
     conditions: &mut Vec<InterlevelCondition>,
+    assets: &crate::assets::AssetStore,
+    state: &crate::state::PreviewState,
 ) -> bool {
     let mut changed = false;
 
@@ -48,54 +70,97 @@ pub(super) fn draw_interlevel_conditions(
 
     let mut to_remove = None;
     for (i, cond) in conditions.iter_mut().enumerate() {
+        let is_true = is_condition_true(cond, state);
         let frame = shared::condition_box_frame();
 
-        frame.show(ui, |ui| {
+        let response = frame.show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .add(egui::Button::new("X").min_size(egui::vec2(18.0, 18.0)))
-                        .on_hover_text("Remove Condition")
-                        .clicked()
-                    {
-                        to_remove = Some(i);
+                ui.vertical(|ui| {
+                    let box_size = 44.0;
+                    let (rect, _) = ui
+                        .allocate_exact_size(egui::vec2(box_size, box_size), egui::Sense::hover());
+                    ui.painter()
+                        .rect_filled(rect, 4.0, egui::Color32::from_gray(45));
+
+                    let tex_id = crate::assets::AssetId::new("PMAPA0");
+                    let tex = assets.textures.get(&tex_id);
+                    crate::ui::properties::common::paint_thumb_content(ui, rect, tex, None);
+
+                    if tex.is_none() {
+                        crate::ui::properties::common::draw_type_placeholder(ui.painter(), rect);
                     }
+                });
 
-                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        let id = ui.make_persistent_id(format!("ilvl_cond_{}", i));
-                        let current_name = condition_name(cond.condition);
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .add(egui::Button::new("X").min_size(egui::vec2(18.0, 18.0)))
+                                .on_hover_text("Remove Condition")
+                                .clicked()
+                            {
+                                to_remove = Some(i);
+                            }
 
-                        let btn_res = shared::combobox_button(ui, current_name, 160.0);
-                        if btn_res.clicked() {
-                            ContextMenu::open(ui, id, btn_res.rect.left_bottom());
-                        }
+                            ui.with_layout(
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    let id = ui.make_persistent_id(format!("ilvl_cond_{}", i));
+                                    let current_name = condition_name(cond.condition);
 
-                        if let Some(menu) = ContextMenu::get(ui, id) {
-                            ContextMenu::show(ui, menu, btn_res.clicked(), |ui| {
-                                ui.set_min_width(160.0);
-                                for val in 0..=7 {
-                                    if crate::ui::properties::common::custom_menu_item(
+                                    let btn_res = shared::combobox_button(
                                         ui,
-                                        condition_name(val),
-                                        cond.condition == val,
-                                    ) {
-                                        cond.condition = val;
-                                        changed = true;
-                                        ContextMenu::close(ui);
+                                        current_name,
+                                        ui.available_width(),
+                                    );
+                                    if btn_res.clicked() {
+                                        ContextMenu::open(ui, id, btn_res.rect.left_bottom());
                                     }
-                                }
-                            });
-                        }
 
+                                    if let Some(menu) = ContextMenu::get(ui, id) {
+                                        ContextMenu::show(ui, menu, btn_res.clicked(), |ui| {
+                                            ui.set_min_width(160.0);
+                                            for val in 0..=7 {
+                                                if crate::ui::properties::common::custom_menu_item(
+                                                    ui,
+                                                    condition_name(val),
+                                                    cond.condition == val,
+                                                ) {
+                                                    cond.condition = val;
+                                                    changed = true;
+                                                    ContextMenu::close(ui);
+                                                }
+                                            }
+                                        });
+                                    }
+                                },
+                            );
+                        });
+                    });
+
+                    shared::draw_separator_line(ui);
+
+                    ui.horizontal(|ui| {
                         if matches!(cond.condition, 1 | 2 | 3) {
-                            ui.add_space(8.0);
-                            ui.label("Map:");
+                            ui.label("Map Param:");
                             changed |= ui.add(egui::DragValue::new(&mut cond.param)).changed();
+                        } else {
+                            ui.label(egui::RichText::new("(No Params)").weak().size(11.0));
                         }
                     });
                 });
             });
         });
+
+        let tint_color = if is_true {
+            egui::Color32::from_rgba_unmultiplied(40, 140, 40, 30)
+        } else {
+            egui::Color32::from_rgba_unmultiplied(140, 40, 40, 30)
+        };
+
+        ui.painter()
+            .rect_filled(response.response.rect, 4.0, tint_color);
+
         ui.add_space(4.0);
     }
 

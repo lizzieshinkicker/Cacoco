@@ -231,6 +231,10 @@ pub fn draw_root_ui(ctx: &egui::Context, app: &mut CacocoApp) {
     if app.creation_modal != crate::app::CreationModal::None {
         ui::menu::draw_creation_wizard(ctx, app);
     }
+
+    if app.loading_receiver.is_some() {
+        ui::modals::draw_loading_modal(ctx);
+    }
 }
 
 /// Helper to update the OS window title based on current document state.
@@ -623,7 +627,7 @@ fn handle_menu_action(app: &mut CacocoApp, action: ui::MenuAction, ctx: &egui::C
             app.doc = None;
             app.creation_modal = crate::app::CreationModal::LumpSelector;
         }
-        ui::MenuAction::LoadProject(loaded, path) => app.load_project(ctx, loaded, &path),
+        ui::MenuAction::LoadProject(path) => app.spawn_load_task(ctx, path),
         ui::MenuAction::Open => app.open_project_ui(ctx),
         ui::MenuAction::RequestDiscard(pending) => {
             app.confirmation_modal = Some(ConfirmationRequest::DiscardChanges(pending));

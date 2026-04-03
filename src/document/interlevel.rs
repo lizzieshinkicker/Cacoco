@@ -36,7 +36,7 @@ pub fn execute_interlevel_action(
             if let Some(screen) = file.screens.get_mut(screen_idx) {
                 screen.data.layers.push(InterlevelLayer::default());
                 selection.clear();
-                selection.insert(vec![screen.data.layers.len() - 1]);
+                selection.insert(vec![screen_idx, screen.data.layers.len() - 1]);
             }
         }
         InterlevelAction::AddAnim {
@@ -47,7 +47,7 @@ pub fn execute_interlevel_action(
                 if let Some(layer) = screen.data.layers.get_mut(layer_idx) {
                     layer.anims.push(InterlevelAnim::default());
                     selection.clear();
-                    selection.insert(vec![layer_idx, layer.anims.len() - 1]);
+                    selection.insert(vec![screen_idx, layer_idx, layer.anims.len() - 1]);
                 }
             }
         }
@@ -81,13 +81,13 @@ pub fn execute_interlevel_action(
                     [l] if *l > 0 => {
                         screen.data.layers.swap(*l, l - 1);
                         selection.clear();
-                        selection.insert(vec![l - 1]);
+                        selection.insert(vec![screen_idx, l - 1]);
                     }
                     [l, a] if *a > 0 => {
                         if let Some(layer) = screen.data.layers.get_mut(*l) {
                             layer.anims.swap(*a, a - 1);
                             selection.clear();
-                            selection.insert(vec![*l, a - 1]);
+                            selection.insert(vec![screen_idx, *l, a - 1]);
                         }
                     }
                     _ => {}
@@ -100,14 +100,14 @@ pub fn execute_interlevel_action(
                     [l] if *l + 1 < screen.data.layers.len() => {
                         screen.data.layers.swap(*l, l + 1);
                         selection.clear();
-                        selection.insert(vec![l + 1]);
+                        selection.insert(vec![screen_idx, l + 1]);
                     }
                     [l, a] => {
                         if let Some(layer) = screen.data.layers.get_mut(*l) {
                             if *a + 1 < layer.anims.len() {
                                 layer.anims.swap(*a, a + 1);
                                 selection.clear();
-                                selection.insert(vec![*l, a + 1]);
+                                selection.insert(vec![screen_idx, *l, a + 1]);
                             }
                         }
                     }

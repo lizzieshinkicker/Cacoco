@@ -11,6 +11,7 @@ use crate::ui::messages::{self, EditorEvent};
 use crate::ui::viewport_controller::ViewportController;
 use eframe::egui;
 use std::collections::HashSet;
+use std::sync::mpsc::Receiver;
 
 const MAX_RECENT_FILES: usize = 5;
 
@@ -104,8 +105,9 @@ pub struct CacocoApp {
     pub iwad_verified: bool,
     /// Lump that is currently being edited.
     pub active_mode: ProjectMode,
-    /// Modal to select which Lump to create.
     pub creation_modal: CreationModal,
+    /// Channel receiver for background project loading.
+    pub loading_receiver: Option<Receiver<Result<(io::LoadedProject, String), String>>>,
 }
 
 impl Default for CacocoApp {
@@ -127,6 +129,7 @@ impl Default for CacocoApp {
             iwad_verified: false,
             active_mode: ProjectMode::SBarDef,
             creation_modal: CreationModal::default(),
+            loading_receiver: None,
         }
     }
 }
@@ -148,16 +151,7 @@ impl CacocoApp {
         }
 
         if let Some(file_path) = open_file_path {
-            let iwad = app.config.base_wad_path.clone();
-            if let Some(loaded) =
-                io::load_project_from_path(&cc.egui_ctx, &file_path, iwad.as_deref())
-            {
-                app.load_project(&cc.egui_ctx, loaded, &file_path);
-                println!("Loaded project from command line: {}", file_path);
-            } else {
-                eprintln!("Failed to load project from command line: {}", file_path);
-                app.reload_resources(&cc.egui_ctx);
-            }
+            app.spawn_load_task(&cc.egui_ctx, file_path);
         } else {
             app.reload_resources(&cc.egui_ctx);
         }
@@ -200,6 +194,26 @@ impl CacocoApp {
 
         self.assets = new_assets;
         self.load_system_assets(ctx);
+    }
+
+    /// Spawns a background thread to load a project, preventing UI hangs.
+    pub fn spawn_load_task(&mut self, ctx: &egui::Context, path: String) {
+        let iwad = self.config.base_wad_path.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.loading_receiver = Some(rx);
+
+        let ctx_clone = ctx.clone();
+        let path_clone = path.clone();
+
+        std::thread::spawn(move || {
+            if let Some(loaded) =
+                io::load_project_from_path(&ctx_clone, &path_clone, iwad.as_deref())
+            {
+                let _ = tx.send(Ok((loaded, path_clone)));
+            } else {
+                let _ = tx.send(Err(format!("Failed to load project: {}", path_clone)));
+            }
+        });
     }
 
     /// Loads built-in branding, badges, and template assets into the store.
@@ -390,16 +404,26 @@ impl CacocoApp {
     /// Opens the system dialog to pick a project and loads it if successful.
     pub fn open_project_ui(&mut self, ctx: &egui::Context) {
         if let Some(path) = io::open_project_dialog() {
-            let iwad = self.config.base_wad_path.clone();
-            if let Some(loaded) = io::load_project_from_path(ctx, &path, iwad.as_deref()) {
-                self.load_project(ctx, loaded, &path);
-            }
+            self.spawn_load_task(ctx, path);
         }
     }
 }
 
 impl eframe::App for CacocoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if let Some(rx) = &self.loading_receiver {
+            if let Ok(result) = rx.try_recv() {
+                match result {
+                    Ok((loaded, path)) => self.load_project(ctx, loaded, &path),
+                    Err(e) => {
+                        messages::log_event(&mut self.preview_state, EditorEvent::Cheat(e));
+                        self.reload_resources(ctx);
+                    }
+                }
+                self.loading_receiver = None;
+            }
+        }
+
         if let Some(doc) = &self.doc {
             if let Some(iwad_path) = &self.config.base_wad_path {
                 self.assets

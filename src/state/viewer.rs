@@ -20,6 +20,7 @@ pub struct ViewerState {
     pub ilvl_is_secret_map: bool,
     pub ilvl_is_tally: bool,
     pub ilvl_secret_visited: bool,
+    pub ilvl_earlier_visited: bool,
 }
 
 impl Default for ViewerState {
@@ -39,6 +40,7 @@ impl Default for ViewerState {
             ilvl_is_secret_map: false,
             ilvl_is_tally: true,
             ilvl_secret_visited: false,
+            ilvl_earlier_visited: true,
         }
     }
 }

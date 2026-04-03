@@ -1,6 +1,6 @@
 use crate::assets::{AssetId, AssetStore};
 use crate::models::interlevel::{InterlevelAnim, InterlevelFrame};
-use crate::ui::layers::thumbnails;
+use crate::ui::properties::common;
 use crate::ui::shared;
 use eframe::egui;
 use std::collections::HashSet;
@@ -9,6 +9,7 @@ pub(super) enum InterlevelFrameAction {
     MoveSelection(Vec<usize>, usize),
     Add(usize, String),
     Replace(usize, String),
+    Remove(usize),
 }
 
 pub(super) fn get_active_frame_index(
@@ -63,14 +64,203 @@ fn draw_interlevel_frame_row(
     is_active: bool,
 ) -> bool {
     let mut changed = false;
-    let row_height = 54.0;
     let is_selected = selection.contains(&idx);
-    let spacing_offset = ui.spacing().item_spacing.y * 0.5;
 
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), row_height),
-        egui::Sense::click_and_drag(),
-    );
+    let box_frame = shared::condition_box_frame();
+
+    let frame_res = box_frame.show(ui, |ui| {
+        let inner_height = 48.0;
+        let (rect, response) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width(), inner_height),
+            egui::Sense::click_and_drag(),
+        );
+
+        ui.scope_builder(
+            egui::UiBuilder::new().max_rect(rect),
+            |ui: &mut egui::Ui| {
+                ui.with_layout(
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui: &mut egui::Ui| {
+                        ui.vertical(|ui: &mut egui::Ui| {
+                            let box_size = 48.0;
+                            let (icon_rect, _) = ui.allocate_exact_size(
+                                egui::vec2(box_size, box_size),
+                                egui::Sense::hover(),
+                            );
+                            ui.painter()
+                                .rect_filled(icon_rect, 4.0, egui::Color32::from_gray(45));
+
+                            let id = AssetId::new(&frame.image);
+                            let tex = assets.textures.get(&id);
+
+                            common::paint_thumb_content(ui, icon_rect, tex, None);
+
+                            if tex.is_none() {
+                                common::draw_type_placeholder(ui.painter(), icon_rect);
+                            }
+                        });
+
+                        ui.vertical(|ui: &mut egui::Ui| {
+                            ui.horizontal(|ui: &mut egui::Ui| {
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui: &mut egui::Ui| {
+                                        if ui
+                                            .add(
+                                                egui::Button::new("X")
+                                                    .min_size(egui::vec2(18.0, 18.0)),
+                                            )
+                                            .on_hover_text("Remove Frame")
+                                            .clicked()
+                                        {
+                                            actions.push(InterlevelFrameAction::Remove(idx));
+                                        }
+
+                                        let base_type = frame.frame_type & 0x7;
+                                        let type_name = match base_type {
+                                            1 => "Infinite",
+                                            4 => "Random",
+                                            _ => "Fixed",
+                                        };
+
+                                        let id =
+                                            ui.make_persistent_id(format!("frame_type_dd_{}", idx));
+                                        let btn_res = shared::combobox_button(ui, type_name, 70.0);
+                                        if btn_res.clicked() {
+                                            crate::ui::context_menu::ContextMenu::open(
+                                                ui,
+                                                id,
+                                                btn_res.rect.left_bottom(),
+                                            );
+                                        }
+
+                                        if let Some(menu) =
+                                            crate::ui::context_menu::ContextMenu::get(ui, id)
+                                        {
+                                            crate::ui::context_menu::ContextMenu::show(
+                                                ui,
+                                                menu,
+                                                btn_res.clicked(),
+                                                |ui: &mut egui::Ui| {
+                                                    ui.set_min_width(90.0);
+                                                    if common::custom_menu_item(
+                                                        ui,
+                                                        "Fixed",
+                                                        base_type == 2,
+                                                    ) {
+                                                        frame.frame_type =
+                                                            (frame.frame_type & !0x7) | 2;
+                                                        changed = true;
+                                                        crate::ui::context_menu::ContextMenu::close(
+                                                            ui,
+                                                        );
+                                                    }
+                                                    if common::custom_menu_item(
+                                                        ui,
+                                                        "Random",
+                                                        base_type == 4,
+                                                    ) {
+                                                        frame.frame_type =
+                                                            (frame.frame_type & !0x7) | 4;
+                                                        changed = true;
+                                                        crate::ui::context_menu::ContextMenu::close(
+                                                            ui,
+                                                        );
+                                                    }
+                                                    if common::custom_menu_item(
+                                                        ui,
+                                                        "Infinite",
+                                                        base_type == 1,
+                                                    ) {
+                                                        frame.frame_type =
+                                                            (frame.frame_type & !0x7) | 1;
+                                                        changed = true;
+                                                        crate::ui::context_menu::ContextMenu::close(
+                                                            ui,
+                                                        );
+                                                    }
+                                                },
+                                            );
+                                        }
+
+                                        ui.with_layout(
+                                            egui::Layout::left_to_right(egui::Align::Center),
+                                            |ui: &mut egui::Ui| {
+                                                ui.label(
+                                                    egui::RichText::new(&frame.image).strong(),
+                                                );
+                                            },
+                                        );
+                                    },
+                                );
+                            });
+
+                            ui.add_space(2.0);
+                            shared::draw_separator_line(ui);
+                            ui.add_space(4.0);
+
+                            ui.horizontal(|ui: &mut egui::Ui| {
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui: &mut egui::Ui| {
+                                        let mut widescreen = (frame.frame_type & 0x8000000) != 0;
+                                        if ui
+                                            .toggle_value(&mut widescreen, "Wide")
+                                            .on_hover_text("Center for Widescreen")
+                                            .changed()
+                                        {
+                                            frame.frame_type = (frame.frame_type & !0x8000000)
+                                                | (if widescreen { 0x8000000 } else { 0 });
+                                            changed = true;
+                                        }
+
+                                        let mut random_first = (frame.frame_type & 0x1000) != 0;
+                                        if ui
+                                            .toggle_value(&mut random_first, "RFF")
+                                            .on_hover_text("Random First Frame Offset")
+                                            .changed()
+                                        {
+                                            frame.frame_type = (frame.frame_type & !0x1000)
+                                                | (if random_first { 0x1000 } else { 0 });
+                                            changed = true;
+                                        }
+
+                                        ui.with_layout(
+                                            egui::Layout::left_to_right(egui::Align::Center),
+                                            |ui: &mut egui::Ui| {
+                                                let base_type = frame.frame_type & 0x7;
+                                                if base_type == 2 || base_type == 4 {
+                                                    changed |= common::draw_tic_drag_value(
+                                                        ui,
+                                                        &mut frame.duration,
+                                                    );
+                                                }
+                                                if base_type == 4 {
+                                                    ui.label("/");
+                                                    changed |= common::draw_tic_drag_value(
+                                                        ui,
+                                                        &mut frame.maxduration,
+                                                    );
+                                                }
+                                            },
+                                        );
+                                    },
+                                );
+                            });
+                        });
+                    },
+                );
+            },
+        );
+
+        response
+    });
+
+    let response = frame_res.inner;
+    let rect = frame_res.response.rect;
+
+    let row_height = rect.height();
+    let spacing_offset = ui.spacing().item_spacing.y * 0.5;
 
     if response.clicked() {
         shared::handle_list_selection(ui, is_selected, idx, selection, pivot);
@@ -146,119 +336,25 @@ fn draw_interlevel_frame_row(
         }
     }
 
-    let mut bg = if is_active {
+    let mut tint = if is_active {
         egui::Color32::from_rgba_unmultiplied(0, 255, 255, 10)
     } else {
         egui::Color32::TRANSPARENT
     };
     if response.hovered() {
-        bg = ui.visuals().widgets.hovered.bg_fill;
+        tint = egui::Color32::from_white_alpha(5);
     }
-    let stroke = if is_selected {
-        ui.visuals().selection.stroke
-    } else {
-        egui::Stroke::NONE
-    };
-    ui.painter()
-        .rect(rect, 4.0, bg, stroke, egui::StrokeKind::Outside);
-
-    let thumb_rect = egui::Rect::from_center_size(
-        egui::pos2(rect.min.x + 22.0, rect.center().y),
-        egui::vec2(thumbnails::THUMB_SIZE, thumbnails::THUMB_SIZE),
-    );
-    let mut thumb_ui = ui.new_child(egui::UiBuilder::new().max_rect(thumb_rect));
-
-    let id = AssetId::new(&frame.image);
-    thumbnails::draw_thumbnail_widget(
-        &mut thumb_ui,
-        assets.textures.get(&id),
-        Some("?"),
-        false,
-        false,
-    );
-
-    let content_rect = egui::Rect::from_min_max(
-        egui::pos2(rect.min.x + 48.0, rect.min.y + 4.0),
-        egui::pos2(rect.max.x - 4.0, rect.max.y - 4.0),
-    );
-
-    ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
-        ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(&frame.image).strong());
-
-                let mut base_type = frame.frame_type & 0x7;
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .radio_value(&mut base_type, 4, "Rnd")
-                        .on_hover_text("Random Duration")
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                    if ui
-                        .radio_value(&mut base_type, 2, "Fix")
-                        .on_hover_text("Fixed Duration")
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                    if ui
-                        .radio_value(&mut base_type, 1, "Inf")
-                        .on_hover_text("Infinite Duration")
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                });
-
-                if changed {
-                    frame.frame_type = (frame.frame_type & !0x7) | base_type;
-                }
-            });
-
-            ui.horizontal(|ui| {
-                let base_type = frame.frame_type & 0x7;
-
-                if base_type == 2 || base_type == 4 {
-                    changed |=
-                        crate::ui::properties::common::draw_tic_drag_value(ui, &mut frame.duration);
-                }
-
-                if base_type == 4 {
-                    ui.label("Max:");
-                    changed |= crate::ui::properties::common::draw_tic_drag_value(
-                        ui,
-                        &mut frame.maxduration,
-                    );
-                }
-
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let mut widescreen = (frame.frame_type & 0x8000000) != 0;
-                    if ui
-                        .checkbox(&mut widescreen, "Wide")
-                        .on_hover_text("Center for Widescreen")
-                        .changed()
-                    {
-                        frame.frame_type = (frame.frame_type & !0x8000000)
-                            | (if widescreen { 0x8000000 } else { 0 });
-                        changed = true;
-                    }
-
-                    let mut random_first = (frame.frame_type & 0x1000) != 0;
-                    if ui
-                        .checkbox(&mut random_first, "RFF")
-                        .on_hover_text("Random First Frame Offset")
-                        .changed()
-                    {
-                        frame.frame_type =
-                            (frame.frame_type & !0x1000) | (if random_first { 0x1000 } else { 0 });
-                        changed = true;
-                    }
-                });
-            });
-        });
-    });
+    if is_selected {
+        ui.painter().rect_stroke(
+            rect,
+            4.0,
+            ui.visuals().selection.stroke,
+            egui::StrokeKind::Inside,
+        );
+    }
+    if tint != egui::Color32::TRANSPARENT {
+        ui.painter().rect_filled(rect, 4.0, tint);
+    }
 
     if response.dragged() {
         let label = if selection.len() > 1 {
@@ -269,17 +365,19 @@ fn draw_interlevel_frame_row(
         shared::draw_drag_ghost(
             ui.ctx(),
             |ui| {
-                thumbnails::draw_thumbnail_widget(
-                    ui,
-                    assets.textures.get(&id),
-                    Some("?"),
-                    false,
-                    false,
-                );
+                let id = AssetId::new(&frame.image);
+                let tex = assets.textures.get(&id);
+                let (ghost_rect, _) =
+                    ui.allocate_exact_size(egui::vec2(36.0, 36.0), egui::Sense::hover());
+                ui.painter()
+                    .rect_filled(ghost_rect, 4.0, egui::Color32::from_gray(45));
+                common::paint_thumb_content(ui, ghost_rect, tex, None);
             },
             &label,
         );
     }
+
+    ui.add_space(4.0);
     changed
 }
 
@@ -325,7 +423,6 @@ pub(super) fn draw_interlevel_frames_editor(
     ui.horizontal(|ui| {
         ui.heading("Frames");
         ui.add_space(8.0);
-        ui.label(egui::RichText::new("Sequence of images to play.").weak());
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.button("Add").clicked() {
@@ -418,6 +515,12 @@ pub(super) fn draw_interlevel_frames_editor(
             InterlevelFrameAction::Replace(i, lump) => {
                 if i < anim.frames.len() {
                     anim.frames[i].image = lump;
+                }
+            }
+            InterlevelFrameAction::Remove(i) => {
+                if i < anim.frames.len() {
+                    anim.frames.remove(i);
+                    f_selection.remove(&i);
                 }
             }
         }
