@@ -545,7 +545,7 @@ dependencies = [
 
 [[package]]
 name = "cacoco"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "anyhow",
  "bitflags 2.10.0",
