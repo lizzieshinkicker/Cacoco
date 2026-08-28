@@ -515,8 +515,8 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                 .num_columns(2)
                 .spacing(egui::vec2(12.0, 4.0))
                 .show(ui, |ui| {
-                    ui.label("Mode:");
-                    egui::ComboBox::from_id_salt("sb_mode_dd")
+                    ui.label("Session Type:");
+                    egui::ComboBox::from_id_salt("sb_session_dd")
                         .selected_text(match state.sim.world.session_type {
                             0 => "Single Player",
                             1 => "Cooperative",
@@ -536,6 +536,30 @@ pub fn draw_context_panel(ui: &mut egui::Ui, state: &mut PreviewState, assets: &
                                 "Cooperative",
                             );
                             ui.selectable_value(&mut state.sim.world.session_type, 2, "Deathmatch");
+                        });
+                    ui.end_row();
+
+                    ui.label("Game Mode:");
+                    egui::ComboBox::from_id_salt("sb_gamemode_dd")
+                        .selected_text(match state.sim.world.game_mode {
+                            0 => "Registered (D1)",
+                            1 => "Retail (UDoom)",
+                            2 => "Commercial (D2)",
+                            _ => "Unknown",
+                        })
+                        .width(110.0)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut state.sim.world.game_mode,
+                                0,
+                                "Registered (D1)",
+                            );
+                            ui.selectable_value(
+                                &mut state.sim.world.game_mode,
+                                1,
+                                "Retail (UDoom)",
+                            );
+                            ui.selectable_value(&mut state.sim.world.game_mode, 2, "Commerc. (D2)");
                         });
                     ui.end_row();
 

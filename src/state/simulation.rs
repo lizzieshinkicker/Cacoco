@@ -164,6 +164,7 @@ impl Inventory {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WorldContext {
     pub session_type: i32,
+    pub game_mode: i32,
     pub episode: i32,
     pub level: i32,
     pub game_version: FeatureLevel,
@@ -227,6 +228,7 @@ impl Default for SimulationState {
                 level: 1,
                 game_version: FeatureLevel::ID24,
                 session_type: 0,
+                game_mode: 2,
             },
             engine: EngineContext::default(),
             selected_weapon_slot: 2,

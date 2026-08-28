@@ -393,6 +393,31 @@ fn draw_params_for_type(
                     assets,
                 );
             }
+            GameModeEq | GameModeNeq => {
+                let id = ui.make_persistent_id(format!("p1_gmode_{:?}_{}", cond.condition, my_idx));
+                let display_label = match cond.param {
+                    0 => "Reg. (D1)",
+                    1 => "Retail (UD)",
+                    2 => "Comm. (D2)",
+                    _ => "Unknown",
+                };
+                let button_res = shared::combobox_button(ui, display_label, ui.available_width());
+                if button_res.clicked() {
+                    ContextMenu::open(ui, id, button_res.rect.left_bottom());
+                }
+                if let Some(menu) = ContextMenu::get(ui, id) {
+                    ContextMenu::show(ui, menu, button_res.clicked(), |ui| {
+                        ui.set_min_width(130.0);
+                        for item in GAME_MODES {
+                            if common::custom_menu_item(ui, item.name, item.id == cond.param) {
+                                cond.param = item.id;
+                                changed = true;
+                                ContextMenu::close(ui);
+                            }
+                        }
+                    });
+                }
+            }
             HudModeEq => {
                 changed |= common::draw_lookup_param_dd(
                     ui,
