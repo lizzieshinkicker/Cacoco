@@ -88,6 +88,12 @@ pub const SESSION_TYPES: &[LookupItem] = &[
     item!(2, "Deathmatch", "STFDEAD0"),
 ];
 
+pub const GAME_MODES: &[LookupItem] = &[
+    item!(0, "Registered (D1)"),
+    item!(1, "Retail (UDoom)"),
+    item!(2, "Commercial (D2)"),
+];
+
 pub const HUD_MODES: &[LookupItem] = &[item!(0, "Standard"), item!(1, "Compact")];
 
 pub const WIDESCREEN_MODES: &[LookupItem] = &[item!(0, "Disabled"), item!(1, "Enabled")];
@@ -264,6 +270,8 @@ pub const GROUPS: &[ConditionGroup] = &[
         variants: &[
             v!("Session", SessionTypeEq),
             v!("Session NOT", SessionTypeNeq),
+            v!("Mode", GameModeEq),
+            v!("Mode NOT", GameModeNeq),
             v!("HUD Mode", HudModeEq),
             v!("Widescreen", WidescreenModeEq),
             v!("Automap", AutomapModeEq),
@@ -327,7 +335,7 @@ pub enum ParamUsage {
 pub fn get_param_usage(condition: ConditionType) -> ParamUsage {
     use ConditionType::*;
     match condition {
-        SelectedWeaponHasAmmo | GameModeEq | GameModeNeq => ParamUsage::None,
+        SelectedWeaponHasAmmo => ParamUsage::None,
         AmmoGe | AmmoLt | AmmoPercentGe | AmmoPercentLt => ParamUsage::Both,
         PowerupTimeGe | PowerupTimeLt | PowerupTimePercentGe | PowerupTimePercentLt => {
             ParamUsage::Both

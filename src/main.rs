@@ -1,3 +1,4 @@
+#![allow(float_literal_f32_fallback)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;

@@ -289,8 +289,8 @@ fn check_game_state_condition(condition: &ConditionDef, state: &PreviewState) ->
         SessionTypeEq => world.session_type == param,
         SessionTypeNeq => world.session_type != param,
 
-        GameModeEq => (world.game_version as i32) == param,
-        GameModeNeq => (world.game_version as i32) != param,
+        GameModeEq => world.game_mode == param,
+        GameModeNeq => world.game_mode != param,
 
         HudModeEq => engine.hud_mode == param,
         AutomapModeEq => {
