@@ -1,6 +1,16 @@
 #![allow(float_literal_f32_fallback)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(target_os = "windows")]
+#[allow(non_upper_case_globals)]
+#[unsafe(no_mangle)]
+pub static NvOptimusEnablement: u32 = 1;
+
+#[cfg(target_os = "windows")]
+#[allow(non_upper_case_globals)]
+#[unsafe(no_mangle)]
+pub static AmdPowerXpressRequestHighPerformance: i32 = 1;
+
 mod app;
 mod assets;
 mod cheats;
