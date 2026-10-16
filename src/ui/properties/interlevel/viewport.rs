@@ -108,21 +108,24 @@ pub(super) fn render_viewport_impl(
 
             let frame_id = AssetId::new(&active_frame.image);
             if let Some(tex) = ctx.assets.textures.get(&frame_id) {
-                let mut x = anim.x as f32;
-                let y = anim.y as f32;
+                let screen_w = if ctx.state.sim.engine.widescreen_mode {
+                    crate::constants::DOOM_W_WIDE
+                } else {
+                    crate::constants::DOOM_W
+                };
 
-                if (active_frame.frame_type & 0x8000000) != 0 {
-                    if ctx.state.sim.engine.widescreen_mode {
-                        x += (crate::constants::DOOM_W_WIDE - crate::constants::DOOM_W) / 2.0;
-                    }
-                }
+                let x = if (active_frame.frame_type & 0x8000000) != 0 {
+                    (screen_w - tex.size()[0] as f32) / 2.0
+                } else {
+                    calculate_interlevel_anim_x(anim.x, ctx.state.sim.engine.widescreen_mode)
+                };
+                let y = anim.y as f32;
 
                 let (left_offset, top_offset) =
                     ctx.assets.offsets.get(&frame_id).copied().unwrap_or((0, 0));
 
                 let draw_x = x - (left_offset as f32);
                 let draw_y = y - (top_offset as f32);
-
                 let virtual_rect = egui::Rect::from_min_size(
                     egui::pos2(draw_x, draw_y),
                     egui::vec2(tex.size()[0] as f32, tex.size()[1] as f32),
@@ -144,4 +147,31 @@ pub(super) fn render_viewport_impl(
 
     ui.ctx().request_repaint();
     Vec::new()
+}
+
+/// Calculates the virtual X coordinate for an interlevel element, accounting for the centered
+/// 320x200 virtual environment in widescreen presentations.
+pub fn calculate_interlevel_anim_x(anim_x: i32, widescreen_mode: bool) -> f32 {
+    let mut x = anim_x as f32;
+    if widescreen_mode {
+        x += (crate::constants::DOOM_W_WIDE - crate::constants::DOOM_W) / 2.0;
+    }
+    x
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interlevel_anim_widescreen_coordinate_centering() {
+        let anim_x = 100;
+
+        let x_4_3 = calculate_interlevel_anim_x(anim_x, false);
+        assert_eq!(x_4_3, 100.0);
+
+        let x_wide = calculate_interlevel_anim_x(anim_x, true);
+        let expected_offset = (crate::constants::DOOM_W_WIDE - crate::constants::DOOM_W) / 2.0;
+        assert_eq!(x_wide, 100.0 + expected_offset);
+    }
 }

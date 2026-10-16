@@ -112,12 +112,6 @@ pub fn load_wad_project(
         }
     }
 
-    if lumps.is_empty() {
-        lumps.push(ProjectData::StatusBar(
-            crate::models::sbardef::SBarDefFile::new_empty(),
-        ));
-    }
-
     Ok(crate::io::LoadedProject {
         lumps,
         assets,
@@ -380,6 +374,25 @@ pub fn write_wad_to_file<W: Write + Seek>(
             size: new_data.len() as u32,
             name,
         });
+    }
+
+    for (id, bytes) in &assets.raw_files {
+        let name = assets
+            .names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| format!("{}", id));
+        let mut stem = AssetStore::stem(&name).to_uppercase();
+        stem.truncate(8);
+        if !records.iter().any(|r| r.name == stem) {
+            let pos = writer.stream_position()? as u32;
+            writer.write_all(bytes)?;
+            records.push(Record {
+                pos,
+                size: bytes.len() as u32,
+                name: stem,
+            });
+        }
     }
 
     let num_lumps = records.len() as i32;

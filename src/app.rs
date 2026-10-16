@@ -257,6 +257,8 @@ impl CacocoApp {
     pub fn load_project(&mut self, ctx: &egui::Context, loaded: io::LoadedProject, path_str: &str) {
         if let Some(first) = loaded.lumps.first() {
             self.active_mode = ProjectMode::from_data(first);
+        } else {
+            self.creation_modal = CreationModal::LumpSelector;
         }
 
         self.doc = Some(ProjectDocument {

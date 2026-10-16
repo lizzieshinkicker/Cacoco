@@ -141,10 +141,23 @@ pub fn draw_menu_bar(
             }
             if ContextMenu::button(ui, "Save As...", doc.is_some()) {
                 if let Some(d) = doc {
-                    if let Some(path) =
+                    let is_wad = d.path.as_deref().map_or_else(
+                        || {
+                            d.lumps.first().map_or(false, |l| {
+                                l.target() == crate::models::sbardef::ExportTarget::Basic
+                            })
+                        },
+                        |p| p.to_lowercase().ends_with(".wad"),
+                    );
+
+                    let path = if is_wad {
+                        io::save_wad_dialog(&d.lumps, assets, &d.passthrough_lumps, d.path.clone())
+                    } else {
                         io::save_pk3_dialog(&d.lumps, assets, &d.passthrough_lumps, d.path.clone())
-                    {
-                        action = MenuAction::SaveDone(path);
+                    };
+
+                    if let Some(p) = path {
+                        action = MenuAction::SaveDone(p);
                     }
                 }
                 ContextMenu::close(ui);
@@ -208,11 +221,18 @@ pub fn draw_menu_bar(
                             let resources: Vec<String> =
                                 config.resource_paths.iter().cloned().collect();
 
+                            let target = d
+                                .lumps
+                                .first()
+                                .map_or(crate::models::sbardef::ExportTarget::Extended, |l| {
+                                    l.target()
+                                });
+
                             io::launch_game(
                                 assets,
                                 &port.command,
                                 iwad,
-                                d.lumps[0].target(),
+                                target,
                                 &d.lumps,
                                 &d.passthrough_lumps,
                                 &resources,

@@ -416,17 +416,38 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
         }
         Action::Save => {
             if let Some(doc) = &mut app.doc {
+                let is_wad = doc.path.as_deref().map_or_else(
+                    || {
+                        doc.lumps.first().map_or(false, |l| {
+                            l.target() == crate::models::sbardef::ExportTarget::Basic
+                        })
+                    },
+                    |p| p.to_lowercase().ends_with(".wad"),
+                );
+
                 let needs_dialog = match &doc.path {
                     Some(p) => !Path::new(p).is_absolute(),
                     None => true,
                 };
+
                 if needs_dialog {
-                    if let Some(p) = crate::io::save_pk3_dialog(
-                        &doc.lumps,
-                        &app.assets,
-                        &doc.passthrough_lumps,
-                        doc.path.clone(),
-                    ) {
+                    let saved_path = if is_wad {
+                        crate::io::save_wad_dialog(
+                            &doc.lumps,
+                            &app.assets,
+                            &doc.passthrough_lumps,
+                            doc.path.clone(),
+                        )
+                    } else {
+                        crate::io::save_pk3_dialog(
+                            &doc.lumps,
+                            &app.assets,
+                            &doc.passthrough_lumps,
+                            doc.path.clone(),
+                        )
+                    };
+
+                    if let Some(p) = saved_path {
                         doc.path = Some(p.clone());
                         doc.dirty = false;
                         app.add_to_recent(&p);
@@ -434,19 +455,30 @@ fn handle_action(app: &mut CacocoApp, action: crate::hotkeys::Action, ctx: &egui
                     }
                 } else {
                     let p = doc.path.as_ref().unwrap();
-                    if crate::io::save_pk3_silent(
-                        &doc.lumps,
-                        &app.assets,
-                        &doc.passthrough_lumps,
-                        p,
-                    )
-                    .is_ok()
-                    {
+                    let save_res = if is_wad {
+                        crate::io::save_wad_silent(
+                            &doc.lumps,
+                            &app.assets,
+                            &doc.passthrough_lumps,
+                            p,
+                        )
+                    } else {
+                        crate::io::save_pk3_silent(
+                            &doc.lumps,
+                            &app.assets,
+                            &doc.passthrough_lumps,
+                            p,
+                        )
+                    };
+
+                    if save_res.is_ok() {
                         doc.dirty = false;
                         messages::log_event(
                             &mut app.preview_state,
                             EditorEvent::ProjectSaved(p.clone()),
                         );
+                    } else if let Err(e) = save_res {
+                        eprintln!("Failed to save project to {}: {}", p, e);
                     }
                 }
             }
@@ -984,5 +1016,103 @@ mod tests {
         );
         assert!(doc.get_lump(ProjectMode::SBarDef).is_some());
         assert!(doc.get_lump(ProjectMode::SkyDefs).is_some());
+    }
+
+    #[test]
+    fn test_saving_wad_produces_pwad_not_pk3() {
+        use std::io::Read;
+
+        let ctx = egui::Context::default();
+        let mut app = CacocoApp::default();
+
+        let temp_dir = std::env::temp_dir();
+        let unique_name = format!(
+            "cacoco_test_{}.wad",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let wad_path = temp_dir.join(unique_name);
+        let wad_path_str = wad_path.to_str().unwrap().to_string();
+
+        let sbar = SBarDefFile::new_empty();
+        let doc = document::ProjectDocument::new(
+            ProjectData::StatusBar(sbar),
+            Vec::new(),
+            Some(wad_path_str.clone()),
+        );
+        app.doc = Some(doc);
+
+        handle_action(&mut app, Action::Save, &ctx);
+
+        let mut file =
+            std::fs::File::open(&wad_path).expect("WAD file should have been created on save");
+        let mut magic = [0u8; 4];
+        file.read_exact(&mut magic)
+            .expect("Failed to read header magic");
+
+        let _ = std::fs::remove_file(&wad_path);
+
+        assert_eq!(
+            &magic, b"PWAD",
+            "Expected PWAD header, but found ZIP/PK3 header: {:?}!",
+            magic
+        );
+    }
+
+    #[test]
+    fn test_backup_created_on_save() {
+        use std::io::Write;
+
+        let ctx = egui::Context::default();
+        let mut app = CacocoApp::default();
+
+        let temp_dir = std::env::temp_dir();
+        let unique_name = format!(
+            "cacoco_bak_test_{}.wad",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let wad_path = temp_dir.join(&unique_name);
+        let bak_path = temp_dir.join(format!("{}.bak", unique_name));
+
+        let original_data = b"PRE_EXISTING_WAD_DATA_12345";
+        {
+            let mut f = std::fs::File::create(&wad_path).unwrap();
+            f.write_all(original_data).unwrap();
+        }
+
+        let sbar = SBarDefFile::new_empty();
+        let doc = document::ProjectDocument::new(
+            ProjectData::StatusBar(sbar),
+            Vec::new(),
+            Some(wad_path.to_str().unwrap().to_string()),
+        );
+        app.doc = Some(doc);
+
+        handle_action(&mut app, Action::Save, &ctx);
+
+        let bak_exists = bak_path.exists();
+        let bak_content = if bak_exists {
+            std::fs::read(&bak_path).ok()
+        } else {
+            None
+        };
+
+        let _ = std::fs::remove_file(&wad_path);
+        let _ = std::fs::remove_file(&bak_path);
+
+        assert!(
+            bak_exists,
+            "A .bak file should be automatically created before overwriting an existing file!"
+        );
+        assert_eq!(
+            bak_content.as_deref(),
+            Some(&original_data[..]),
+            ".bak file must be a 1:1 copy of the file before Cacoco modified it!"
+        );
     }
 }
