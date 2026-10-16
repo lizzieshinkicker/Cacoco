@@ -202,10 +202,6 @@ fn load_pk3(ctx: &egui::Context, path: &PathBuf) -> Option<LoadedProject> {
         }
     }
 
-    if lumps.is_empty() {
-        return None;
-    }
-
     Some(LoadedProject {
         lumps,
         assets,
@@ -371,6 +367,7 @@ pub fn save_pk3_dialog(
     }
 
     if let Some(path) = dialog.save_file() {
+        let _ = ensure_backup(&path);
         match fs::File::create(&path) {
             Ok(fs_file) => {
                 if let Err(e) = build_pk3(fs_file, lumps, assets, passthrough) {
@@ -404,6 +401,7 @@ pub fn save_wad_dialog(
     }
 
     if let Some(path) = dialog.save_file() {
+        let _ = ensure_backup(&path);
         if let Ok(mut f) = fs::File::create(&path) {
             if wad::write_wad_to_file(&mut f, lumps, assets, passthrough).is_ok() {
                 return Some(path.to_string_lossy().into_owned());
@@ -413,6 +411,28 @@ pub fn save_wad_dialog(
     None
 }
 
+/// Creates a 1:1 `.bak` backup copy of a file before overwriting it if it already exists on disk.
+pub fn ensure_backup(path: &Path) -> anyhow::Result<()> {
+    if path.exists() {
+        let bak_path = format!("{}.bak", path.to_string_lossy());
+        fs::copy(path, &bak_path)?;
+    }
+    Ok(())
+}
+
+pub fn save_wad_silent(
+    lumps: &[crate::models::ProjectData],
+    assets: &AssetStore,
+    passthrough: &[wad::RawLump],
+    path_str: &str,
+) -> anyhow::Result<()> {
+    let path = Path::new(path_str);
+    ensure_backup(path)?;
+    let mut fs_file = fs::File::create(path)?;
+    wad::write_wad_to_file(&mut fs_file, lumps, assets, passthrough)?;
+    Ok(())
+}
+
 pub fn save_pk3_silent(
     lumps: &[crate::models::ProjectData],
     assets: &AssetStore,
@@ -420,6 +440,7 @@ pub fn save_pk3_silent(
     path_str: &str,
 ) -> anyhow::Result<()> {
     let path = Path::new(path_str);
+    ensure_backup(path)?;
     let fs_file = fs::File::create(path)?;
     build_pk3(fs_file, lumps, assets, passthrough)?;
     Ok(())
@@ -686,6 +707,89 @@ mod tests {
         assert!(
             zip.by_name("graphics/patch.png").is_ok(),
             "Explicit path failed to preserve correctly"
+        );
+    }
+
+    #[test]
+    fn test_wad_without_id24_does_not_inject_sbardef() {
+        use std::io::Write;
+
+        let ctx = egui::Context::default();
+        let temp_dir = env::temp_dir();
+        let unique_name = format!(
+            "cacoco_raw_test_{}.wad",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let wad_path = temp_dir.join(&unique_name);
+
+        {
+            let mut f = fs::File::create(&wad_path).unwrap();
+            f.write_all(b"PWAD").unwrap();
+            f.write_all(&1i32.to_le_bytes()).unwrap();
+            f.write_all(&16i32.to_le_bytes()).unwrap();
+            f.write_all(b"DATA").unwrap();
+
+            f.write_all(&12i32.to_le_bytes()).unwrap();
+            f.write_all(&4i32.to_le_bytes()).unwrap();
+            f.write_all(b"TESTLUMP").unwrap();
+        }
+
+        let loaded =
+            wad::load_wad_project(&ctx, &wad_path, None).expect("Should load raw WAD successfully");
+
+        let _ = fs::remove_file(&wad_path);
+
+        assert!(
+            loaded.lumps.is_empty(),
+            "Raw WAD without ID24 lumps should NOT automatically have SBARDEF injected!"
+        );
+    }
+
+    #[test]
+    fn test_pk3_without_id24_loads_with_empty_lumps() {
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+
+        let ctx = egui::Context::default();
+        let temp_dir = env::temp_dir();
+        let unique_name = format!(
+            "cacoco_raw_test_{}.pk3",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let pk3_path = temp_dir.join(&unique_name);
+        let pk3_path_str = pk3_path.to_str().unwrap().to_string();
+
+        {
+            let file = fs::File::create(&pk3_path).unwrap();
+            let mut zip = ZipWriter::new(file);
+            zip.start_file("sndinfo.txt", SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"weapons/pistol dspistol").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let loaded = load_project_from_path(&ctx, &pk3_path_str, None);
+        let _ = fs::remove_file(&pk3_path);
+
+        assert!(
+            loaded.is_some(),
+            "A raw PK3 without ID24 lumps should load successfully!"
+        );
+        let project = loaded.unwrap();
+        assert!(
+            project.lumps.is_empty(),
+            "A raw PK3 should have 0 ID24 lumps initially!"
+        );
+        assert_eq!(
+            project.passthrough_lumps.len(),
+            1,
+            "The non-ID24 files should be preserved in passthrough_lumps!"
         );
     }
 }
